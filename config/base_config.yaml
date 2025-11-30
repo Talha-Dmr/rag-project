@@ -74,3 +74,84 @@ reranker:
     model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
     top_k: 5
     device: ${DEVICE:cpu}
+
+# Training Configuration for Hallucination Detection Model
+training:
+  # Model configuration
+  model:
+    base_model: microsoft/deberta-v3-large-mnli
+    num_labels: 3  # entailment, neutral, contradiction
+    cache_dir: ./models/training
+
+  # Training hyperparameters
+  hyperparameters:
+    learning_rate: 2.0e-5
+    weight_decay: 0.01
+    warmup_steps: 500
+    max_epochs: 5
+    batch_size: 16
+    gradient_accumulation_steps: 4  # Effective batch size = 64
+    max_grad_norm: 1.0
+    mixed_precision: fp16  # Options: fp16, fp32 (fp16 for 2x speedup)
+    optimizer: adamw  # Options: adamw, adam, sgd
+    scheduler: linear  # Options: linear, cosine, constant
+
+  # Data configuration
+  data:
+    max_seq_length: 256
+    train_split: 0.85
+    val_split: 0.10
+    test_split: 0.05
+    balance_classes: true
+    balance_strategy: undersample  # Options: undersample, oversample
+
+  # Checkpointing configuration
+  checkpointing:
+    save_dir: ./models/checkpoints
+    save_strategy: best  # Options: epoch, best
+    save_every_n_epochs: 1
+    save_total_limit: 3
+    metric_for_best: val_f1_macro
+    mode: max  # Options: max, min
+
+  # Early stopping configuration
+  early_stopping:
+    enabled: true
+    patience: 3
+    metric: val_f1_macro
+    mode: max
+    min_delta: 0.0001
+
+  # Dataset paths and weights
+  datasets:
+    ambigqa:
+      path: data/ambiguity_datasets/02_ambigqa
+      weight: 1.0
+      multiplier: 3  # 12K → 36K examples
+
+    asqa:
+      path: data/ambiguity_datasets/03_asqa
+      weight: 1.0
+      multiplier: 4  # 5.3K → 21K examples
+
+    wic:
+      path: data/ambiguity_datasets/01_wic
+      weight: 0.5  # Different task type, lower weight
+      multiplier: 2  # 6K → 12K examples
+
+    clamber:
+      path: data/ambiguity_datasets/04_clamber
+      weight: 1.0
+      multiplier: 3  # 3.2K → 9.6K examples
+
+    condambigqa:
+      path: data/ambiguity_datasets/05_condambigqa
+      weight: 1.0
+      multiplier: 3  # 2K → 6K examples
+
+  # Output directories
+  output:
+    training_data_dir: ./data/training/nli_dataset
+    checkpoint_dir: ./models/checkpoints/hallucination_detector
+    final_model_dir: ./models/hallucination_detector
+    logs_dir: ./logs/training

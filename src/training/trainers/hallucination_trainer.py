@@ -72,6 +72,7 @@ class HallucinationTrainer(BaseTrainer):
         self.scaler = None
         self.train_loader = None
         self.val_loader = None
+        self.global_step = 0  # Track global step across epochs for batch checkpointing
 
         # Callbacks
         self.checkpoint_callback = None
@@ -184,7 +185,8 @@ class HallucinationTrainer(BaseTrainer):
             metric_for_best=checkpoint_config.get('metric_for_best', 'val_f1_macro'),
             mode=checkpoint_config.get('mode', 'max'),
             save_total_limit=checkpoint_config.get('save_total_limit', 3),
-            save_every_n_epochs=checkpoint_config.get('save_every_n_epochs', 1)
+            save_every_n_epochs=checkpoint_config.get('save_every_n_epochs', 1),
+            save_every_n_batches=checkpoint_config.get('save_every_n_batches', 500)  # Default: every 500 batches
         )
 
         early_stopping_config = self.config.get('early_stopping', {})
@@ -196,6 +198,23 @@ class HallucinationTrainer(BaseTrainer):
                 min_delta=early_stopping_config.get('min_delta', 0.0001)
             )
 
+        # Resume from checkpoint if provided
+        start_epoch = 0
+        if resume_from_checkpoint:
+            logger.info(f"Resuming from checkpoint: {resume_from_checkpoint}")
+            checkpoint_state = self.load_checkpoint(resume_from_checkpoint)
+
+            # Determine start epoch
+            if 'epoch' in checkpoint_state:
+                # For batch checkpoints, continue from the same epoch
+                # For epoch checkpoints, start from next epoch
+                if 'batch_idx' in checkpoint_state:
+                    start_epoch = checkpoint_state['epoch']
+                    logger.info(f"Resuming mid-epoch from epoch {start_epoch + 1}")
+                else:
+                    start_epoch = checkpoint_state['epoch'] + 1
+                    logger.info(f"Resuming from epoch {start_epoch + 1}")
+
         # Training history
         history = {
             'train_loss': [],
@@ -204,7 +223,7 @@ class HallucinationTrainer(BaseTrainer):
         }
 
         # Training loop
-        for epoch in range(num_epochs):
+        for epoch in range(start_epoch, num_epochs):
             logger.info(f"\n{'='*80}")
             logger.info(f"Epoch {epoch + 1}/{num_epochs}")
             logger.info(f"{'='*80}")
@@ -301,11 +320,33 @@ class HallucinationTrainer(BaseTrainer):
                 self.scheduler.step()
                 self.optimizer.zero_grad()
 
+                # Increment global step and save batch checkpoint
+                self.global_step += 1
+                current_loss = loss.item() * self.gradient_accumulation_steps
+
+                # Call batch checkpoint callback
+                if self.checkpoint_callback:
+                    self.checkpoint_callback.on_batch_end(
+                        epoch=epoch,
+                        batch_idx=batch_idx,
+                        global_step=self.global_step,
+                        model=self.model,
+                        optimizer=self.optimizer,
+                        loss=current_loss,
+                        extra_state={
+                            'scaler': self.scaler.state_dict() if self.scaler else None,
+                            'scheduler': self.scheduler.state_dict() if self.scheduler else None
+                        }
+                    )
+
             total_loss += loss.item() * self.gradient_accumulation_steps
             num_batches += 1
 
             # Update progress bar
-            progress_bar.set_postfix({'loss': loss.item() * self.gradient_accumulation_steps})
+            progress_bar.set_postfix({
+                'loss': loss.item() * self.gradient_accumulation_steps,
+                'step': self.global_step
+            })
 
         avg_loss = total_loss / num_batches
         logger.info(f"Train Loss: {avg_loss:.4f}")
@@ -475,18 +516,31 @@ class HallucinationTrainer(BaseTrainer):
         model_path = checkpoint_path / "model.pt"
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
 
+        # Load optimizer
+        optimizer_path = checkpoint_path / "optimizer.pt"
+        if optimizer_path.exists() and self.optimizer:
+            self.optimizer.load_state_dict(torch.load(optimizer_path, map_location=self.device))
+
         # Load training state
         state_path = checkpoint_path / "training_state.pt"
+        state = {}
         if state_path.exists():
             state = torch.load(state_path, map_location=self.device)
 
-            if self.optimizer and 'optimizer_state_dict' in state:
-                self.optimizer.load_state_dict(state['optimizer_state_dict'])
+            # Restore global step for batch checkpoints
+            if 'global_step' in state:
+                self.global_step = state['global_step']
+                logger.info(f"Resuming from global step {self.global_step}")
 
-            if self.scheduler and state.get('scheduler_state_dict'):
-                self.scheduler.load_state_dict(state['scheduler_state_dict'])
+            # Restore scheduler state
+            if self.scheduler and 'scheduler' in state and state['scheduler']:
+                self.scheduler.load_state_dict(state['scheduler'])
+
+            # Restore scaler state
+            if self.scaler and 'scaler' in state and state['scaler']:
+                self.scaler.load_state_dict(state['scaler'])
 
             logger.info(f"Loaded checkpoint from {checkpoint_path}")
-            return state
+            logger.info(f"Checkpoint epoch: {state.get('epoch', 'N/A')}, batch: {state.get('batch_idx', 'N/A')}")
 
-        return {}
+        return state

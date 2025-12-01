@@ -28,7 +28,8 @@ class CheckpointCallback:
         metric_for_best: str = "val_f1_macro",
         mode: str = "max",  # "max" or "min"
         save_total_limit: Optional[int] = 3,
-        save_every_n_epochs: int = 1
+        save_every_n_epochs: int = 1,
+        save_every_n_batches: Optional[int] = None  # NEW: batch-level checkpointing
     ):
         """
         Initialize checkpoint callback.
@@ -40,6 +41,7 @@ class CheckpointCallback:
             mode: "max" to maximize metric, "min" to minimize
             save_total_limit: Maximum number of checkpoints to keep
             save_every_n_epochs: Save every N epochs (for "epoch" strategy)
+            save_every_n_batches: Save every N batches for mid-epoch recovery (None to disable)
         """
         self.save_dir = Path(save_dir)
         self.save_dir.mkdir(parents=True, exist_ok=True)
@@ -49,12 +51,65 @@ class CheckpointCallback:
         self.mode = mode
         self.save_total_limit = save_total_limit
         self.save_every_n_epochs = save_every_n_epochs
+        self.save_every_n_batches = save_every_n_batches
 
         self.best_metric = float('-inf') if mode == 'max' else float('inf')
         self.best_model_path = None
         self.checkpoint_paths = []
+        self.batch_checkpoint_paths = []  # Track batch checkpoints separately
 
-        logger.info(f"CheckpointCallback initialized: save_dir={save_dir}")
+        logger.info(f"CheckpointCallback initialized: save_dir={save_dir}, batch_checkpoint_interval={save_every_n_batches}")
+
+    def on_batch_end(
+        self,
+        epoch: int,
+        batch_idx: int,
+        global_step: int,
+        model: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        loss: float,
+        extra_state: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """
+        Called at the end of each batch (for mid-epoch checkpointing).
+
+        Args:
+            epoch: Current epoch number
+            batch_idx: Batch index within epoch
+            global_step: Global step count (across all epochs)
+            model: Model to save
+            optimizer: Optimizer to save
+            loss: Current batch loss
+            extra_state: Optional extra state to save (e.g., scaler, scheduler)
+        """
+        if self.save_every_n_batches is None:
+            return
+
+        # Save every N batches
+        if global_step > 0 and global_step % self.save_every_n_batches == 0:
+            checkpoint_name = f"checkpoint-step-{global_step}"
+            checkpoint_path = self.save_dir / checkpoint_name
+
+            self._save_checkpoint(
+                checkpoint_path,
+                epoch,
+                model,
+                optimizer,
+                metrics={'train_loss': loss},
+                extra_state={
+                    'global_step': global_step,
+                    'batch_idx': batch_idx,
+                    **(extra_state or {})
+                }
+            )
+
+            # Track batch checkpoint
+            self.batch_checkpoint_paths.append(checkpoint_path)
+
+            # Keep only the latest batch checkpoint to save space
+            if len(self.batch_checkpoint_paths) > 1:
+                oldest_checkpoint = self.batch_checkpoint_paths.pop(0)
+                self._remove_checkpoint(oldest_checkpoint)
 
     def on_epoch_end(
         self,

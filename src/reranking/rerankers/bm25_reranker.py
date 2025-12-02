@@ -28,17 +28,34 @@ class BM25Reranker(BaseReranker):
         documents: List[Dict[str, Any]],
         top_k: Optional[int] = None
     ) -> List[Dict[str, Any]]:
+        """
+        Rerank documents using BM25
+
+        Args:
+            query: Query text
+            documents: List of documents with 'content' field
+            top_k: Number of top documents to return
+
+        Returns:
+            Reranked list of documents with updated scores
+        """
         if not documents:
+            return []
+
+        # Filter valid documents
+        valid_docs = [doc for doc in documents if doc.get('content', '').strip()]
+        if not valid_docs:
+            logger.warning("No valid documents found for BM25 reranking.")
             return []
 
         top_k = top_k or self.top_k
 
         try:
             # Tokenize documents
-            logger.debug(f"Tokenizing {len(documents)} documents for BM25")
+            logger.debug(f"Tokenizing {len(valid_docs)} documents for BM25")
             tokenized_docs = [
-                doc.get('content', '').lower().split()
-                for doc in documents
+                doc['content'].lower().split()
+                for doc in valid_docs
             ]
 
             # Create BM25 index
@@ -51,15 +68,15 @@ class BM25Reranker(BaseReranker):
             scores = bm25.get_scores(tokenized_query)
 
             # Update scores
-            for i, doc in enumerate(documents):
-                # Orijinal skoru saklayalım
+            for i, doc in enumerate(valid_docs):
+                # Preserve original score
                 doc['original_score'] = doc.get('score', 0.0)
-                # Yeni sıralama skorunu standart 'score' anahtarına yazalım
+                # Assign new score
                 doc['score'] = float(scores[i])
 
-            # Sort by BM25 score ('score' anahtarını kullanarak)
+            # Sort by BM25 score
             reranked = sorted(
-                documents,
+                valid_docs,
                 key=lambda x: x['score'],
                 reverse=True
             )
@@ -73,3 +90,4 @@ class BM25Reranker(BaseReranker):
         except Exception as e:
             logger.error(f"Error during BM25 reranking: {e}")
             return documents[:top_k]
+        

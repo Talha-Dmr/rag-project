@@ -1,64 +1,78 @@
 import sys
 import os
+import pytest
 
-# Dosyanın bulunduğu yer: rag-project/tests/test_mgte.py
+# Path setup
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Bir üst dizine (rag-project klasörüne) çıkıyoruz
-project_root = os.path.abspath(os.path.join(current_dir, "../")) 
+project_root = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(project_root)
 
 from src.reranking.base_reranker import RerankerFactory
-import src.reranking.rerankers  # Register işlemini tetiklemek için import şart
+import src.reranking.rerankers
 from src.core.logger import get_logger
 
-# Basit bir loglama görelim
 logger = get_logger(__name__)
 
+# Configuration
+CONFIG = {
+    "model_name_or_path": "Alibaba-NLP/gte-multilingual-reranker-base",
+    "device": "cpu",
+    "batch_size": 2
+}
+
 def test_mgte_integration():
-    print("=== mGTE Reranker Test Başlıyor ===")
+    """Standard integration test"""
+    print("\n=== Test 1: Standard Integration ===")
+    reranker = RerankerFactory.create("mgte", CONFIG)
     
-    # 1. Konfigürasyon
-    config = {
-        "model_name_or_path": "Alibaba-NLP/gte-multilingual-reranker-base",
-        "device": "cpu",  # Hızlı test için CPU yeterli, varsa 'cuda' yapabilirsin
-        "batch_size": 2
-    }
+    query = "What is the capital of Turkey?"
+    documents = [
+        {"content": "Paris is the capital of France.", "metadata": {"id": 1}},
+        {"content": "Ankara is the capital of Turkey.", "metadata": {"id": 2}},
+        {"content": "Istanbul is the largest city in Turkey.", "metadata": {"id": 3}}
+    ]
     
-    try:
-        # 2. Factory üzerinden modeli oluşturma
-        print("Model yükleniyor (biraz zaman alabilir)...")
-        reranker = RerankerFactory.create("mgte", config)
-        print("Model başarıyla yüklendi!")
-        
-        # 3. Test Verisi (BaseReranker formatına uygun: Dict listesi)
-        query = "What is the capital of Turkey?"
-        documents = [
-            {"content": "Paris is the capital of France.", "metadata": {"id": 1}},
-            {"content": "Ankara is the capital of Turkey.", "metadata": {"id": 2}},
-            {"content": "Istanbul is the largest city in Turkey.", "metadata": {"id": 3}},
-            {"content": "Berlin is the capital of Germany.", "metadata": {"id": 4}}
-        ]
-        
-        # 4. Rerank işlemi
-        print(f"\nSorgu: {query}")
-        print("Dökümanlar skorlanıyor...")
-        
-        results = reranker.rerank(query, documents, top_k=2)
-        
-        # 5. Sonuçları Yazdır
-        print("\n=== Sonuçlar (Top 2) ===")
-        for rank, doc in enumerate(results, 1):
-            print(f"{rank}. Skor: {doc['score']:.4f} | İçerik: {doc['content']}")
-            
-            # Basit bir assertion (Ankara'nın en üstte olmasını bekliyoruz)
-            if rank == 1 and "Ankara" not in doc['content']:
-                print("UYARI: Beklenen döküman ilk sırada değil!")
-                
-    except Exception as e:
-        print(f"\nHATA OLUŞTU: {str(e)}")
-        import traceback
-        traceback.print_exc()
+    results = reranker.rerank(query, documents, top_k=2)
+    
+    assert len(results) == 2
+    assert "Ankara" in results[0]['content']
+    print("✅ Standard test passed.")
+
+def test_empty_documents():
+    """Empty list test"""
+    print("\n=== Test 2: Empty List Test ===")
+    reranker = RerankerFactory.create("mgte", CONFIG)
+    result = reranker.rerank("query", [])
+    assert result == []
+    print("✅ Empty list test passed.")
+
+def test_missing_content():
+    """Test for documents with missing/empty content"""
+    print("\n=== Test 3: Missing Content Test ===")
+    reranker = RerankerFactory.create("mgte", CONFIG)
+    
+    docs = [
+        {"metadata": {"id": 1}},           # missing content key
+        {"content": "", "metadata": {"id": 2}}, # empty content string
+        {"content": "   ", "metadata": {"id": 3}}, # whitespace only content
+        {"content": "Valid doc", "metadata": {"id": 4}} # Valid
+    ]
+    
+    result = reranker.rerank("query", docs)
+    
+    # Should return only 1 valid document
+    assert len(result) == 1
+    assert result[0]["content"] == "Valid doc"
+    print("✅ Missing content test passed.")
 
 if __name__ == "__main__":
-    test_mgte_integration()
+    try:
+        test_mgte_integration()
+        test_empty_documents()
+        test_missing_content()
+        print("\n🎉 ALL TESTS COMPLETED SUCCESSFULLY!")
+    except AssertionError as e:
+        print(f"\n❌ TEST FAILED: {e}")
+    except Exception as e:
+        print(f"\n❌ UNEXPECTED ERROR: {e}")
+        

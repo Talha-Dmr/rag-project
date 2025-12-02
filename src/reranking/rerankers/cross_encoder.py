@@ -15,9 +15,6 @@ logger = get_logger(__name__)
 class CrossEncoderReranker(BaseReranker):
     """
     Reranks documents using a cross-encoder model
-
-    Cross-encoders encode query and document together, providing
-    more accurate relevance scores than bi-encoders
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -59,36 +56,43 @@ class CrossEncoderReranker(BaseReranker):
         if not documents:
             return []
 
+        # Filter valid documents
+        valid_docs = [doc for doc in documents if doc.get('content', '').strip()]
+        if not valid_docs:
+            logger.warning("No valid documents found for Cross-Encoder reranking.")
+            return []
+
         top_k = top_k or self.top_k
 
         try:
             # Prepare query-document pairs
-            pairs = [[query, doc['content']] for doc in documents]
+            pairs = [[query, doc['content']] for doc in valid_docs]
 
             # Get cross-encoder scores
-            logger.debug(f"Reranking {len(documents)} documents")
+            logger.debug(f"Reranking {len(valid_docs)} documents")
             scores = self.model.predict(pairs)
 
             # Update scores and sort
-            for i, doc in enumerate(documents):
-                doc['rerank_score'] = float(scores[i])
+            for i, doc in enumerate(valid_docs):
+                # Preserve original score
                 doc['original_score'] = doc.get('score', 0.0)
+                # Assign new score
+                doc['score'] = float(scores[i])
 
-            # Sort by rerank score
+            # Sort by score
             reranked = sorted(
-                documents,
-                key=lambda x: x['rerank_score'],
+                valid_docs,
+                key=lambda x: x['score'],
                 reverse=True
             )
 
             # Return top_k
             result = reranked[:top_k]
-
             logger.info(f"Reranked to top {len(result)} documents")
 
             return result
 
         except Exception as e:
             logger.error(f"Error during reranking: {e}")
-            # Fallback: return original documents
             return documents[:top_k]
+        

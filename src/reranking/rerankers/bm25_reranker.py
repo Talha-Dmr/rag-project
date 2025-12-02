@@ -15,9 +15,6 @@ logger = get_logger(__name__)
 class BM25Reranker(BaseReranker):
     """
     Reranks documents using BM25 algorithm
-
-    BM25 is a lexical search algorithm that ranks documents based on
-    term frequency and document length
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -45,14 +42,20 @@ class BM25Reranker(BaseReranker):
         if not documents:
             return []
 
+        # Filter valid documents
+        valid_docs = [doc for doc in documents if doc.get('content', '').strip()]
+        if not valid_docs:
+            logger.warning("No valid documents found for BM25 reranking.")
+            return []
+
         top_k = top_k or self.top_k
 
         try:
             # Tokenize documents
-            logger.debug(f"Tokenizing {len(documents)} documents for BM25")
+            logger.debug(f"Tokenizing {len(valid_docs)} documents for BM25")
             tokenized_docs = [
                 doc['content'].lower().split()
-                for doc in documents
+                for doc in valid_docs
             ]
 
             # Create BM25 index
@@ -65,25 +68,26 @@ class BM25Reranker(BaseReranker):
             scores = bm25.get_scores(tokenized_query)
 
             # Update scores
-            for i, doc in enumerate(documents):
-                doc['rerank_score'] = float(scores[i])
+            for i, doc in enumerate(valid_docs):
+                # Preserve original score
                 doc['original_score'] = doc.get('score', 0.0)
+                # Assign new score
+                doc['score'] = float(scores[i])
 
             # Sort by BM25 score
             reranked = sorted(
-                documents,
-                key=lambda x: x['rerank_score'],
+                valid_docs,
+                key=lambda x: x['score'],
                 reverse=True
             )
 
             # Return top_k
             result = reranked[:top_k]
-
             logger.info(f"BM25 reranked to top {len(result)} documents")
 
             return result
 
         except Exception as e:
             logger.error(f"Error during BM25 reranking: {e}")
-            # Fallback: return original documents
             return documents[:top_k]
+        

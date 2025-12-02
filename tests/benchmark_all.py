@@ -4,20 +4,19 @@ import time
 import pandas as pd
 from typing import List, Dict
 
-# Path ayarları (rag-project kök dizinini bulmak için)
+# Path settings
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, "../"))
 sys.path.append(project_root)
 
-# Gerekli importlar (init dosyasını düzelttiğimiz için artık sorunsuz)
 from src.reranking.base_reranker import RerankerFactory
 import src.reranking.rerankers
 from src.core.logger import get_logger
 
 logger = get_logger(__name__)
 
-def run_benchmark():
-    print("=== Reranker Benchmark Başlıyor ===\n")
+def run_benchmark() -> None:
+    print("=== Reranker Benchmark Starting ===\n")
 
     # 1. Test Verisi
     # Zorlu bir senaryo: Hem İngilizce hem Türkçe, hem de çeldirici (distractor) içeren dökümanlar.

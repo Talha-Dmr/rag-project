@@ -10,7 +10,20 @@ logger = get_logger(__name__)
 @register_reranker("mgte")
 class MGTEReranker(BaseReranker):
     """
-    Implementation of mGTE Reranker compatible with BaseReranker interface.
+    Implementation of mGTE (Multilingual Generalized Text Embedding) Reranker.
+    
+    Paper: "mGTE: Generalized Long-Context Text Representation and Reranking Models for Multilingual Text Retrieval"
+    
+    Key Features:
+    - **Context Window**: Supports up to 8192 tokens natively, enabling long-context retrieval.
+    - **Architecture**: Enhanced BERT-like encoder with Rotary Position Embeddings (RoPE) and GLU.
+    - **Multilingual**: Optimized for retrieval across diverse languages.
+    - **Scoring**: Computes relevance score via a linear layer on the [CLS] token ($s = W h_{[CLS]}$).
+    
+    Configuration:
+        model_name_or_path (str): Path to the pretrained model (default: Alibaba-NLP/gte-multilingual-reranker-base).
+        device (str): Device to run the model on ('cpu' or 'cuda').
+        batch_size (int): Number of pairs to process at once.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -20,6 +33,8 @@ class MGTEReranker(BaseReranker):
         # Default model from the paper
         self.model_name = self.config.get("model_name_or_path", "Alibaba-NLP/gte-multilingual-reranker-base")
         self.device = self.config.get("device", "cuda" if torch.cuda.is_available() else "cpu")
+        
+        # Native context length from mGTE paper is 8192 tokens
         self.max_length = self.config.get("max_length", 8192)
         self.batch_size = self.config.get("batch_size", 4)
         

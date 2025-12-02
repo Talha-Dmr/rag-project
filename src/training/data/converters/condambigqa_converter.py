@@ -90,19 +90,26 @@ class CondAmbigQAConverter(BaseConverter):
         for raw_ex in raw_examples:
             # CondAmbigQA structure varies, adapt to what we find
             question = raw_ex.get('question', raw_ex.get('Question', ''))
-            properties = raw_ex.get('properties', raw_ex.get('Properties', {}))
-            contexts = raw_ex.get('contexts', raw_ex.get('Contexts', []))
+            properties = raw_ex.get('properties', raw_ex.get('Properties', []))
+            # Check both 'ctxs' (actual field) and 'contexts' (fallback)
+            contexts = raw_ex.get('ctxs', raw_ex.get('contexts', raw_ex.get('Contexts', [])))
 
             if not question:
                 continue
 
-            # Process properties
-            if isinstance(properties, dict):
-                for prop_name, prop_value in properties.items():
-                    # 1. ENTAILMENT: Correct property
+            # Process properties (list of property objects)
+            if isinstance(properties, list):
+                for prop in properties:
+                    condition = prop.get('condition', '')
+                    groundtruth = prop.get('groundtruth', '')
+
+                    if not condition or not groundtruth:
+                        continue
+
+                    # 1. ENTAILMENT: Correct property with condition
                     hypothesis_correct = (
-                        f"For the question '{question}', "
-                        f"the {prop_name} is {prop_value}."
+                        f"For the question '{question}' given that {condition}, "
+                        f"the answer is: {groundtruth}"
                     )
 
                     nli_examples.append({
@@ -110,16 +117,16 @@ class CondAmbigQAConverter(BaseConverter):
                         'hypothesis': hypothesis_correct,
                         'label': self.LABEL_ENTAILMENT,
                         'metadata': {
-                            'property': prop_name,
-                            'value': str(prop_value),
+                            'condition': condition,
+                            'groundtruth': groundtruth,
                             'type': 'correct'
                         }
                     })
 
-                    # 2. CONTRADICTION: Wrong value
+                    # 2. CONTRADICTION: Wrong assumption
                     hypothesis_wrong = (
                         f"For the question '{question}', "
-                        f"the {prop_name} is unknown."
+                        f"the answer is independent of any conditions."
                     )
 
                     nli_examples.append({
@@ -127,9 +134,9 @@ class CondAmbigQAConverter(BaseConverter):
                         'hypothesis': hypothesis_wrong,
                         'label': self.LABEL_CONTRADICTION,
                         'metadata': {
-                            'property': prop_name,
-                            'value': str(prop_value),
-                            'type': 'wrong_value'
+                            'condition': condition,
+                            'groundtruth': groundtruth,
+                            'type': 'wrong_assumption'
                         }
                     })
 

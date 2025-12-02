@@ -41,8 +41,8 @@ class AmbigQAConverter(BaseConverter):
         Returns:
             List of raw AmbigQA examples
         """
-        # AmbigQA has train.json, dev.json, test.json
-        data_files = ['train.json', 'dev.json']
+        # AmbigQA has train_light.json, dev_light.json (light versions)
+        data_files = ['train_light.json', 'dev_light.json']
         all_examples = []
 
         for file_name in data_files:

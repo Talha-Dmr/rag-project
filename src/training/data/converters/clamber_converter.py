@@ -94,61 +94,61 @@ class CLAMBERConverter(BaseConverter):
         nli_examples = []
 
         for raw_ex in raw_examples:
-            initial_request = raw_ex.get('initial_request', '')
-            clarification_need = raw_ex.get('clarification_need', '')
-            facet = raw_ex.get('facet', '')
+            question = raw_ex.get('question', '')
+            clarifying_question = raw_ex.get('clarifying_question', '')
+            require_clarification = raw_ex.get('require_clarification', False)
 
-            if not initial_request:
+            if not question:
                 continue
 
             # 1. NEUTRAL: Ambiguous without clarification
             hypothesis_ambiguous = (
-                f"The request '{initial_request}' can be answered directly "
+                f"The request '{question}' can be answered directly "
                 f"without additional information."
             )
 
             nli_examples.append({
-                'premise': initial_request,
+                'premise': question,
                 'hypothesis': hypothesis_ambiguous,
                 'label': self.LABEL_NEUTRAL,
                 'metadata': {
-                    'clarification_need': clarification_need,
-                    'facet': facet,
+                    'clarifying_question': clarifying_question,
+                    'require_clarification': require_clarification,
                     'type': 'ambiguous'
                 }
             })
 
             # 2. ENTAILMENT: With clarification (if available)
-            if clarification_need:
+            if clarifying_question:
                 hypothesis_clarified = (
-                    f"To answer '{initial_request}', we need to know: "
-                    f"{clarification_need}"
+                    f"To answer '{question}', we need to know: "
+                    f"{clarifying_question}"
                 )
 
                 nli_examples.append({
-                    'premise': initial_request,
+                    'premise': question,
                     'hypothesis': hypothesis_clarified,
                     'label': self.LABEL_ENTAILMENT,
                     'metadata': {
-                        'clarification_need': clarification_need,
-                        'facet': facet,
+                        'clarifying_question': clarifying_question,
+                        'require_clarification': require_clarification,
                         'type': 'clarified'
                     }
                 })
 
             # 3. CONTRADICTION: Wrong assumption
             hypothesis_wrong = (
-                f"The request '{initial_request}' is completely clear "
+                f"The request '{question}' is completely clear "
                 f"and unambiguous."
             )
 
             nli_examples.append({
-                'premise': initial_request,
+                'premise': question,
                 'hypothesis': hypothesis_wrong,
                 'label': self.LABEL_CONTRADICTION,
                 'metadata': {
-                    'clarification_need': clarification_need,
-                    'facet': facet,
+                    'clarifying_question': clarifying_question,
+                    'require_clarification': require_clarification,
                     'type': 'wrong_assumption'
                 }
             })

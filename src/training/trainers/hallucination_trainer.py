@@ -269,9 +269,14 @@ class HallucinationTrainer(BaseTrainer):
         total_loss = 0.0
         num_batches = 0
 
+        # Calculate total steps for this epoch (for progress bar)
+        total_batches = len(self.train_loader)
+        total_steps = total_batches // self.gradient_accumulation_steps
+        epoch_step = 0  # Track steps within this epoch
+
         progress_bar = tqdm(
             self.train_loader,
-            desc=f"Training Epoch {epoch + 1}",
+            desc=f"Epoch {epoch + 1} [Step 0/{total_steps}]",
             leave=False
         )
 
@@ -322,7 +327,13 @@ class HallucinationTrainer(BaseTrainer):
 
                 # Increment global step and save batch checkpoint
                 self.global_step += 1
+                epoch_step += 1
                 current_loss = loss.item() * self.gradient_accumulation_steps
+
+                # Update progress bar description to show optimizer steps
+                progress_bar.set_description(
+                    f"Epoch {epoch + 1} [Step {epoch_step}/{total_steps}]"
+                )
 
                 # Call batch checkpoint callback
                 if self.checkpoint_callback:

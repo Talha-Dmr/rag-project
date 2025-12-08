@@ -60,10 +60,12 @@ class CLAMBERConverter(BaseConverter):
                     if not line:
                         continue
 
-                    # Double-encoded JSON
+                    # Try normal JSON first, then double-encoded
                     try:
-                        json_str = json.loads(line)
-                        json_obj = json.loads(json_str)
+                        json_obj = json.loads(line)
+                        # If it's a string, parse again (double-encoded)
+                        if isinstance(json_obj, str):
+                            json_obj = json.loads(json_obj)
                         all_examples.append(json_obj)
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse line: {e}")

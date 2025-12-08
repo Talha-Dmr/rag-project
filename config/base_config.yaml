@@ -40,10 +40,9 @@ chunking:
 
 # Embeddings
 embeddings:
-  model_name: sentence-transformers/all-mpnet-base-v2
-  device: ${DEVICE:cpu}
-  cache_folder: ${EMBEDDING_CACHE_DIR:./models/embeddings}
-  batch_size: 32
+  type: mgte
+  model_name: llmrails/mgte-large
+  device: ${DEVICE:cuda}
 
 # Vector Store
 vector_store:

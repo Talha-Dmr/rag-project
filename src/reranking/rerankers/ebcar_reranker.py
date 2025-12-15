@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from src.core.base_classes import BaseReranker
 from src.reranking.base_reranker import register_reranker
 from src.core.logger import get_logger
-from src.embeddings.embedder_loader import load_embedder  # varsa kullanıyoruz
+from src.embeddings.base_embedder import EmbedderFactory
 
 logger = get_logger(__name__)
 
@@ -25,7 +25,7 @@ class EBCARReranker(BaseReranker):
 
         # embedder (mGTE embedding için)
         embedder_name = self.config.get("embedder_name", "mgte")
-        self.embedder = load_embedder(embedder_name)
+        self.embedder = EmbedderFactory.create(embedder_name)
 
         if model_path is None:
             raise ValueError("EBCAR checkpoint path is required")

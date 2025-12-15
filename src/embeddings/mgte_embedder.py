@@ -1,14 +1,18 @@
 import torch
 from transformers import AutoTokenizer, AutoModel
-from src.embeddings.base_embedder import BaseEmbedder
+from src.embeddings.base_embedder import BaseEmbedder, register_embedder
 
 
+@register_embedder("mgte")
 class MGTEEmbedder(BaseEmbedder):
-    def __init__(self, model_name: str = "llmrails/mgte-large", device: str = "cpu"):
+    def __init__(self, config=None):
         super().__init__()
-        self.device = device
+        if config is None:
+            config = {}
+        model_name = config.get("model_name", "sentence-transformers/all-MiniLM-L6-v2")
+        self.device = config.get("device", "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModel.from_pretrained(model_name).to(device)
+        self.model = AutoModel.from_pretrained(model_name).to(self.device)
         self.dim = self.model.config.hidden_size
 
     def embed_text(self, text: str):

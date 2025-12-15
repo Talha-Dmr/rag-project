@@ -68,11 +68,15 @@ retrieval:
 
 # Reranking
 reranker:
-  type: cross_encoder  # Options: cross_encoder, bm25
+  type: cross_encoder  # Options: cross_encoder, bm25, ebcar
   config:
     model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
     top_k: 5
     device: ${DEVICE:cpu}
+    # For ebcar reranker, use these config fields instead:
+    # checkpoint: path/to/ebcar/model.pth
+    # embedder_name: mgte  # Options: mgte, sentence_transformers, etc.
+    # hidden_size: 768  # Model's hidden size
 
 # Training Configuration for Hallucination Detection Model
 training:

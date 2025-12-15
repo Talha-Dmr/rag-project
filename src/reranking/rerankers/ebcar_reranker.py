@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 from typing import List, Dict, Any, Optional
@@ -7,6 +8,8 @@ from src.core.logger import get_logger
 from src.embeddings.embedder_loader import load_embedder  # varsa kullanıyoruz
 
 logger = get_logger(__name__)
+
+
 
 
 @register_reranker("ebcar")
@@ -23,6 +26,12 @@ class EBCARReranker(BaseReranker):
         # embedder (mGTE embedding için)
         embedder_name = self.config.get("embedder_name", "mgte")
         self.embedder = load_embedder(embedder_name)
+
+        if model_path is None:
+            raise ValueError("EBCAR checkpoint path is required")
+
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"EBCAR checkpoint not found: {model_path}")
 
         # Model
         self.model = torch.load(model_path, map_location=self.device)
@@ -57,6 +66,15 @@ class EBCARReranker(BaseReranker):
         out = self.model(q_emb.unsqueeze(0), p_embs, doc_ids, positions)
 
         # compute scores
+        if out.dim() != 2 or q_emb.dim() != 1:
+            raise ValueError(
+                f"Unexpected tensor shapes: out={out.shape}, q_emb={q_emb.shape}"
+            )
+
+        if out.size(1) != q_emb.size(0):
+            raise ValueError(
+                f"Embedding dimension mismatch: {out.size(1)} != {q_emb.size(0)}"
+            )
         scores = torch.matmul(out, q_emb.unsqueeze(1)).squeeze(1)
 
         # attach

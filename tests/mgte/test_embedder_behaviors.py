@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from unittest.mock import patch
 
 from src.embeddings.mgte_embedder import MGTEEmbedder
 
@@ -16,16 +15,11 @@ def cosine_similarity(vec_a, vec_b) -> float:
 
 @pytest.fixture(scope="module")
 def mgte_embedder():
-    from transformers import AutoModel
-
-    original_from_pretrained = AutoModel.from_pretrained
-
-    def patched_from_pretrained(*args, **kwargs):
-        kwargs.setdefault("trust_remote_code", True)
-        return original_from_pretrained(*args, **kwargs)
-
-    with patch("transformers.AutoModel.from_pretrained", patched_from_pretrained):
-        embedder = MGTEEmbedder(model_name="Alibaba-NLP/gte-multilingual-reranker-base", device="cpu")
+    config = {
+        "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+        "device": "cpu",
+    }
+    embedder = MGTEEmbedder(config)
     if hasattr(embedder, "model"):
         embedder.model.eval()
     return embedder
@@ -115,11 +109,3 @@ def test_embeddings_are_deterministic_per_input(mgte_embedder):
     second = np.asarray(mgte_embedder.embed_text(text), dtype=float)
 
     assert np.allclose(first, second, atol=1e-5, rtol=1e-5)
-
-
-
-
-
-
-
-

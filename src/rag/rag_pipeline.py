@@ -7,9 +7,11 @@ from pathlib import Path
 from src.dataset.data_manager import DataManager
 from src.chunking.base_chunker import ChunkerFactory
 from src.embeddings.base_embedder import EmbedderFactory
+from src.reranking.base_reranker import RerankerFactory
 from src.vector_stores.base_store import VectorStoreFactory
 from src.rag.llm_wrapper import HuggingFaceLLM
 from src.rag.retriever import Retriever
+from src.core.base_classes import BaseReranker
 from src.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,13 +26,14 @@ class RAGPipeline:
 
     def __init__(
         self,
-        data_manager: Optional[DataManager] = None,
-        chunker = None,
-        embedder = None,
-        vector_store = None,
-        llm = None,
-        retriever = None,
-        hallucination_detector = None
+        data_manager: DataManager,
+        chunker,
+        embedder,
+        vector_store,
+        llm,
+        retriever,
+        reranker=None,
+        hallucination_detector=None
     ):
         """
         Initialize RAG Pipeline
@@ -50,6 +53,7 @@ class RAGPipeline:
         self.vector_store = vector_store
         self.llm = llm
         self.retriever = retriever
+        self.reranker = reranker
         self.hallucination_detector = hallucination_detector
 
         if hallucination_detector:
@@ -132,6 +136,11 @@ class RAGPipeline:
         # Retrieve relevant documents
         logger.info(f"Retrieving top {k} documents...")
         retrieved_docs = self.retriever.retrieve(query_text, k=k)
+
+        if self.reranker:
+            logger.info("Applying reranker...")
+            retrieved_docs = self.reranker.rerank(query_text, retrieved_docs, top_k=k)
+            logger.info(f"Reranked documents → top {len(retrieved_docs)} kept")
 
         if not retrieved_docs:
             logger.warning("No documents retrieved")
@@ -223,7 +232,8 @@ class RAGPipeline:
 
         # Embedder
         embedder_config = config.get('embeddings', {})
-        embedder = EmbedderFactory.create('huggingface', embedder_config)
+        embedder_type = embedder_config.get('type', 'huggingface')  # mgte, huggingface, etc.
+        embedder = EmbedderFactory.create(embedder_type, embedder_config)
 
         # Vector Store
         vector_store_config = config.get('vector_store', {})
@@ -243,6 +253,23 @@ class RAGPipeline:
             k=config.get('retrieval', {}).get('k', 10),
             score_threshold=config.get('retrieval', {}).get('score_threshold', 0.0)
         )
+
+        # --- Reranker (EBCAR, MGTE, etc.) ---
+        reranker = None
+        reranker_cfg = config.get("reranker", {})
+
+        if reranker_cfg:
+            reranker_type = reranker_cfg["type"]
+            reranker = RerankerFactory.create(
+                reranker_type,
+                {
+                    "embedder": embedder,
+                    **reranker_cfg
+                }
+            )
+            logger.info(f"Loaded reranker: {reranker_type}")
+        else:
+            logger.info("No reranker specified in config.")
 
         # Hallucination Detector (optional)
         hallucination_detector = None
@@ -273,5 +300,6 @@ class RAGPipeline:
             vector_store=vector_store,
             llm=llm,
             retriever=retriever,
+            reranker=reranker,
             hallucination_detector=hallucination_detector
         )

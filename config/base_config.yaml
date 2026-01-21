@@ -40,10 +40,9 @@ chunking:
 
 # Embeddings
 embeddings:
-  model_name: sentence-transformers/all-mpnet-base-v2
-  device: ${DEVICE:cpu}
-  cache_folder: ${EMBEDDING_CACHE_DIR:./models/embeddings}
-  batch_size: 32
+  type: mgte
+  model_name: llmrails/mgte-large
+  device: ${DEVICE:cuda}
 
 # Vector Store
 vector_store:
@@ -69,11 +68,15 @@ retrieval:
 
 # Reranking
 reranker:
-  type: cross_encoder  # Options: cross_encoder, bm25
+  type: cross_encoder  # Options: cross_encoder, bm25, ebcar
   config:
     model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
     top_k: 5
     device: ${DEVICE:cpu}
+    # For ebcar reranker, use these config fields instead:
+    # checkpoint: path/to/ebcar/model.pth
+    # embedder_name: mgte  # Options: mgte, sentence_transformers, etc.
+    # hidden_size: 768  # Model's hidden size
 
 # Training Configuration for Hallucination Detection Model
 training:

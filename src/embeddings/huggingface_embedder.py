@@ -89,7 +89,8 @@ class HuggingFaceEmbedder(BaseEmbedder):
         Returns:
             Dimension of embedding vectors
         """
-        return self.model.get_sentence_embedding_dimension()
+        dim = self.model.get_sentence_embedding_dimension()
+        return int(dim or 0)
 
     def compute_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
         """

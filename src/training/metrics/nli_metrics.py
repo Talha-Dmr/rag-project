@@ -6,7 +6,7 @@ for 3-way classification (entailment/neutral/contradiction).
 """
 
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Sequence, Any
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -25,19 +25,28 @@ class NLIMetrics:
 
     LABEL_NAMES = ['entailment', 'neutral', 'contradiction']
 
-    def __init__(self):
+    def __init__(self, calibration_bins: int = 15):
         """Initialize metrics tracker."""
+        if calibration_bins <= 0:
+            raise ValueError("calibration_bins must be a positive integer")
+        self.calibration_bins = calibration_bins
         self.reset()
 
     def reset(self) -> None:
         """Reset all accumulated predictions and labels."""
         self.all_predictions = []
         self.all_labels = []
+        self._brier_total = 0.0
+        self._brier_count = 0
+        self._ece_bin_conf = [0.0 for _ in range(self.calibration_bins)]
+        self._ece_bin_acc = [0.0 for _ in range(self.calibration_bins)]
+        self._ece_bin_counts = [0 for _ in range(self.calibration_bins)]
 
     def update(
         self,
         predictions: List[int],
-        labels: List[int]
+        labels: List[int],
+        probabilities: Optional[Sequence[Sequence[float]]] = None
     ) -> None:
         """
         Update metrics with new batch of predictions.
@@ -45,9 +54,39 @@ class NLIMetrics:
         Args:
             predictions: List of predicted labels (0, 1, or 2)
             labels: List of ground truth labels (0, 1, or 2)
+            probabilities: Optional per-class probabilities aligned with predictions
         """
         self.all_predictions.extend(predictions)
         self.all_labels.extend(labels)
+
+        if probabilities is None:
+            return
+
+        if len(probabilities) != len(predictions):
+            raise ValueError("probabilities length must match predictions length")
+
+        for pred, label, probs in zip(predictions, labels, probabilities):
+            if probs is None:
+                continue
+            prob_list = np.asarray(probs, dtype=float).tolist()
+            if not prob_list:
+                continue
+
+            # Brier score (multi-class)
+            brier = 0.0
+            for idx, prob in enumerate(prob_list):
+                target = 1.0 if idx == label else 0.0
+                brier += (prob - target) ** 2
+            self._brier_total += brier
+            self._brier_count += 1
+
+            # ECE binning using predicted class confidence
+            if 0 <= pred < len(prob_list):
+                conf = float(prob_list[pred])
+                bin_idx = min(int(conf * self.calibration_bins), self.calibration_bins - 1)
+                self._ece_bin_conf[bin_idx] += conf
+                self._ece_bin_acc[bin_idx] += 1.0 if pred == label else 0.0
+                self._ece_bin_counts[bin_idx] += 1
 
     def compute(self, reset: bool = False) -> Dict[str, float]:
         """
@@ -70,19 +109,20 @@ class NLIMetrics:
         accuracy = accuracy_score(labels, predictions)
 
         # Macro-averaged metrics (average across classes)
-        f1_macro = f1_score(labels, predictions, average='macro')
-        precision_macro = precision_score(labels, predictions, average='macro')
-        recall_macro = recall_score(labels, predictions, average='macro')
+        class_labels = list(range(len(self.LABEL_NAMES)))
+        f1_macro = f1_score(labels, predictions, average='macro', labels=class_labels, zero_division=0)
+        precision_macro = precision_score(labels, predictions, average='macro', labels=class_labels, zero_division=0)
+        recall_macro = recall_score(labels, predictions, average='macro', labels=class_labels, zero_division=0)
 
         # Weighted-averaged metrics (weighted by support)
-        f1_weighted = f1_score(labels, predictions, average='weighted')
-        precision_weighted = precision_score(labels, predictions, average='weighted')
-        recall_weighted = recall_score(labels, predictions, average='weighted')
+        f1_weighted = f1_score(labels, predictions, average='weighted', labels=class_labels, zero_division=0)
+        precision_weighted = precision_score(labels, predictions, average='weighted', labels=class_labels, zero_division=0)
+        recall_weighted = recall_score(labels, predictions, average='weighted', labels=class_labels, zero_division=0)
 
         # Per-class metrics
-        f1_per_class = f1_score(labels, predictions, average=None)
-        precision_per_class = precision_score(labels, predictions, average=None)
-        recall_per_class = recall_score(labels, predictions, average=None)
+        f1_per_class = f1_score(labels, predictions, average=None, labels=class_labels, zero_division=0)
+        precision_per_class = precision_score(labels, predictions, average=None, labels=class_labels, zero_division=0)
+        recall_per_class = recall_score(labels, predictions, average=None, labels=class_labels, zero_division=0)
 
         metrics = {
             'accuracy': accuracy,
@@ -99,6 +139,21 @@ class NLIMetrics:
             metrics[f'f1_{label_name}'] = f1_per_class[i]
             metrics[f'precision_{label_name}'] = precision_per_class[i]
             metrics[f'recall_{label_name}'] = recall_per_class[i]
+
+        if self._brier_count > 0:
+            metrics['brier'] = self._brier_total / self._brier_count
+
+        total_calibration = sum(self._ece_bin_counts)
+        if total_calibration > 0:
+            ece = 0.0
+            for idx in range(self.calibration_bins):
+                count = self._ece_bin_counts[idx]
+                if count == 0:
+                    continue
+                avg_conf = self._ece_bin_conf[idx] / count
+                avg_acc = self._ece_bin_acc[idx] / count
+                ece += (count / total_calibration) * abs(avg_acc - avg_conf)
+            metrics['ece'] = ece
 
         if reset:
             self.reset()
@@ -157,6 +212,10 @@ class NLIMetrics:
         logger.info(f"  F1 (macro): {metrics['f1_macro']:.4f}")
         logger.info(f"  Precision (macro): {metrics['precision_macro']:.4f}")
         logger.info(f"  Recall (macro): {metrics['recall_macro']:.4f}")
+        if 'ece' in metrics:
+            logger.info(f"  ECE: {metrics['ece']:.4f}")
+        if 'brier' in metrics:
+            logger.info(f"  Brier: {metrics['brier']:.4f}")
 
         logger.info(f"\n{prefix}Per-class metrics:")
         for label_name in self.LABEL_NAMES:
@@ -170,7 +229,8 @@ class NLIMetrics:
 
 def compute_metrics_from_predictions(
     predictions: List[int],
-    labels: List[int]
+    labels: List[int],
+    probabilities: Optional[Sequence[Sequence[float]]] = None
 ) -> Dict[str, float]:
     """
     Compute metrics from predictions and labels (one-shot).
@@ -183,7 +243,7 @@ def compute_metrics_from_predictions(
         Dictionary of computed metrics
     """
     metrics_tracker = NLIMetrics()
-    metrics_tracker.update(predictions, labels)
+    metrics_tracker.update(predictions, labels, probabilities=probabilities)
     return metrics_tracker.compute()
 
 

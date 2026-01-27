@@ -4,7 +4,7 @@ Model utilities for loading and initializing models.
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,8 @@ def load_model_and_tokenizer(
     model_name: str,
     num_labels: int = 3,
     cache_dir: Optional[str] = None,
-    device: Optional[str] = None
+    device: Optional[str] = None,
+    lora_config: Optional[Dict[str, Any]] = None
 ) -> Tuple[torch.nn.Module, any]:
     """
     Load pre-trained model and tokenizer.
@@ -42,6 +43,37 @@ def load_model_and_tokenizer(
         num_labels=num_labels,
         cache_dir=cache_dir
     )
+
+    # Optional LoRA
+    if lora_config and lora_config.get("enabled", False):
+        try:
+            from peft import LoraConfig, get_peft_model, TaskType
+        except Exception as exc:
+            raise ImportError(
+                "peft is required for LoRA. Install with: pip install peft"
+            ) from exc
+
+        target_modules = lora_config.get(
+            "target_modules",
+            ["query_proj", "key_proj", "value_proj"]
+        )
+        task_type = lora_config.get("task_type", "SEQ_CLS")
+        task_type_enum = getattr(TaskType, task_type, TaskType.SEQ_CLS)
+
+        lora_cfg = LoraConfig(
+            r=int(lora_config.get("r", 8)),
+            lora_alpha=int(lora_config.get("lora_alpha", 16)),
+            lora_dropout=float(lora_config.get("lora_dropout", 0.05)),
+            bias=lora_config.get("bias", "none"),
+            task_type=task_type_enum,
+            target_modules=target_modules,
+            modules_to_save=lora_config.get("modules_to_save")
+        )
+        model = get_peft_model(model, lora_cfg)
+        try:
+            model.print_trainable_parameters()
+        except Exception:
+            pass
 
     # Move to device
     if device is None:
@@ -97,7 +129,8 @@ def get_optimizer(
     model: torch.nn.Module,
     learning_rate: float = 2e-5,
     weight_decay: float = 0.01,
-    optimizer_type: str = "adamw"
+    optimizer_type: str = "adamw",
+    noise_scale: float = 1.0
 ) -> torch.optim.Optimizer:
     """
     Create optimizer for model training.
@@ -106,7 +139,8 @@ def get_optimizer(
         model: Model to optimize
         learning_rate: Learning rate
         weight_decay: Weight decay for regularization
-        optimizer_type: Type of optimizer ('adamw', 'adam', 'sgd')
+        optimizer_type: Type of optimizer ('adamw', 'adam', 'sgd', 'sgld')
+        noise_scale: Langevin noise scale (only for SGLD)
 
     Returns:
         Optimizer instance
@@ -145,6 +179,15 @@ def get_optimizer(
             optimizer_grouped_parameters,
             lr=learning_rate,
             momentum=0.9
+        )
+    elif optimizer_type.lower() == 'sgld':
+        from src.training.utils.sgld import SGLD
+
+        optimizer = SGLD(
+            optimizer_grouped_parameters,
+            lr=learning_rate,
+            weight_decay=weight_decay,
+            noise_scale=noise_scale
         )
     else:
         raise ValueError(f"Unknown optimizer type: {optimizer_type}")

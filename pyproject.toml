@@ -19,6 +19,7 @@ transformers = "^4.36.0"
 sentence-transformers = "^2.2.2"
 torch = "^2.1.0"
 accelerate = "^0.25.0"
+peft = "^0.10.0"
 bitsandbytes = {version = "^0.41.3", optional = true}
 datasets = "^2.14.0"
 evaluate = "^0.4.0"

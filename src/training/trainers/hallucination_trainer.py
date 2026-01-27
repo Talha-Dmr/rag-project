@@ -60,6 +60,7 @@ class HallucinationTrainer(BaseTrainer):
         self.mixed_precision = hyper_config.get('mixed_precision', 'fp16')
         self.optimizer_type = hyper_config.get('optimizer', 'adamw')
         self.scheduler_type = hyper_config.get('scheduler', 'linear')
+        self.noise_scale = hyper_config.get('noise_scale', 1.0)
 
         # Data settings
         self.max_seq_length = data_config.get('max_seq_length', 256)
@@ -117,11 +118,13 @@ class HallucinationTrainer(BaseTrainer):
         logger.info("Building model...")
 
         # Load model and tokenizer
+        lora_config = self.config.get("model", {}).get("lora")
         self.model, self.tokenizer = load_model_and_tokenizer(
             model_name=self.model_name,
             num_labels=self.num_labels,
             cache_dir=self.cache_dir,
-            device=self.device
+            device=self.device,
+            lora_config=lora_config
         )
 
         # Count parameters
@@ -133,7 +136,8 @@ class HallucinationTrainer(BaseTrainer):
             model=self.model,
             learning_rate=self.learning_rate,
             weight_decay=self.weight_decay,
-            optimizer_type=self.optimizer_type
+            optimizer_type=self.optimizer_type,
+            noise_scale=self.noise_scale
         )
 
         # Setup mixed precision
@@ -405,12 +409,14 @@ class HallucinationTrainer(BaseTrainer):
                 num_batches += 1
 
                 # Predictions
-                predictions = torch.argmax(outputs.logits, dim=-1)
+                probs = torch.softmax(outputs.logits, dim=-1)
+                predictions = torch.argmax(probs, dim=-1)
 
                 # Update metrics
                 metrics_tracker.update(
                     predictions=predictions.cpu().tolist(),
-                    labels=labels.cpu().tolist()
+                    labels=labels.cpu().tolist(),
+                    probabilities=probs.cpu().tolist()
                 )
 
                 # Update progress bar
@@ -422,6 +428,10 @@ class HallucinationTrainer(BaseTrainer):
         logger.info(f"Val Loss: {avg_loss:.4f}")
         logger.info(f"Val Accuracy: {metrics['accuracy']:.4f}")
         logger.info(f"Val F1 (macro): {metrics['f1_macro']:.4f}")
+        if 'ece' in metrics:
+            logger.info(f"Val ECE: {metrics['ece']:.4f}")
+        if 'brier' in metrics:
+            logger.info(f"Val Brier: {metrics['brier']:.4f}")
 
         return avg_loss, metrics
 
@@ -461,11 +471,13 @@ class HallucinationTrainer(BaseTrainer):
                     attention_mask=attention_mask
                 )
 
-                predictions = torch.argmax(outputs.logits, dim=-1)
+                probs = torch.softmax(outputs.logits, dim=-1)
+                predictions = torch.argmax(probs, dim=-1)
 
                 metrics_tracker.update(
                     predictions=predictions.cpu().tolist(),
-                    labels=labels.cpu().tolist()
+                    labels=labels.cpu().tolist(),
+                    probabilities=probs.cpu().tolist()
                 )
 
         metrics = metrics_tracker.compute()

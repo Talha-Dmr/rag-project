@@ -188,3 +188,31 @@ Interpretation:
 - Low‑abstain tuning (0.50/0.70/0.42) produced no change.
 - High‑abstain tuning (0.40/0.60/0.35) over‑abstained (11/20).
 - Keep `gating_energy_ebcar.yaml` as the active config; baseline kept for comparison.
+
+### Macro Outlooks Domain (World Bank + UN WESP) — Conflict-Focused Gating
+Corpus (PDFs):
+- `data/domain_macro/raw/worldbank_gep_2026_jan.pdf`
+- `data/domain_macro/raw/un_wesp_2025.pdf`
+- `data/domain_macro/raw/un_wesp_2025_midyear.pdf`
+
+Notes:
+- IMF WEO PDFs were blocked by the IMF CDN in this environment; skipped for now.
+
+Indexing:
+- `config/gating_macro_ebcar.yaml` → `./data/vector_db/macro_outlooks` (collection `rag_macro_outlooks`)
+- 3 PDFs → 467 pages → 3,873 chunks indexed (fixed size 512, overlap 50).
+
+Question set:
+- `data/domain_macro/questions_macro_conflict.jsonl` (20 items, 15 conflict + 5 sanity).
+
+EBCAR (main, `config/gating_macro_ebcar.yaml`):
+- thresholds: contradiction_rate=0.45, contradiction_prob=0.65, uncertainty=0.38
+- abstain: 5/20 (0.25), actions: none=15, retrieve_more=5
+- abstain_by_type: conflict=3, sanity=2
+
+Baseline vs tuning:
+- Baseline (no reranker, `config/gating_macro_base.yaml`):
+  - abstain: 7/20 (0.35), actions: none=13, retrieve_more=7
+  - abstain_by_type: conflict=5, sanity=2
+- Low‑abstain tuning (0.50/0.70/0.42) matched EBCAR overall (5/20).
+- High‑abstain tuning (0.40/0.60/0.35) over‑abstained (11/20).

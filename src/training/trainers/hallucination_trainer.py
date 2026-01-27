@@ -541,8 +541,25 @@ class HallucinationTrainer(BaseTrainer):
 
         # Load optimizer
         optimizer_path = checkpoint_path / "optimizer.pt"
+        optimizer_loaded = False
         if optimizer_path.exists() and self.optimizer:
-            self.optimizer.load_state_dict(torch.load(optimizer_path, map_location=self.device))
+            try:
+                optimizer_state = torch.load(optimizer_path, map_location=self.device)
+                loaded_groups = optimizer_state.get("param_groups", [{}])
+                loaded_keys = set(loaded_groups[0].keys()) if loaded_groups else set()
+                expected_keys = set(self.optimizer.param_groups[0].keys())
+
+                if "noise_scale" in expected_keys and "noise_scale" not in loaded_keys:
+                    logger.warning(
+                        "Skipping optimizer state load: incompatible with current optimizer."
+                    )
+                else:
+                    self.optimizer.load_state_dict(optimizer_state)
+                    optimizer_loaded = True
+            except Exception as exc:
+                logger.warning(
+                    f"Skipping optimizer state load due to error: {exc}"
+                )
 
         # Load training state
         state_path = checkpoint_path / "training_state.pt"
@@ -556,11 +573,11 @@ class HallucinationTrainer(BaseTrainer):
                 logger.info(f"Resuming from global step {self.global_step}")
 
             # Restore scheduler state
-            if self.scheduler and 'scheduler' in state and state['scheduler']:
+            if optimizer_loaded and self.scheduler and 'scheduler' in state and state['scheduler']:
                 self.scheduler.load_state_dict(state['scheduler'])
 
             # Restore scaler state
-            if self.scaler and 'scaler' in state and state['scaler']:
+            if optimizer_loaded and self.scaler and 'scaler' in state and state['scaler']:
                 self.scaler.load_state_dict(state['scaler'])
 
             logger.info(f"Loaded checkpoint from {checkpoint_path}")

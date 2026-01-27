@@ -38,7 +38,9 @@ class HallucinationDetector:
         model_path: str,
         device: Optional[str] = None,
         max_length: int = 256,
-        batch_size: int = 8
+        batch_size: int = 8,
+        base_model: Optional[str] = None,
+        lora_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize hallucination detector.
@@ -52,6 +54,8 @@ class HallucinationDetector:
         self.model_path = Path(model_path)
         self.max_length = max_length
         self.batch_size = batch_size
+        self.base_model = base_model
+        self.lora_config = lora_config
 
         # Set device
         if device is None:
@@ -67,17 +71,60 @@ class HallucinationDetector:
 
     def _load_model(self) -> None:
         """Load model and tokenizer."""
+        model_pt = self.model_path / "model.pt"
         model_dir = self.model_path / "model"
         tokenizer_dir = self.model_path / "tokenizer"
 
         # Check if paths exist
         if not model_dir.exists():
-            # Try loading directly from model_path
+            # Try loading directly from model_path (HF export)
             model_dir = self.model_path
 
         if not tokenizer_dir.exists():
             tokenizer_dir = self.model_path
 
+        # Case 1: training checkpoint (model.pt)
+        if model_pt.exists():
+            base_model = self.base_model
+            lora_config = self.lora_config
+
+            # Try to infer base model from training_state if available
+            state_path = self.model_path / "training_state.pt"
+            if state_path.exists():
+                try:
+                    state = torch.load(state_path, map_location="cpu")
+                    cfg = state.get("config", {})
+                    base_model = base_model or cfg.get("model", {}).get("base_model")
+                    lora_config = lora_config or cfg.get("model", {}).get("lora")
+                except Exception:
+                    pass
+
+            if not base_model:
+                raise ValueError(
+                    "base_model is required to load a checkpoint with model.pt"
+                )
+
+            try:
+                from src.training.utils.model_utils import load_model_and_tokenizer
+            except Exception as exc:
+                raise ImportError(
+                    "Failed to import training utilities needed for checkpoint loading."
+                ) from exc
+
+            self.model, self.tokenizer = load_model_and_tokenizer(
+                model_name=base_model,
+                num_labels=3,
+                cache_dir=None,
+                device=self.device,
+                lora_config=lora_config
+            )
+            self.model.load_state_dict(torch.load(model_pt, map_location=self.device))
+            self.model.eval()
+
+            logger.info("Loaded model from training checkpoint")
+            return
+
+        # Case 2: HF export
         try:
             self.model = AutoModelForSequenceClassification.from_pretrained(str(model_dir))
             self.tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_dir))

@@ -18,6 +18,7 @@ sys.path.insert(0, str(project_root))
 
 from src.core.config_loader import load_config
 from src.training.base_trainer import TrainerFactory
+from src.training.trainers import hallucination_trainer  # noqa: F401
 
 # Configure logging
 logging.basicConfig(
@@ -161,6 +162,10 @@ def train_model(args: argparse.Namespace) -> None:
         logger.info(f"  Accuracy: {final_metrics.get('accuracy', 0):.4f}")
         logger.info(f"  F1 (macro): {final_metrics.get('f1_macro', 0):.4f}")
         logger.info(f"  F1 (weighted): {final_metrics.get('f1_weighted', 0):.4f}")
+        if 'ece' in final_metrics:
+            logger.info(f"  ECE: {final_metrics.get('ece', 0):.4f}")
+        if 'brier' in final_metrics:
+            logger.info(f"  Brier: {final_metrics.get('brier', 0):.4f}")
 
         logger.info("\nPer-class F1 scores:")
         for label in ['entailment', 'neutral', 'contradiction']:

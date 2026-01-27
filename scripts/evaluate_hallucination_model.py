@@ -20,6 +20,7 @@ sys.path.insert(0, str(project_root))
 
 from src.core.config_loader import load_config
 from src.training.base_trainer import TrainerFactory
+from src.training.trainers import hallucination_trainer  # noqa: F401
 from src.training.metrics.nli_metrics import NLIMetrics, print_confusion_matrix
 
 # Configure logging
@@ -158,6 +159,10 @@ def evaluate_model(args: argparse.Namespace) -> None:
     logger.info(f"  F1 (weighted):    {metrics['f1_weighted']:.4f}")
     logger.info(f"  Precision (macro): {metrics['precision_macro']:.4f}")
     logger.info(f"  Recall (macro):    {metrics['recall_macro']:.4f}")
+    if 'ece' in metrics:
+        logger.info(f"  ECE:              {metrics['ece']:.4f}")
+    if 'brier' in metrics:
+        logger.info(f"  Brier:            {metrics['brier']:.4f}")
 
     logger.info("\nPer-Class Metrics:")
     for label in ['entailment', 'neutral', 'contradiction']:

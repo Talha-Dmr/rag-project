@@ -158,3 +158,33 @@ Quick summary table:
 |------------------|--------------|----------|
 | baseline         | 0.640        | 0.080    |
 | EBCAR + gating   | 0.410        | 0.170    |
+
+### Energy Outlooks Domain (EIA/IRENA/Shell) — Conflict-Focused Gating
+Corpus (PDFs):
+- `data/domain_energy/raw/eia_aeo2025_narrative.pdf`
+- `data/domain_energy/raw/eia_ieo2023_narrative.pdf`
+- `data/domain_energy/raw/eia_steo_full_2026_01.pdf`
+- `data/domain_energy/raw/irena_weto_2024.pdf`
+- `data/domain_energy/raw/shell_energy_transition_strategy_2024.pdf`
+
+Indexing:
+- `config/gating_energy_ebcar.yaml` → `./data/vector_db/energy_outlooks` (collection `rag_energy_outlooks`)
+- 2,127 chunks indexed (fixed size 512, overlap 50).
+
+Question set:
+- `data/domain_energy/questions_energy_conflict.jsonl` (20 items, 15 conflict + 5 sanity).
+
+Baseline vs EBCAR:
+- Baseline (no reranker, `config/gating_energy_base.yaml`):
+  - abstain: 2/20 (0.10), actions: none=18, retrieve_more=2
+  - abstain_by_type: conflict=2, sanity=0
+- EBCAR (main, `config/gating_energy_ebcar.yaml`):
+  - thresholds: contradiction_rate=0.45, contradiction_prob=0.65, uncertainty=0.38
+  - abstain: 6/20 (0.30), actions: none=14, retrieve_more=6
+  - abstain_by_type: conflict=4, sanity=2
+
+Interpretation:
+- EBCAR is more conservative and flags conflict questions more often (desired for Domain‑B).
+- Low‑abstain tuning (0.50/0.70/0.42) produced no change.
+- High‑abstain tuning (0.40/0.60/0.35) over‑abstained (11/20).
+- Keep `gating_energy_ebcar.yaml` as the active config; baseline kept for comparison.

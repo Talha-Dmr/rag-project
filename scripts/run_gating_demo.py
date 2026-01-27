@@ -15,17 +15,18 @@ def run_demo(args: argparse.Namespace) -> None:
 
     rag = RAGPipeline.from_config(config)
 
-    # Index the provided source file
-    source = Path(args.source)
-    if not source.exists():
-        raise FileNotFoundError(f"Source not found: {source}")
+    if args.index:
+        source = Path(args.source)
+        if not source.exists():
+            raise FileNotFoundError(f"Source not found: {source}")
+        if args.reset:
+            rag.vector_store.delete_collection()
+        rag.index_documents(str(source), recursive=False)
 
-    rag.index_documents(str(source), recursive=False)
-
-    queries = [
-        "Bu raporun konusu nedir?",
-        "Projede kullanılan ana bileşenler nelerdir?",
-        "Bu projede hangi metriklerle değerlendirme yapılmış?"
+    queries = args.queries or [
+        "When was the last time Brazil won the World Cup?",
+        "Who has the most blocks in the NBA?",
+        "Where did the story of The Sound of Music take place?"
     ]
 
     for idx, query in enumerate(queries, 1):
@@ -61,8 +62,24 @@ def main() -> None:
     )
     parser.add_argument(
         "--source",
-        default="designprojectfinal.pdf",
-        help="Path to a document file to index"
+        default="",
+        help="Path to a document file to index (use with --index)"
+    )
+    parser.add_argument(
+        "--index",
+        action="store_true",
+        help="Index the --source file before running queries"
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Delete collection before indexing"
+    )
+    parser.add_argument(
+        "--queries",
+        nargs="+",
+        default=None,
+        help="Optional list of queries to run"
     )
     parser.add_argument(
         "--k",

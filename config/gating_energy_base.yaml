@@ -1,0 +1,67 @@
+# Energy outlooks domain (EIA + Shell)
+
+data_loader:
+  type: pdf
+  batch_size: 10
+  pdf:
+    extract_images: false
+
+chunking:
+  strategy: fixed_size
+  config:
+    chunk_size: 512
+    chunk_overlap: 50
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: ${DEVICE:cpu}
+  cache_folder: ${EMBEDDING_CACHE_DIR:./models/embeddings}
+  batch_size: 32
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ${VECTOR_DB_PATH:./data/vector_db/energy_outlooks}
+    collection_name: rag_energy_outlooks
+
+llm:
+  model_name: Qwen/Qwen2.5-1.5B-Instruct
+  device: ${DEVICE:cuda}
+  cache_folder: ${LLM_CACHE_DIR:./models/llm}
+  max_new_tokens: 128
+  temperature: 0.7
+  top_p: 0.9
+  load_in_8bit: false
+
+retrieval:
+  k: 5
+  score_threshold: 0.0
+
+hallucination_detector:
+  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5/checkpoint-step-5000
+  base_model: microsoft/deberta-v3-small
+  device: cpu
+  max_length: 128
+  lora:
+    enabled: true
+    r: 8
+    lora_alpha: 16
+    lora_dropout: 0.05
+    bias: none
+    task_type: SEQ_CLS
+    target_modules: ["query_proj", "key_proj", "value_proj"]
+    modules_to_save: ["classifier", "pooler"]
+
+gating:
+  enabled: true
+  strategy: retrieve_more   # options: retrieve_more, abstain
+  contradiction_rate_threshold: 0.45
+  contradiction_prob_threshold: 0.65
+  uncertainty_threshold: 0.38
+  min_retrieval_score: 0.15
+  min_mean_retrieval_score: 0.08
+  max_retries: 2
+  k_multiplier: 2.0
+  max_k: 20
+  abstain_message: "Bu soruya güvenilir şekilde yanıt veremiyorum."

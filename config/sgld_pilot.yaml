@@ -1,0 +1,76 @@
+# Pilot configuration for SGLD/Langevin on the hallucination (NLI) model.
+# Use with: python scripts/train_hallucination_model.py --config sgld_pilot ...
+
+training:
+  model:
+    base_model: microsoft/deberta-v3-base
+    num_labels: 3
+    cache_dir: ./models/training
+
+  hyperparameters:
+    learning_rate: 5.0e-5
+    weight_decay: 0.01
+    warmup_steps: 0
+    max_epochs: 1
+    batch_size: 8
+    gradient_accumulation_steps: 1
+    max_grad_norm: 1.0
+    mixed_precision: fp16
+    optimizer: sgld
+    noise_scale: 1.0
+    scheduler: linear
+
+  data:
+    max_seq_length: 128
+    train_split: 0.85
+    val_split: 0.10
+    test_split: 0.05
+    balance_classes: true
+    balance_strategy: undersample
+
+  checkpointing:
+    save_dir: ./models/checkpoints/sgld_pilot
+    save_strategy: best
+    save_every_n_epochs: 1
+    save_total_limit: 2
+    metric_for_best: val_f1_macro
+    mode: max
+
+  early_stopping:
+    enabled: true
+    patience: 1
+    metric: val_f1_macro
+    mode: max
+    min_delta: 0.0001
+
+  datasets:
+    ambigqa:
+      path: data/ambiguity_datasets/02_ambigqa
+      weight: 1.0
+      multiplier: 3
+
+    asqa:
+      path: data/ambiguity_datasets/03_asqa
+      weight: 1.0
+      multiplier: 4
+
+    wic:
+      path: data/ambiguity_datasets/01_wic
+      weight: 0.5
+      multiplier: 2
+
+    clamber:
+      path: data/ambiguity_datasets/04_clamber
+      weight: 1.0
+      multiplier: 3
+
+    condambigqa:
+      path: data/ambiguity_datasets/05_condambigqa
+      weight: 1.0
+      multiplier: 3
+
+  output:
+    training_data_dir: ./data/training/nli_dataset
+    checkpoint_dir: ./models/checkpoints/sgld_pilot
+    final_model_dir: ./models/hallucination_detector_sgld_pilot
+    logs_dir: ./logs/training

@@ -3,6 +3,7 @@ ChromaDB vector store implementation.
 """
 
 from typing import List, Dict, Any, Optional
+import os
 import chromadb
 from chromadb.config import Settings
 from src.core.base_classes import BaseVectorStore
@@ -25,15 +26,17 @@ class ChromaStore(BaseVectorStore):
 
         self.persist_directory = self.config.get('persist_directory', './data/vector_db/chroma')
         self.collection_name = self.config.get('collection_name', 'documents')
+        self.batch_size = int(self.config.get('batch_size', 5000))
 
         logger.info(f"Initializing ChromaDB at {self.persist_directory}")
 
         try:
-            # Initialize Chroma client with persistence
-            self.client = chromadb.Client(Settings(
-                persist_directory=self.persist_directory,
-                anonymized_telemetry=False
-            ))
+            os.makedirs(self.persist_directory, exist_ok=True)
+            # Initialize persistent client (ensures data survives process restarts)
+            self.client = chromadb.PersistentClient(
+                path=self.persist_directory,
+                settings=Settings(anonymized_telemetry=False)
+            )
 
             # Get or create collection
             self.collection = self.client.get_or_create_collection(
@@ -75,10 +78,6 @@ class ChromaStore(BaseVectorStore):
             raise ValueError("Number of metadatas must match number of texts")
 
         try:
-            # Generate IDs
-            start_id = self.collection.count()
-            ids = [f"doc_{start_id + i}" for i in range(len(texts))]
-
             # Prepare metadatas
             if metadatas is None:
                 metadatas = [{}] * len(texts)
@@ -92,15 +91,28 @@ class ChromaStore(BaseVectorStore):
                         clean_meta[key] = str(value) if not isinstance(value, (int, float, bool)) else value
                 clean_metadatas.append(clean_meta)
 
-            # Add to collection
-            self.collection.add(
-                ids=ids,
-                embeddings=embeddings,
-                documents=texts,
-                metadatas=clean_metadatas
-            )
+            # Add to collection in batches (Chroma has a max batch size)
+            start_id = self.collection.count()
+            total = len(texts)
+            batch_size = max(1, min(self.batch_size, total))
 
-            logger.info(f"Added {len(texts)} documents to ChromaDB")
+            for offset in range(0, total, batch_size):
+                batch_texts = texts[offset:offset + batch_size]
+                batch_embeddings = embeddings[offset:offset + batch_size]
+                batch_metadatas = clean_metadatas[offset:offset + batch_size]
+                batch_ids = [
+                    f"doc_{start_id + i}"
+                    for i in range(offset, offset + len(batch_texts))
+                ]
+
+                self.collection.add(
+                    ids=batch_ids,
+                    embeddings=batch_embeddings,
+                    documents=batch_texts,
+                    metadatas=batch_metadatas
+                )
+
+            logger.info(f"Added {len(texts)} documents to ChromaDB (batch_size={batch_size})")
 
         except Exception as e:
             logger.error(f"Error adding documents to ChromaDB: {e}")

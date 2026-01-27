@@ -33,7 +33,9 @@ class RAGPipeline:
         llm,
         retriever,
         reranker=None,
-        hallucination_detector=None
+        reranker_top_k: Optional[int] = None,
+        hallucination_detector=None,
+        gating_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize RAG Pipeline
@@ -54,7 +56,9 @@ class RAGPipeline:
         self.llm = llm
         self.retriever = retriever
         self.reranker = reranker
+        self.reranker_top_k = reranker_top_k
         self.hallucination_detector = hallucination_detector
+        self.gating_config = gating_config or {}
 
         if hallucination_detector:
             logger.info("RAG Pipeline initialized with hallucination detection")
@@ -109,13 +113,103 @@ class RAGPipeline:
 
         return len(chunks)
 
+    def _compute_uncertainty_stats(self, detection_result: Dict[str, Any]) -> Dict[str, float]:
+        individual = detection_result.get("individual_results", [])
+        if not individual:
+            return {
+                "contradiction_rate": 0.0,
+                "contradiction_prob_mean": 0.0,
+                "uncertainty_mean": 0.0
+            }
+
+        contradiction_probs = []
+        uncertainties = []
+        for result in individual:
+            scores = result.get("scores")
+            if scores:
+                contradiction_probs.append(scores.get("contradiction", 0.0))
+                max_prob = max(scores.values())
+                uncertainties.append(1.0 - max_prob)
+            else:
+                contradiction_probs.append(1.0 if result.get("is_hallucination") else 0.0)
+                uncertainties.append(1.0 - result.get("confidence", 0.0))
+
+        contradiction_prob_mean = sum(contradiction_probs) / len(contradiction_probs)
+        uncertainty_mean = sum(uncertainties) / len(uncertainties)
+
+        return {
+            "contradiction_rate": detection_result.get("hallucination_score", 0.0),
+            "contradiction_prob_mean": contradiction_prob_mean,
+            "uncertainty_mean": uncertainty_mean
+        }
+
+    def _compute_retrieval_stats(self, retrieved_docs: List[Dict[str, Any]]) -> Dict[str, float]:
+        if not retrieved_docs:
+            return {
+                "max_score": 0.0,
+                "mean_score": 0.0
+            }
+
+        scores = [doc.get("score", 0.0) for doc in retrieved_docs]
+        scores = [float(s) for s in scores if isinstance(s, (int, float))]
+        if not scores:
+            return {
+                "max_score": 0.0,
+                "mean_score": 0.0
+            }
+
+        return {
+            "max_score": max(scores),
+            "mean_score": sum(scores) / len(scores)
+        }
+
+    def _merge_gating_config(self, override: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if not override:
+            return dict(self.gating_config)
+
+        merged = dict(self.gating_config)
+        merged.update(override)
+        return merged
+
+    def _decide_gating_action(self, stats: Dict[str, float], gating_config: Dict[str, Any]) -> str:
+        contradiction_rate = stats.get("contradiction_rate", 0.0)
+        contradiction_prob = stats.get("contradiction_prob_mean", 0.0)
+        uncertainty = stats.get("uncertainty_mean", 0.0)
+        max_retrieval_score = stats.get("retrieval_max_score", 1.0)
+        mean_retrieval_score = stats.get("retrieval_mean_score", 1.0)
+
+        contradiction_rate_threshold = gating_config.get("contradiction_rate_threshold", 0.34)
+        contradiction_prob_threshold = gating_config.get("contradiction_prob_threshold", 0.5)
+        uncertainty_threshold = gating_config.get("uncertainty_threshold", 0.3)
+        min_retrieval_score = gating_config.get("min_retrieval_score")
+        min_mean_retrieval_score = gating_config.get("min_mean_retrieval_score")
+
+        retrieval_low = False
+        if isinstance(min_retrieval_score, (int, float)) and max_retrieval_score < float(min_retrieval_score):
+            retrieval_low = True
+        if isinstance(min_mean_retrieval_score, (int, float)) and mean_retrieval_score < float(min_mean_retrieval_score):
+            retrieval_low = True
+
+        should_gate = (
+            contradiction_rate >= contradiction_rate_threshold or
+            contradiction_prob >= contradiction_prob_threshold or
+            uncertainty >= uncertainty_threshold or
+            retrieval_low
+        )
+
+        if not should_gate:
+            return "none"
+
+        return gating_config.get("strategy", "abstain")
+
     def query(
         self,
         query_text: str,
-        k: int = 5,
+        k: Optional[int] = None,
         return_context: bool = False,
         detect_hallucinations: bool = True,
-        hallucination_aggregation: str = 'any'
+        hallucination_aggregation: str = 'any',
+        gating: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Query the RAG system
@@ -133,73 +227,140 @@ class RAGPipeline:
         """
         logger.info(f"Processing query: {query_text[:100]}...")
 
-        # Retrieve relevant documents
-        logger.info(f"Retrieving top {k} documents...")
-        retrieved_docs = self.retriever.retrieve(query_text, k=k)
+        gating_config = self._merge_gating_config(gating)
+        gating_enabled = bool(gating_config.get("enabled", False)) and bool(self.hallucination_detector)
+        gating_action = "none"
+        gating_stats = None
+        gating_attempts = 0
 
-        if self.reranker:
-            logger.info("Applying reranker...")
-            retrieved_docs = self.reranker.rerank(query_text, retrieved_docs, top_k=k)
-            logger.info(f"Reranked documents → top {len(retrieved_docs)} kept")
+        current_k = k if k is not None else self.retriever.k
+        max_retries = int(gating_config.get("max_retries", 1))
+        k_multiplier = float(gating_config.get("k_multiplier", 2.0))
+        max_k = gating_config.get("max_k")
+        abstain_message = gating_config.get(
+            "abstain_message",
+            "I don't have enough reliable information to answer that."
+        )
 
-        if not retrieved_docs:
-            logger.warning("No documents retrieved")
-            return {
-                'answer': "I couldn't find relevant information to answer your question.",
-                'context': [] if return_context else None,
-                'num_docs_retrieved': 0,
-                'hallucination_detected': False
-            }
+        while True:
+            # Retrieve relevant documents
+            logger.info(f"Retrieving top {current_k} documents...")
+            retrieved_docs = self.retriever.retrieve(query_text, k=current_k)
 
-        logger.info(f"Retrieved {len(retrieved_docs)} documents")
+            if self.reranker:
+                logger.info("Applying reranker...")
+                rerank_top_k = self.reranker_top_k or current_k
+                retrieved_docs = self.reranker.rerank(query_text, retrieved_docs, top_k=rerank_top_k)
+                logger.info(f"Reranked documents → top {len(retrieved_docs)} kept")
 
-        # Generate answer
-        logger.info("Generating answer...")
-        context_texts = [doc['content'] for doc in retrieved_docs]
-        answer = self.llm.generate_with_context(query_text, context_texts)
-
-        result = {
-            'answer': answer,
-            'num_docs_retrieved': len(retrieved_docs)
-        }
-
-        # Hallucination detection
-        if detect_hallucinations and self.hallucination_detector:
-            logger.info("Checking for hallucinations...")
-
-            try:
-                detection_result = self.hallucination_detector.verify_answer_with_contexts(
-                    answer=answer,
-                    contexts=context_texts,
-                    aggregation=hallucination_aggregation
-                )
-
-                result['hallucination_detected'] = detection_result['is_hallucination']
-                result['hallucination_score'] = detection_result['hallucination_score']
-                result['hallucination_details'] = {
-                    'num_contexts': detection_result['num_contexts'],
-                    'num_contradictions': detection_result['num_contradictions'],
-                    'aggregation': detection_result['aggregation']
+            if not retrieved_docs:
+                logger.warning("No documents retrieved")
+                return {
+                    'answer': "I couldn't find relevant information to answer your question.",
+                    'context': [] if return_context else None,
+                    'num_docs_retrieved': 0,
+                    'hallucination_detected': False
                 }
 
-                if detection_result['is_hallucination']:
-                    logger.warning(
-                        f"Hallucination detected! Score: {detection_result['hallucination_score']:.2f} "
-                        f"({detection_result['num_contradictions']}/{detection_result['num_contexts']} contexts)"
+            logger.info(f"Retrieved {len(retrieved_docs)} documents")
+
+            retrieval_stats = self._compute_retrieval_stats(retrieved_docs)
+
+            # Generate answer
+            logger.info("Generating answer...")
+            context_texts = [doc['content'] for doc in retrieved_docs]
+            answer = self.llm.generate_with_context(query_text, context_texts)
+
+            result = {
+                'answer': answer,
+                'num_docs_retrieved': len(retrieved_docs)
+            }
+
+            # Hallucination detection
+            if detect_hallucinations and self.hallucination_detector:
+                logger.info("Checking for hallucinations...")
+
+                try:
+                    detection_result = self.hallucination_detector.verify_answer_with_contexts(
+                        answer=answer,
+                        contexts=context_texts,
+                        aggregation=hallucination_aggregation
                     )
-                else:
-                    logger.info("No hallucinations detected")
 
-            except Exception as e:
-                logger.error(f"Hallucination detection failed: {e}")
+                    result['hallucination_detected'] = detection_result['is_hallucination']
+                    result['hallucination_score'] = detection_result['hallucination_score']
+                    result['hallucination_details'] = {
+                        'num_contexts': detection_result['num_contexts'],
+                        'num_contradictions': detection_result['num_contradictions'],
+                        'aggregation': detection_result['aggregation']
+                    }
+
+                    if detection_result['is_hallucination']:
+                        logger.warning(
+                            f"Hallucination detected! Score: {detection_result['hallucination_score']:.2f} "
+                            f"({detection_result['num_contradictions']}/{detection_result['num_contexts']} contexts)"
+                        )
+                    else:
+                        logger.info("No hallucinations detected")
+
+                except Exception as e:
+                    logger.error(f"Hallucination detection failed: {e}")
+                    result['hallucination_detected'] = None
+                    result['hallucination_error'] = str(e)
+                    detection_result = None
+
+            elif detect_hallucinations and not self.hallucination_detector:
+                logger.warning("Hallucination detection requested but detector not available")
                 result['hallucination_detected'] = None
-                result['hallucination_error'] = str(e)
+                detection_result = None
+            else:
+                result['hallucination_detected'] = False
+                detection_result = None
 
-        elif detect_hallucinations and not self.hallucination_detector:
-            logger.warning("Hallucination detection requested but detector not available")
-            result['hallucination_detected'] = None
-        else:
-            result['hallucination_detected'] = False
+            # Adaptive gating
+            if gating_enabled and detection_result:
+                gating_stats = self._compute_uncertainty_stats(detection_result)
+                gating_stats.update({
+                    "retrieval_max_score": retrieval_stats.get("max_score", 0.0),
+                    "retrieval_mean_score": retrieval_stats.get("mean_score", 0.0)
+                })
+                decision = self._decide_gating_action(gating_stats, gating_config)
+
+                if decision == "retrieve_more" and gating_attempts < max_retries:
+                    gating_attempts += 1
+                    gating_action = "retrieve_more"
+                    next_k = int(current_k * k_multiplier)
+                    if max_k is not None:
+                        next_k = min(next_k, int(max_k))
+                    if next_k == current_k:
+                        break
+                    current_k = next_k
+                    logger.info(f"Gating triggered: retrieving more (k={current_k})")
+                    continue
+
+                if decision in {"abstain", "retrieve_more"}:
+                    if decision == "abstain":
+                        gating_action = "abstain"
+                    result['answer'] = abstain_message
+                else:
+                    gating_action = "none"
+
+            break
+
+        if gating_enabled:
+            result['gating'] = {
+                'enabled': True,
+                'strategy': gating_config.get("strategy", "abstain"),
+                'action': gating_action,
+                'attempts': gating_attempts,
+                'k_used': current_k,
+                'thresholds': {
+                    'contradiction_rate': gating_config.get("contradiction_rate_threshold"),
+                    'contradiction_prob': gating_config.get("contradiction_prob_threshold"),
+                    'uncertainty': gating_config.get("uncertainty_threshold")
+                },
+                'stats': gating_stats
+            }
 
         if return_context:
             result['context'] = retrieved_docs
@@ -267,14 +428,20 @@ class RAGPipeline:
                     **reranker_cfg
                 }
             )
+            reranker_top_k = reranker_cfg.get("top_k")
             logger.info(f"Loaded reranker: {reranker_type}")
         else:
             logger.info("No reranker specified in config.")
+            reranker_top_k = None
 
         # Hallucination Detector (optional)
         hallucination_detector = None
         training_config = config.get('training', {})
         model_path = training_config.get('output', {}).get('final_model_dir')
+        detector_config = config.get('hallucination_detector', {})
+
+        if detector_config:
+            model_path = detector_config.get('model_path', model_path)
 
         if model_path and Path(model_path).exists():
             try:
@@ -283,7 +450,13 @@ class RAGPipeline:
                 logger.info(f"Loading hallucination detector from: {model_path}")
                 hallucination_detector = HallucinationDetector(
                     model_path=model_path,
-                    max_length=training_config.get('data', {}).get('max_seq_length', 256)
+                    max_length=detector_config.get(
+                        'max_length',
+                        training_config.get('data', {}).get('max_seq_length', 256)
+                    ),
+                    device=detector_config.get('device'),
+                    base_model=detector_config.get('base_model'),
+                    lora_config=detector_config.get('lora')
                 )
                 logger.info("Hallucination detector loaded successfully")
 
@@ -301,5 +474,7 @@ class RAGPipeline:
             llm=llm,
             retriever=retriever,
             reranker=reranker,
-            hallucination_detector=hallucination_detector
+            reranker_top_k=reranker_top_k,
+            hallucination_detector=hallucination_detector,
+            gating_config=config.get('gating', {})
         )

@@ -1,0 +1,65 @@
+# Warm-start config for LoRA + SGLD on AmbigQA-only NLI mini dataset.
+# Use with: python scripts/train_hallucination_model.py --config sgld_lora_warmstart_ambigqa_mini ...
+
+training:
+  model:
+    base_model: microsoft/deberta-v3-small
+    num_labels: 3
+    cache_dir: ./models/training
+    lora:
+      enabled: true
+      r: 8
+      lora_alpha: 16
+      lora_dropout: 0.05
+      bias: none
+      task_type: SEQ_CLS
+      target_modules: ["query_proj", "key_proj", "value_proj"]
+      modules_to_save: ["classifier", "pooler"]
+
+  hyperparameters:
+    learning_rate: 1.0e-5
+    weight_decay: 0.01
+    warmup_steps: 0
+    max_epochs: 1
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_grad_norm: 1.0
+    mixed_precision: fp16
+    optimizer: sgld
+    noise_scale: 1.0e-4
+    scheduler: linear
+
+  data:
+    max_seq_length: 128
+    train_split: 0.85
+    val_split: 0.10
+    test_split: 0.05
+    balance_classes: true
+    balance_strategy: undersample
+
+  checkpointing:
+    save_dir: ./models/checkpoints/sgld_lora_warmstart_ambigqa_mini
+    save_strategy: best
+    save_every_n_epochs: 1
+    save_total_limit: 2
+    metric_for_best: val_f1_macro
+    mode: max
+
+  early_stopping:
+    enabled: true
+    patience: 1
+    metric: val_f1_macro
+    mode: max
+    min_delta: 0.0001
+
+  datasets:
+    ambigqa:
+      path: data/ambiguity_datasets/02_ambigqa
+      weight: 1.0
+      multiplier: 3
+
+  output:
+    training_data_dir: ./data/training/nli_dataset_ambigqa_mini
+    checkpoint_dir: ./models/checkpoints/sgld_lora_warmstart_ambigqa_mini
+    final_model_dir: ./models/hallucination_detector_sgld_lora_warmstart_ambigqa_mini
+    logs_dir: ./logs/training

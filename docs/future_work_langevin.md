@@ -108,3 +108,53 @@ Outcome:
 - SGLD needs warm-start from a well-trained LoRA model and significantly smaller noise.
 - Next step is warm-start SGLD from AdamW LoRA checkpoint:
   - `models/checkpoints/adamw_lora_sanity_ambigqa_mini/checkpoint-step-1500`
+
+### Test Set Comparison (AmbigQA mini)
+- Comparison artifacts:
+  - `evaluation_results/comparison/adamw_vs_sgld_test_metrics.png`
+  - `evaluation_results/comparison/adamw_vs_sgld_test_metrics.md`
+
+| Model | Accuracy | F1_macro | F1_weighted | ECE | Brier |
+|---|---:|---:|---:|---:|---:|
+| AdamW LoRA sanity | 0.7780 | 0.7404 | 0.7471 | 0.0209 | 0.2694 |
+| SGLD warm-start (noise=5e-5) | 0.7780 | 0.7404 | 0.7471 | 0.0194 | 0.2693 |
+
+Notes:
+- SGLD warm-start gives a small ECE improvement; other metrics are effectively identical.
+
+### Gating Prototype (Qwen2.5-1.5B, designprojectfinal.pdf)
+- Demo config: `config/gating_demo.yaml`
+- Model: `Qwen/Qwen2.5-1.5B-Instruct` (CUDA)
+- Hallucination detector: SGLD LoRA checkpoint
+
+Threshold sweep (uncertainty_threshold):
+- 0.4 → retrieve-more triggered on “evaluation metrics” query; escalated k=5→10→20 then abstained.
+- 0.5 / 0.6 → no gating triggered.
+
+Selected default:
+- `uncertainty_threshold: 0.4` with `strategy: retrieve_more`, `max_retries: 2`, `max_k: 20`.
+
+### AmbigQA Evidence Corpus + EBCAR (Mini Eval)
+- Evidence corpus built from AmbigQA evidence articles:
+  - `data/corpora/ambigqa_wiki_evidence.jsonl` (40,000 docs → 167,337 chunks).
+- Chroma indexing updated to batch inserts.
+- Retrieval-score gating added:
+  - sweep @ n=30 (seed=7): best trade-off at `min_retrieval_score: 0.2`, `min_mean_retrieval_score: 0.1`.
+- Reranker configs:
+  - `config/gating_demo_ebcar.yaml` (retrieval k=20 → EBCAR top_k=5).
+  - `config/gating_demo_mgte.yaml` (retrieval k=20 → mGTE top_k=5).
+
+Mini eval on AmbigQA dev (n=100, seed=7) after sweep thresholds:
+- baseline (no reranker):
+  - abstain_rate: 0.640, hit_rate: 0.080
+- EBCAR + gating:
+  - abstain_rate: 0.410, hit_rate: 0.170
+
+Interpretation:
+- EBCAR reduces abstention and improves hit rate (~2×) on a larger sample.
+
+Quick summary table:
+| setup            | abstain_rate | hit_rate |
+|------------------|--------------|----------|
+| baseline         | 0.640        | 0.080    |
+| EBCAR + gating   | 0.410        | 0.170    |

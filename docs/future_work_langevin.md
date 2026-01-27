@@ -216,3 +216,12 @@ Baseline vs tuning:
   - abstain_by_type: conflict=5, sanity=2
 - Low‑abstain tuning (0.50/0.70/0.42) matched EBCAR overall (5/20).
 - High‑abstain tuning (0.40/0.60/0.35) over‑abstained (11/20).
+
+After adding IMF WEO:
+- Added `data/domain_macro/raw/imf_weo_2025_oct.pdf` (181 pages).
+- New index size: 648 pages → 5,454 chunks.
+- EBCAR eval (old thresholds): abstain 8/20 (0.40), actions none=12, retrieve_more=8,
+  abstain_by_type conflict=5, sanity=3.
+- Low‑abstain thresholds (0.50/0.70/0.42) improved coverage:
+  abstain 3/20 (0.15), actions none=17, retrieve_more=3,
+  abstain_by_type conflict=2, sanity=1.

@@ -80,3 +80,8 @@ htmlcov/
 # Temporary
 tmp/
 temp/
+
+# Local artifacts
+checkpoints_step6000.tar.gz
+Gemini_Generated_Image_*.png
+electra_deberta/

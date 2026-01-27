@@ -159,6 +159,30 @@ Quick summary table:
 | baseline         | 0.640        | 0.080    |
 | EBCAR + gating   | 0.410        | 0.170    |
 
+## Results Summary (Adaptive Gating on Conflict-Focused Domains)
+Key point: EBCAR + gating yields conservative, conflict-aware behavior. Macro domain improved after
+adding IMF WEO and loosening thresholds.
+
+| Domain | Corpus | Config | Thresholds (cr/cp/u) | Abstain | Actions (none/retrieve_more) |
+|---|---|---|---|---|---|
+| Energy outlooks | 5 PDFs | `gating_energy_ebcar.yaml` | 0.45 / 0.65 / 0.38 | 6/20 (0.30) | 14 / 6 |
+| Macro outlooks | 4 PDFs (incl. IMF) | `gating_macro_ebcar.yaml` | 0.50 / 0.70 / 0.42 | 3/20 (0.15) | 17 / 3 |
+
+Notes:
+- Energy domain: EBCAR more conservative vs baseline; flags conflict questions more often.
+- Macro domain: IMF WEO increased abstain at old thresholds; low‑abstain tuning restored coverage.
+
+## Qualitative Examples (Gating Decisions)
+Energy (EIA/IRENA/Shell, EBCAR):
+- q03 (sanity): "What is the focus of the IEO 2023 narrative report?" → action=retrieve_more, abstain=True
+- q04 (sanity): "What is the stated purpose of the IRENA World Energy Transitions Outlook 2024?" → action=retrieve_more, abstain=True
+- q06 (conflict): "AEO 2025 reference case vs IRENA WETO 2024: which is policy-neutral vs normative, and how does that change the fossil-fuel narrative?" → action=none, abstain=False
+
+Macro (World Bank + UN WESP + IMF, EBCAR):
+- q02 (sanity): "What is the stated purpose of the UN World Economic Situation and Prospects 2025 report?" → action=retrieve_more, abstain=True
+- q06 (conflict): "Compare the global growth outlook for 2025 across the reports: which is more optimistic?" → action=none, abstain=False
+- q08 (conflict): "How do the reports differ on the expected path of inflation and monetary policy tightening?" → action=retrieve_more, abstain=True
+
 ### Energy Outlooks Domain (EIA/IRENA/Shell) — Conflict-Focused Gating
 Corpus (PDFs):
 - `data/domain_energy/raw/eia_aeo2025_narrative.pdf`
@@ -188,6 +212,9 @@ Interpretation:
 - Low‑abstain tuning (0.50/0.70/0.42) produced no change.
 - High‑abstain tuning (0.40/0.60/0.35) over‑abstained (11/20).
 - Keep `gating_energy_ebcar.yaml` as the active config; baseline kept for comparison.
+- Ablation (energy, EBCAR):
+  - Gating disabled (`gating_energy_ebcar_nogate.yaml`): abstain 0/20, actions none=20.
+  - Gating retrieve_more (`gating_energy_ebcar.yaml`): abstain 7/20 (0.35), actions none=13, retrieve_more=7.
 
 ### Macro Outlooks Domain (World Bank + UN WESP) — Conflict-Focused Gating
 Corpus (PDFs):
@@ -225,3 +252,7 @@ After adding IMF WEO:
 - Low‑abstain thresholds (0.50/0.70/0.42) improved coverage:
   abstain 3/20 (0.15), actions none=17, retrieve_more=3,
   abstain_by_type conflict=2, sanity=1.
+- Ablation (IMF included, low‑abstain thresholds):
+  - Gating disabled (`gating_macro_ebcar_nogate.yaml`): abstain 0/20, actions none=20.
+  - Gating retrieve_more (`gating_macro_ebcar.yaml`): abstain 5/20 (0.25), actions none=15, retrieve_more=5.
+  - Gating abstain (`gating_macro_ebcar_abstain.yaml`): abstain 8/20 (0.40), actions none=12, abstain=8.

@@ -11,6 +11,13 @@ A highly modular Retrieval-Augmented Generation (RAG) system built with LangChai
 - **Advanced Reranking**: Cross-encoder and BM25 reranking strategies
 - **Configuration-Driven**: Change components via YAML configs without code changes
 
+## Results (Current Snapshot)
+
+- Final MC Dropout gating (50 questions):
+  - Energy: abstain 13/50 (0.26), actions none=37, retrieve_more=13
+  - Macro: abstain 9/50 (0.18), actions none=41, retrieve_more=9
+- Details and ablations: see `docs/future_work_langevin.md`
+
 ## Project Structure
 
 ```

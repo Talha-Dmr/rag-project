@@ -35,7 +35,8 @@ class RAGPipeline:
         reranker=None,
         reranker_top_k: Optional[int] = None,
         hallucination_detector=None,
-        gating_config: Optional[Dict[str, Any]] = None
+        gating_config: Optional[Dict[str, Any]] = None,
+        source_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize RAG Pipeline
@@ -59,6 +60,7 @@ class RAGPipeline:
         self.reranker_top_k = reranker_top_k
         self.hallucination_detector = hallucination_detector
         self.gating_config = gating_config or {}
+        self.source_config = source_config or {}
 
         if hallucination_detector:
             logger.info("RAG Pipeline initialized with hallucination detection")
@@ -218,6 +220,8 @@ class RAGPipeline:
         query_text: str,
         k: Optional[int] = None,
         return_context: bool = False,
+        return_sources: bool = False,
+        include_sources_in_answer: bool = False,
         detect_hallucinations: bool = True,
         hallucination_aggregation: str = 'any',
         gating: Optional[Dict[str, Any]] = None
@@ -229,6 +233,8 @@ class RAGPipeline:
             query_text: User query
             k: Number of documents to retrieve
             return_context: Include retrieved context in response
+            return_sources: Include formatted sources list in response
+            include_sources_in_answer: Append sources to answer text
             detect_hallucinations: Run hallucination detection on answer
             hallucination_aggregation: How to aggregate hallucination detection
                                       across contexts ('any', 'majority', 'all')
@@ -243,6 +249,7 @@ class RAGPipeline:
         gating_action = "none"
         gating_stats = None
         gating_attempts = 0
+        final_retrieved_docs: List[Dict[str, Any]] = []
 
         current_k = k if k is not None else self.retriever.k
         max_retries = int(gating_config.get("max_retries", 1))
@@ -269,6 +276,7 @@ class RAGPipeline:
                 return {
                     'answer': "I couldn't find relevant information to answer your question.",
                     'context': [] if return_context else None,
+                    'sources': [] if return_sources else None,
                     'num_docs_retrieved': 0,
                     'hallucination_detected': False
                 }
@@ -359,6 +367,7 @@ class RAGPipeline:
                 else:
                     gating_action = "none"
 
+            final_retrieved_docs = retrieved_docs
             break
 
         if gating_enabled:
@@ -376,11 +385,100 @@ class RAGPipeline:
                 'stats': gating_stats
             }
 
+        is_abstain = bool(abstain_message) and result.get("answer") == abstain_message
+        if gating_action == "abstain":
+            is_abstain = True
+
         if return_context:
-            result['context'] = retrieved_docs
+            result['context'] = final_retrieved_docs
+
+        if return_sources or include_sources_in_answer:
+            if is_abstain:
+                if return_sources:
+                    result['sources'] = []
+            else:
+                sources = self._build_source_entries(final_retrieved_docs)
+                if return_sources:
+                    result['sources'] = sources
+                if include_sources_in_answer:
+                    sources_text = self._format_sources_text(sources)
+                    if sources_text:
+                        result['answer'] = f"{result['answer']}\n\n{sources_text}"
 
         logger.info("Query complete")
         return result
+
+    def _build_source_entries(
+        self,
+        retrieved_docs: List[Dict[str, Any]],
+        max_sources: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        max_sources = int(max_sources or self.source_config.get("max_sources", 5))
+        include_scores = bool(self.source_config.get("include_scores", False))
+        entries: List[Dict[str, Any]] = []
+        seen = set()
+
+        for doc in retrieved_docs:
+            metadata = doc.get("metadata") or {}
+            raw_source = (
+                metadata.get("title")
+                or metadata.get("source")
+                or metadata.get("url")
+                or metadata.get("path")
+            )
+            if not raw_source:
+                continue
+
+            page = metadata.get("page") or metadata.get("page_number")
+            section = metadata.get("section") or metadata.get("heading")
+            key = (str(raw_source), str(page), str(section))
+            if key in seen:
+                continue
+            seen.add(key)
+
+            label = str(raw_source)
+            if isinstance(raw_source, str):
+                label = Path(raw_source).name or raw_source
+
+            entry: Dict[str, Any] = {
+                "source": str(raw_source),
+                "label": label
+            }
+
+            if page is not None:
+                entry["page"] = page
+            if section:
+                entry["section"] = section
+            if include_scores and doc.get("score") is not None:
+                try:
+                    entry["score"] = float(doc["score"])
+                except (TypeError, ValueError):
+                    pass
+
+            entries.append(entry)
+            if len(entries) >= max_sources:
+                break
+
+        return entries
+
+    def _format_sources_text(self, sources: List[Dict[str, Any]]) -> str:
+        if not sources:
+            return ""
+
+        lines = ["Sources:"]
+        for idx, source in enumerate(sources, start=1):
+            label = source.get("label") or source.get("source") or "source"
+            extras = []
+            if source.get("page") is not None:
+                extras.append(f"p.{source['page']}")
+            if source.get("section"):
+                extras.append(f"sec:{source['section']}")
+            if "score" in source:
+                extras.append(f"score={source['score']:.2f}")
+            suffix = f" ({', '.join(extras)})" if extras else ""
+            lines.append(f"[{idx}] {label}{suffix}")
+
+        return "\n".join(lines)
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'RAGPipeline':
@@ -492,5 +590,6 @@ class RAGPipeline:
             reranker=reranker,
             reranker_top_k=reranker_top_k,
             hallucination_detector=hallucination_detector,
-            gating_config=config.get('gating', {})
+            gating_config=config.get('gating', {}),
+            source_config=config.get('sources', {})
         )

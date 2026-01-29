@@ -73,7 +73,7 @@ rag = RAGPipeline.from_config(config)
 rag.index_documents(source="/path/to/documents")
 
 # Query
-response = rag.query("What is RAG?")
+response = rag.query("What is RAG?", return_sources=True, include_sources_in_answer=True)
 print(response)
 ```
 

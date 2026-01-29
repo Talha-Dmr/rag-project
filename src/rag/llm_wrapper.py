@@ -135,7 +135,8 @@ class HuggingFaceLLM(BaseLLM):
         self,
         query: str,
         context: List[str],
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None
     ) -> str:
         """
         Generate text with retrieved context
@@ -144,6 +145,7 @@ class HuggingFaceLLM(BaseLLM):
             query: User query
             context: Retrieved context documents
             max_tokens: Maximum tokens to generate
+            temperature: Optional sampling temperature override
 
         Returns:
             Generated response
@@ -165,7 +167,7 @@ class HuggingFaceLLM(BaseLLM):
             "ANSWER:"
         )
 
-        answer = self.generate(prompt, max_tokens=max_tokens)
+        answer = self.generate(prompt, max_tokens=max_tokens, temperature=temperature)
 
         # Post-process to drop prompt-injection or extra roles
         for marker in [

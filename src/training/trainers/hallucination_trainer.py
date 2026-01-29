@@ -62,6 +62,11 @@ class HallucinationTrainer(BaseTrainer):
         self.scheduler_type = hyper_config.get('scheduler', 'linear')
         self.noise_scale = hyper_config.get('noise_scale', 1.0)
 
+        # SWAG (LoRA posterior approx)
+        self.swag_config = config.get('swag', {})
+        self.swag_enabled = bool(self.swag_config.get('enabled', False))
+        self.swag_state = None
+
         # Data settings
         self.max_seq_length = data_config.get('max_seq_length', 256)
 
@@ -80,6 +85,13 @@ class HallucinationTrainer(BaseTrainer):
         self.early_stopping_callback = None
 
         logger.info(f"Initialized HallucinationTrainer on device: {self.device}")
+        if self.swag_enabled:
+            logger.info(
+                "SWAG enabled: freq=%s start_step=%s max_snapshots=%s",
+                self.swag_config.get('snapshot_freq', 50),
+                self.swag_config.get('start_step', 0),
+                self.swag_config.get('max_snapshots', 20)
+            )
 
     def prepare_data(self, train_data_path: str, val_data_path: str) -> None:
         """
@@ -257,7 +269,88 @@ class HallucinationTrainer(BaseTrainer):
                     break
 
         logger.info("\nTraining complete!")
+        if self.swag_enabled:
+            self._save_swag_state(output_dir)
         return history
+
+    def _get_swag_params(self) -> Dict[str, torch.nn.Parameter]:
+        params = {}
+        for name, param in self.model.named_parameters():
+            if not param.requires_grad:
+                continue
+            if "lora" not in name.lower():
+                continue
+            params[name] = param
+        return params
+
+    def _maybe_collect_swag(self) -> None:
+        if not self.swag_enabled:
+            return
+        snapshot_freq = int(self.swag_config.get('snapshot_freq', 50))
+        start_step = int(self.swag_config.get('start_step', 0))
+        max_snapshots = self.swag_config.get('max_snapshots')
+
+        if self.global_step < start_step:
+            return
+        if snapshot_freq <= 0 or self.global_step % snapshot_freq != 0:
+            return
+        if self.swag_state and max_snapshots is not None:
+            if self.swag_state.get('count', 0) >= int(max_snapshots):
+                return
+
+        self._update_swag_state()
+
+    def _init_swag_state(self, param_names: list[str]) -> None:
+        self.swag_state = {
+            'count': 0,
+            'param_names': list(param_names),
+            'mean': {},
+            'sq_mean': {}
+        }
+
+    def _update_swag_state(self) -> None:
+        params = self._get_swag_params()
+        if not params:
+            logger.warning("SWAG enabled but no LoRA parameters found.")
+            return
+
+        if self.swag_state is None:
+            self._init_swag_state(list(params.keys()))
+
+        self.swag_state['count'] += 1
+        count = self.swag_state['count']
+
+        for name, param in params.items():
+            value = param.detach().float().cpu()
+            mean = self.swag_state['mean'].get(name)
+            sq_mean = self.swag_state['sq_mean'].get(name)
+
+            if mean is None:
+                self.swag_state['mean'][name] = value.clone()
+                self.swag_state['sq_mean'][name] = value.pow(2)
+                continue
+
+            mean += (value - mean) / count
+            sq_mean += (value.pow(2) - sq_mean) / count
+
+        logger.info(
+            "SWAG snapshot collected at step %s (count=%s)",
+            self.global_step,
+            self.swag_state['count']
+        )
+
+    def _save_swag_state(self, output_dir: str) -> None:
+        if not self.swag_state or self.swag_state.get('count', 0) == 0:
+            logger.warning("SWAG enabled but no snapshots collected.")
+            return
+
+        save_path = self.swag_config.get('save_path')
+        if not save_path:
+            save_path = str(Path(output_dir) / "swag_stats.pt")
+
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        torch.save(self.swag_state, save_path)
+        logger.info("SWAG stats saved to %s", save_path)
 
     def _train_epoch(self, epoch: int) -> float:
         """
@@ -338,6 +431,9 @@ class HallucinationTrainer(BaseTrainer):
                 progress_bar.set_description(
                     f"Epoch {epoch + 1} [Step {epoch_step}/{total_steps}]"
                 )
+
+                # SWAG snapshot (LoRA params)
+                self._maybe_collect_swag()
 
                 # Call batch checkpoint callback
                 if self.checkpoint_callback:

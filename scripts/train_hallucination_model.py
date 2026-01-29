@@ -158,20 +158,24 @@ def train_model(args: argparse.Namespace) -> None:
 
         # Print final metrics
         final_metrics = history['val_metrics'][-1]
-        logger.info("\nFinal Validation Metrics:")
-        logger.info(f"  Accuracy: {final_metrics.get('accuracy', 0):.4f}")
-        logger.info(f"  F1 (macro): {final_metrics.get('f1_macro', 0):.4f}")
-        logger.info(f"  F1 (weighted): {final_metrics.get('f1_weighted', 0):.4f}")
-        if 'ece' in final_metrics:
-            logger.info(f"  ECE: {final_metrics.get('ece', 0):.4f}")
-        if 'brier' in final_metrics:
-            logger.info(f"  Brier: {final_metrics.get('brier', 0):.4f}")
+        if history['val_metrics']:
+            final_metrics = history['val_metrics'][-1]
+            logger.info("\nFinal Validation Metrics:")
+            logger.info(f"  Accuracy: {final_metrics.get('accuracy', 0):.4f}")
+            logger.info(f"  F1 (macro): {final_metrics.get('f1_macro', 0):.4f}")
+            logger.info(f"  F1 (weighted): {final_metrics.get('f1_weighted', 0):.4f}")
+            if 'ece' in final_metrics:
+                logger.info(f"  ECE: {final_metrics.get('ece', 0):.4f}")
+            if 'brier' in final_metrics:
+                logger.info(f"  Brier: {final_metrics.get('brier', 0):.4f}")
 
-        logger.info("\nPer-class F1 scores:")
-        for label in ['entailment', 'neutral', 'contradiction']:
-            f1_key = f'f1_{label}'
-            if f1_key in final_metrics:
-                logger.info(f"  {label}: {final_metrics[f1_key]:.4f}")
+            logger.info("\nPer-class F1 scores:")
+            for label in ['entailment', 'neutral', 'contradiction']:
+                f1_key = f'f1_{label}'
+                if f1_key in final_metrics:
+                    logger.info(f"  {label}: {final_metrics[f1_key]:.4f}")
+        else:
+            logger.warning("No validation metrics recorded (no epochs ran).")
 
     except Exception as e:
         logger.error(f"Training failed: {e}", exc_info=True)

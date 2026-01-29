@@ -113,7 +113,11 @@ class RAGPipeline:
 
         return len(chunks)
 
-    def _compute_uncertainty_stats(self, detection_result: Dict[str, Any]) -> Dict[str, float]:
+    def _compute_uncertainty_stats(
+        self,
+        detection_result: Dict[str, Any],
+        uncertainty_source: Optional[str] = None
+    ) -> Dict[str, float]:
         individual = detection_result.get("individual_results", [])
         if not individual:
             return {
@@ -128,8 +132,15 @@ class RAGPipeline:
             scores = result.get("scores")
             if scores:
                 contradiction_probs.append(scores.get("contradiction", 0.0))
-                max_prob = max(scores.values())
-                uncertainties.append(1.0 - max_prob)
+                if uncertainty_source == "entropy":
+                    uncertainties.append(result.get("uncertainty_entropy", 0.0))
+                elif uncertainty_source == "variance":
+                    uncertainties.append(result.get("uncertainty_variance", 0.0))
+                elif uncertainty_source == "contradiction_variance":
+                    uncertainties.append(result.get("contradiction_variance", 0.0))
+                else:
+                    max_prob = max(scores.values())
+                    uncertainties.append(1.0 - max_prob)
             else:
                 contradiction_probs.append(1.0 if result.get("is_hallucination") else 0.0)
                 uncertainties.append(1.0 - result.get("confidence", 0.0))
@@ -319,7 +330,10 @@ class RAGPipeline:
 
             # Adaptive gating
             if gating_enabled and detection_result:
-                gating_stats = self._compute_uncertainty_stats(detection_result)
+                gating_stats = self._compute_uncertainty_stats(
+                    detection_result,
+                    gating_config.get("uncertainty_source")
+                )
                 gating_stats.update({
                     "retrieval_max_score": retrieval_stats.get("max_score", 0.0),
                     "retrieval_mean_score": retrieval_stats.get("mean_score", 0.0)
@@ -456,7 +470,9 @@ class RAGPipeline:
                     ),
                     device=detector_config.get('device'),
                     base_model=detector_config.get('base_model'),
-                    lora_config=detector_config.get('lora')
+                    lora_config=detector_config.get('lora'),
+                    mc_dropout_samples=detector_config.get('mc_dropout_samples', 1),
+                    swag_config=detector_config.get('swag')
                 )
                 logger.info("Hallucination detector loaded successfully")
 

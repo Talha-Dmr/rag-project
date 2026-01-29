@@ -40,7 +40,9 @@ class HallucinationDetector:
         max_length: int = 256,
         batch_size: int = 8,
         base_model: Optional[str] = None,
-        lora_config: Optional[Dict[str, Any]] = None
+        lora_config: Optional[Dict[str, Any]] = None,
+        mc_dropout_samples: int = 1,
+        swag_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize hallucination detector.
@@ -56,6 +58,13 @@ class HallucinationDetector:
         self.batch_size = batch_size
         self.base_model = base_model
         self.lora_config = lora_config
+        self.mc_dropout_samples = max(1, int(mc_dropout_samples))
+        self.swag_config = swag_config or {}
+        self.swag_enabled = bool(self.swag_config.get("enabled", False))
+        self.swag_state = None
+        self.swag_param_names = []
+        self.swag_param_cache = {}
+        self.swag_base_params = {}
 
         # Set device
         if device is None:
@@ -66,6 +75,8 @@ class HallucinationDetector:
         # Load model and tokenizer
         logger.info(f"Loading hallucination detector from: {model_path}")
         self._load_model()
+        if self.swag_enabled:
+            self._setup_swag()
 
         logger.info(f"Hallucination detector initialized on {self.device}")
 
@@ -138,6 +149,100 @@ class HallucinationDetector:
             logger.error(f"Failed to load model: {e}")
             raise
 
+    def _setup_swag(self) -> None:
+        swag_path = self.swag_config.get("path")
+        if not swag_path:
+            raise ValueError("swag.path is required when swag is enabled")
+
+        self.swag_state = torch.load(swag_path, map_location="cpu")
+        param_names = self.swag_state.get("param_names")
+        if not param_names:
+            param_names = list(self.swag_state.get("mean", {}).keys())
+        self.swag_param_names = list(param_names or [])
+
+        # Cache LoRA parameters by name
+        for name, param in self.model.named_parameters():
+            if not param.requires_grad:
+                continue
+            if name not in self.swag_param_names:
+                continue
+            self.swag_param_cache[name] = param
+            self.swag_base_params[name] = param.detach().clone()
+
+        if not self.swag_param_cache:
+            logger.warning("SWAG enabled but no matching LoRA parameters found.")
+
+    def _apply_swag_sample(self) -> None:
+        if not self.swag_state or not self.swag_param_cache:
+            return
+
+        mean = self.swag_state.get("mean", {})
+        sq_mean = self.swag_state.get("sq_mean", {})
+
+        for name, param in self.swag_param_cache.items():
+            mu = mean.get(name)
+            second = sq_mean.get(name)
+            if mu is None or second is None:
+                continue
+            mu = mu.to(param.device)
+            second = second.to(param.device)
+            var = torch.clamp(second - mu.pow(2), min=1e-12)
+            std = torch.sqrt(var)
+            sample = mu + torch.randn_like(std) * std
+            param.data.copy_(sample)
+
+    def _restore_swag_base(self) -> None:
+        if not self.swag_base_params:
+            return
+        for name, param in self.swag_param_cache.items():
+            base = self.swag_base_params.get(name)
+            if base is None:
+                continue
+            param.data.copy_(base)
+
+    def _predict_probs(self, inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
+        if self.swag_enabled:
+            if not self.swag_state or not self.swag_param_cache:
+                logger.warning("SWAG enabled but not initialized; falling back to single pass.")
+            else:
+                num_samples = max(1, int(self.swag_config.get("num_samples", 5)))
+                probs_sum = None
+                probs_sq_sum = None
+                with torch.no_grad():
+                    for _ in range(num_samples):
+                        self._apply_swag_sample()
+                        outputs = self.model(**inputs)
+                        logits = outputs.logits
+                        probs = torch.softmax(logits, dim=-1)
+                        probs_sum = probs if probs_sum is None else probs_sum + probs
+                        probs_sq = probs.pow(2)
+                        probs_sq_sum = probs_sq if probs_sq_sum is None else probs_sq_sum + probs_sq
+                self._restore_swag_base()
+                mean = probs_sum / float(num_samples)
+                var = probs_sq_sum / float(num_samples) - mean.pow(2)
+                return mean, var
+
+        if self.mc_dropout_samples <= 1:
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                logits = outputs.logits
+                return torch.softmax(logits, dim=-1)
+
+        was_training = self.model.training
+        self.model.train()  # enable dropout
+        probs_sum = None
+        with torch.no_grad():
+            for _ in range(self.mc_dropout_samples):
+                outputs = self.model(**inputs)
+                logits = outputs.logits
+                probs = torch.softmax(logits, dim=-1)
+                probs_sum = probs if probs_sum is None else probs_sum + probs
+
+        if not was_training:
+            self.model.eval()
+
+        return probs_sum / float(self.mc_dropout_samples)
+
     def detect(
         self,
         premise: str,
@@ -172,11 +277,14 @@ class HallucinationDetector:
         # Move to device
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        # Predict
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            logits = outputs.logits
-            probs = torch.softmax(logits, dim=-1)[0]
+        pred = self._predict_probs(inputs)
+        if isinstance(pred, tuple):
+            probs, var = pred
+        else:
+            probs, var = pred, None
+
+        probs = probs[0]
+        var_row = var[0] if var is not None else None
 
         # Get prediction
         predicted_class = torch.argmax(probs).item()
@@ -198,6 +306,16 @@ class HallucinationDetector:
                 'neutral': probs[self.LABEL_NEUTRAL].item(),
                 'contradiction': probs[self.LABEL_CONTRADICTION].item()
             }
+            # Normalized entropy as uncertainty in [0,1]
+            probs_safe = torch.clamp(probs, min=1e-12)
+            entropy = -(probs_safe * torch.log(probs_safe)).sum().item()
+            norm_entropy = entropy / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+            result['uncertainty_entropy'] = float(norm_entropy)
+            if var_row is not None:
+                result['uncertainty_variance'] = float(var_row.mean().item())
+                result['contradiction_variance'] = float(
+                    var_row[self.LABEL_CONTRADICTION].item()
+                )
 
         return result
 
@@ -241,11 +359,11 @@ class HallucinationDetector:
             # Move to device
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-            # Predict
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                logits = outputs.logits
-                probs = torch.softmax(logits, dim=-1)
+            pred = self._predict_probs(inputs)
+            if isinstance(pred, tuple):
+                probs, var = pred
+            else:
+                probs, var = pred, None
 
             # Process results
             for j in range(len(batch_premises)):
@@ -267,6 +385,16 @@ class HallucinationDetector:
                         'neutral': probs[j][self.LABEL_NEUTRAL].item(),
                         'contradiction': probs[j][self.LABEL_CONTRADICTION].item()
                     }
+                    probs_safe = torch.clamp(probs[j], min=1e-12)
+                    entropy = -(probs_safe * torch.log(probs_safe)).sum().item()
+                    norm_entropy = entropy / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                    result['uncertainty_entropy'] = float(norm_entropy)
+                    if var is not None:
+                        var_row = var[j]
+                        result['uncertainty_variance'] = float(var_row.mean().item())
+                        result['contradiction_variance'] = float(
+                            var_row[self.LABEL_CONTRADICTION].item()
+                        )
 
                 all_results.append(result)
 

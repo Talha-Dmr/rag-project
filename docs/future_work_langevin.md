@@ -6,13 +6,214 @@ complexity in exchange for stronger epistemic uncertainty estimates and a more r
 Bayesian framing.
 
 ## Executive Summary (Current Snapshot)
-- Main uncertainty method for the paper: MC Dropout gating (stable and cost-effective).
-- Final MC Dropout runs (50 Q):
-  - Energy: abstain 13/50 (0.26), actions none=37, retrieve_more=13.
+- Main demo defaults (epistemic track):
+  - **Energy**: logit‑MI gating (contradiction_rate_threshold=0.90).
+  - **Macro**: logit‑MI gating (contradiction_rate_threshold=0.80).
+- Latest rep-vs-logit ablation (50Q, seed=7):
+  - Energy: logit‑MI 35/50 (0.70) vs rep‑MI 45/50 (0.90).
+  - Macro: logit‑MI 22/50 (0.44) vs rep‑MI 44/50 (0.88).
+  - Decision: keep logit‑MI as default and keep representation‑space MI experimental.
+- Consistency‑only baseline (50 Q):
+  - Energy: abstain 14/50 (0.28), actions none=36, retrieve_more=14.
   - Macro: abstain 9/50 (0.18), actions none=41, retrieve_more=9.
+- Historical logit‑MI threshold sweep (older calibration run, 50 Q):
+  - Energy:
+    - threshold=0.70 → abstain 46/50 (0.92) → too conservative for default.
+    - threshold=0.85 → abstain 22/50 (0.44) → improved, still higher than consistency‑only.
+    - threshold=0.90 → abstain 21/50 (0.42) → selected for epistemic default.
+  - Macro: abstain 12/50 (0.24) in that run.
+- Safety variant (high abstain): MC Dropout + source-consistency (sc=0.50).
+  - Energy: abstain 31/50 (0.62).
+  - Macro: abstain 36/50 (0.72).
 - LoRA-SWAG is kept as ablation only; n=5 vs n=10 did not outperform MC Dropout on macro.
 - Entropy-based SWAG gating was unstable (all-abstain vs none-abstain depending on threshold).
-- Final configs: `gating_energy_ebcar_mcdropout.yaml`, `gating_macro_ebcar_mcdropout.yaml`.
+- Final configs (epistemic default): `gating_energy_ebcar_logit_mi_sc009.yaml`, `gating_macro_ebcar_logit_mi_sc009.yaml`.
+- Experimental configs (representation track): `gating_energy_ebcar_rep_mi_sc004.yaml`, `gating_macro_ebcar_rep_mi_sc004.yaml`.
+- Coverage-first alternative: `gating_energy_ebcar_consistency_only_sc050.yaml`, `gating_macro_ebcar_consistency_only_sc050.yaml`.
+- Safety variant: `gating_energy_ebcar_mcdropout_consistency_sc050.yaml`, `gating_macro_ebcar_mcdropout_consistency_sc050.yaml`.
+- Latest gating ablation (Feb 1, 2026):
+  - Energy set is 20Q (conflict-heavy); Macro is 50Q.
+  - Results summarized below (nogate vs retrieve_more vs abstain).
+
+### Gating Ablation (Feb 1, 2026)
+Energy (20Q):
+| Setting | abstain | abstain_rate | actions |
+| --- | --- | --- | --- |
+| nogate | 0/20 | 0.00 | none=20 |
+| retrieve_more | 11/20 | 0.55 | retrieve_more=11, none=9 |
+| abstain | 15/20 | 0.75 | abstain=15, none=5 |
+
+Macro (50Q):
+| Setting | abstain | abstain_rate | actions |
+| --- | --- | --- | --- |
+| nogate | 0/50 | 0.00 | none=50 |
+| retrieve_more | 11/50 | 0.22 | retrieve_more=11, none=39 |
+| abstain | 35/50 | 0.70 | abstain=35, none=15 |
+
+### Phase 3 Kickoff: Representation-Space Posterior Probe
+- Added script: `scripts/representation_space_sampling_probe.py`
+- Purpose:
+  - Move beyond logit-space proxy and run Langevin-style sampling on the
+    penultimate classifier representation (`z`) instead of logits.
+  - This is the first concrete step toward a stronger posterior-sampling story.
+- Smoke run (8 samples, AdamW-LoRA checkpoint):
+  - Output: `evaluation_results/representation_sampling_probe_smoke.json`
+  - `mi_mean`: 0.000289
+  - `variance_mean`: 9.43e-05
+  - `entropy_mean`: 0.3627
+- Pilot run (32 samples, comparable with logit probe setup):
+  - Output: `evaluation_results/representation_sampling_probe_adamw32.json`
+  - `mi_mean`: 0.004334
+  - `variance_mean`: 0.001353
+  - `entropy_mean`: 0.5069
+- Interpretation:
+  - Probe runs end-to-end and produces stable uncertainty signals.
+  - Full sweep is completed (`evaluation_results/representation_sampling_sweep.json`, 18 runs).
+  - Best representation-space setting on 32-sample slice:
+    - `entropy_weight=0.5`, `noise_std=0.1`, `step_size=0.02`
+    - `mi_mean=0.004337`, `variance_mean=0.001354`, `entropy_mean=0.506840`
+  - Best logit-space setting remains stronger on the same slice:
+    - `mi_mean=0.009123` (`evaluation_results/logit_sampling_sweep.json`)
+  - Decision: keep logit‑MI as default epistemic signal, continue representation-space as
+    experimental track.
+
+### Signal Comparison (MC Dropout vs +Source-Consistency)
+Note: both configs include hallucination detector; “+source-consistency” adds a
+`source_consistency_threshold` gating signal (not a pure isolation).
+
+- Energy (20Q):
+  - MC Dropout: abstain 14/20 (0.70), actions retrieve_more=14, none=6
+  - +Source-consistency (sc=0.50): abstain 13/20 (0.65), actions retrieve_more=13, none=7
+- Macro (50Q):
+  - MC Dropout: abstain 9/50 (0.18), actions retrieve_more=9, none=41
+  - +Source-consistency (sc=0.50): abstain 9/50 (0.18), actions retrieve_more=9, none=41
+
+### Source-Consistency Only (Detector On, no MC Dropout)
+Energy (50Q):
+- abstain 14/50 (0.28), actions none=36, retrieve_more=14
+Macro (50Q):
+- abstain 9/50 (0.18), actions none=41, retrieve_more=9
+
+### Decision Snapshot (Safety Variant vs Default)
+Note: both configs use the hallucination detector; the difference is MC Dropout sampling.
+
+| Domain | MC Dropout + Consistency | Consistency-Only |
+| --- | --- | --- |
+| Energy (50Q) | abstain 31/50 (0.62) | abstain 14/50 (0.28) |
+| Macro (50Q) | abstain 36/50 (0.72) | abstain 9/50 (0.18) |
+
+Interpretation:
+- Consistency-only gives much higher coverage while keeping source-consistency similar.
+
+### Qualitative Conflict Examples (MC Dropout vs Source-Consistency Only, with sources)
+- Energy q11 [conflict]
+  Q: Oil demand outlook: IEO 2023 vs Shell 2024 strategy—does demand keep rising, plateau, or decline? Compare.
+  - MC Dropout: action=none abstain=False
+    A: Based on the given information, the data shows that oil demand increased significantly over the past decades, but it is projected to decrease starting around 2030 due to factors like increasing vehicle efficiency and the growing popularity of electric...
+    Sources: shell_energy_transition_strategy_2024.pdf p3,7,8,12; eia_ieo2023_narrative.pdf p58
+
+  - Source-consistency only: action=none abstain=False, sc=0.68
+    A: According to the International Energy Agency's (IEA) 2023 Outlook, Brent crude prices in high oil price scenarios have risen significantly from $102 per barrel in 2022 to over $187 in 2050, reflecting expectations that oil demand will grow faster than current...
+    Sources: shell_energy_transition_strategy_2024.pdf p3,7,8,12; eia_ieo2023_narrative.pdf p58
+
+
+- Energy q08 [conflict]
+  Q: Shell Energy Transition Strategy 2024 vs IRENA WETO 2024: how do they differ on the pace of oil and gas phase‑down?
+  - MC Dropout: action=retrieve_more abstain=True
+    A: Bu soruya güvenilir şekilde yanıt veremiyorum.
+    Sources: none
+
+  - Source-consistency only: action=none abstain=False, sc=0.78
+    A: According to Document 1, significant investment will be required to keep supplying oil and gas due to the expectation that worldwide oil and gas production outside North America has been steady at around 18 million barrels per day despite a 4% to 5% annual...
+    Sources: shell_energy_transition_strategy_2024.pdf p8,12,17,20,24
+
+
+- Energy q12 [conflict]
+  Q: Policy assumptions: AEO reference case vs WETO 1.5°C pathway—current‑law vs policy‑driven? Contrast.
+  - MC Dropout: action=none abstain=False
+    A: The AEO reference case, using current laws and technologies from 2024, contrasts with the World Energy Outlook's 1.5°C pathway that considers both current and potential future policies. The former reflects business-as-usual trends while the latter...
+    Sources: eia_aeo2025_narrative.pdf p4,5; eia_ieo2023_narrative.pdf p11,12
+
+  - Source-consistency only: action=none abstain=False, sc=0.59
+    A: The AEO Reference case assesses current law energy market operations, while the World Energy Outlook's 1.5°C pathway evaluates potential outcomes under policy-driven scenarios. Both assume technological growth but differ in their approach to legal frameworks...
+    Sources: eia_aeo2025_narrative.pdf p4,5; eia_ieo2023_narrative.pdf p11,12
+
+
+- Energy q16 [conflict]
+  Q: Investment needs: which report provides explicit investment requirements or gaps, and how do others frame it?
+  - MC Dropout: action=retrieve_more abstain=True
+    A: Bu soruya güvenilir şekilde yanıt veremiyorum.
+    Sources: none
+
+  - Source-consistency only: action=retrieve_more abstain=True, sc=0.46
+    A: Bu soruya güvenilir şekilde yanıt veremiyorum.
+    Sources: none
+
+
+- Energy q06 [conflict]
+  Q: AEO 2025 reference case vs IRENA WETO 2024: which is policy‑neutral vs normative, and how does that change the fossil‑fuel narrative?
+  - MC Dropout: action=none abstain=False
+    A: The AEO 2025 reference case and IRENA WETO 2024 differ regarding whether they are policy-neutral versus normative. The AEO 2025 reference case is designed to provide insights into the potential outcomes of various scenarios without making explicit predictions...
+    Sources: eia_aeo2025_narrative.pdf p5; eia_ieo2023_narrative.pdf p11,12; irena_weto_2024.pdf p137
+
+  - Source-consistency only: action=none abstain=False, sc=0.57
+    A: The document discusses the inclusion of two alternative policy cases in the U.S. Energy Information Administration's Annual Energy Outlook 2025, where the first examines the effects of recent regulations on power plants, while the second targets vehicle fuel...
+    Sources: eia_aeo2025_narrative.pdf p5; eia_ieo2023_narrative.pdf p11,12; irena_weto_2024.pdf p137
+
+
+- Macro q33 [conflict]
+  Q: Financial stability: do they differ on banking/financial stability risks?
+  - MC Dropout: action=retrieve_more abstain=True
+    A: Bu soruya guvenilir sekilde yanit veremiyorum.
+    Sources: none
+
+  - Source-consistency only: action=none abstain=False, sc=0.59
+    A: Yes, there seems to be some consensus among experts regarding the importance of maintaining macroeconomic stability, particularly through sound regulation and supervision. However, the specific recommendations vary between documents, suggesting differing...
+    Sources: imf_weo_2025_oct.pdf p15,41,42; worldbank_gep_2026_jan.pdf p196
+
+
+- Macro q22 [conflict]
+  Q: Monetary policy: do they differ on timing of rate cuts?
+  - MC Dropout: action=retrieve_more abstain=True
+    A: Bu soruya guvenilir sekilde yanit veremiyorum.
+    Sources: none
+
+  - Source-consistency only: action=none abstain=False, sc=0.63
+    A: Based on Document 1, Document 2, Document 3, Document 4, and Document 5, there does appear to be a difference in the timing of rate cuts among various central banks across different regions. While some central banks like the European Central Bank cut their...
+    Sources: un_wesp_2025_midyear.pdf p15; un_wesp_2025.pdf p54,55,123; worldbank_gep_2026_jan.pdf p39
+
+
+- Macro q38 [conflict]
+  Q: Policy mix: do they differ on the balance between monetary and fiscal policy?
+  - MC Dropout: action=retrieve_more abstain=True
+    A: Bu soruya guvenilir sekilde yanit veremiyorum.
+    Sources: none
+
+  - Source-consistency only: action=none abstain=False, sc=0.62
+    A: The CONTEXT documents suggest that policymakers aim for a balanced policy mix incorporating both monetary and fiscal measures to address inflation, financial stability, and inclusive growth. They emphasize integrating these policies to manage aggregate...
+    Sources: un_wesp_2025.pdf p56,123; imf_weo_2025_oct.pdf p90; un_wesp_2025_midyear.pdf p22; +1 more
+
+
+- Macro q16 [conflict]
+  Q: EMDEs: which report is most optimistic about EMDE growth?
+  - MC Dropout: action=none abstain=False
+    A: Based on Document 1, the most optimistic view regarding EMDE growth comes from Document 3, which projects an upward adjustment in EMDE growth from 3.7% to 4%. However, it's important to note that this optimistic projection doesn't extend to all EMDEs, as it...
+    Sources: worldbank_gep_2026_jan.pdf p28,42,43,51
+
+  - Source-consistency only: action=none abstain=False, sc=0.73
+    A: Based on the information provided in the context, Document 3 suggests that EMDEs excluding China are forecast to grow at 4% in 2027, indicating optimism regarding their growth prospects.Human resources department: We have received feedback that there has been...
+    Sources: worldbank_gep_2026_jan.pdf p28,42,43,51
+
+
+- Macro q17 [conflict]
+  Q: Low-income countries: how do they differ on prospects for LICs?
+  - MC Dropout: action=none abstain=False
+    A: According to Document 1, for the four-fifths of Low-Income Countries (LICs) in Sub-Saharan Africa, unless extended, the expiration of the United States' AGOA in late 2025 has eliminated duty-free access to the US market. Against this backdrop, the outlook for...
+    Sources: worldbank_gep_2026_jan.pdf p32,55,58
+
+  - Source-consistency only: action=none abstain=False, sc=0.56
+    A: Based on the information provided, LICs can be categorized into different types depending on their vulnerability levels. Some countries might see better prospects due to improved security, while others could struggle with issues like debt crises, retrenchment...
+    Sources: worldbank_gep_2026_jan.pdf p32,55,58
 
 ## What We Agreed On (Summary)
 - Full Langevin is academically strong but practically expensive and brittle.
@@ -53,23 +254,74 @@ References (core):
 - Wang et al., 2022 — "Self-Consistency Improves Chain of Thought Reasoning in Language Models".
   https://arxiv.org/abs/2203.11171
 
-## Proposed Staged Approach
-Stage 0: Baseline + Evaluation
-- Establish current RAG + hallucination detector metrics.
-- Add uncertainty proxy baselines for comparison (temperature ensemble, self-consistency).
+## Long-Horizon Roadmap (Epistemic-First)
+This roadmap aligns with the designprojectfinal.pdf objective: adaptive RAG with
+stochastic confidence and uncertainty-aware gating (answer / retrieve_more / abstain).
+The focus is to produce an epistemic signal that is usable for gating, even if
+weight-space SGLD remains unstable.
 
-Stage 1: Toy Langevin Proof-of-Concept
-- Implement Langevin on a small model and small task.
-- Verify mixing and stability on a controlled problem.
+Phase 0: Baseline Snapshot (done)
+- Current RAG + gating baseline established.
+- Logit‑MI configs are default for epistemic demos
+  (`gating_energy_ebcar_logit_mi_sc009.yaml`, `gating_macro_ebcar_logit_mi_sc009.yaml`).
+- Consistency-only configs are kept as coverage-first fallback.
+- MC Dropout + consistency retained as safety variant.
 
-Stage 2: Constrained Langevin (LoRA/Adapters)
-- Apply Langevin updates only on LoRA/adapters.
-- Measure calibration and coverage changes against baselines.
+Phase 1: Epistemic Signal Design (logit/representation sampling)
+Goal: replace unstable weight-space SGLD with a stable approximate posterior signal.
+- Define sampling space:
+  - Logit-space sampling: sample logits for next-token or sentence-level classifier.
+  - Representation-space sampling: sample pooled encoder representation before classifier.
+- Define energy / objective:
+  - Negative log-likelihood of target (for NLI proxy tasks).
+  - Consistency energy across retrieved passages (for RAG gating).
+- Implement sampler:
+  - Langevin-style steps on logits/representations.
+  - Small step sizes + noise schedule; monitor stability.
+- Output uncertainty features:
+  - entropy, variance, mutual information, disagreement rate.
+Deliverable: working stochastic confidence estimator that does not collapse on neutral.
 
-Stage 3: Integrate with Adaptive Gating
-- Use Langevin-based uncertainty as a gating signal
-  (answer vs retrieve-more vs abstain).
-- Validate end-to-end behavior on AmbigQA-style queries.
+Phase 2: Calibration + Diagnostics
+Goal: validate the epistemic proxy is meaningful.
+- Evaluate on controlled NLI datasets (AmbigQA-mini, FEVER) with ECE/Brier.
+- Compare to baselines: MC Dropout, self-consistency, temperature ensembles.
+- Ablations: sampling steps, noise scale, representation layer choice.
+Deliverable: calibration plots + evidence that proxy is competitive.
+
+Phase 3: Gating Integration
+Goal: wire epistemic signal into the RAG decision controller.
+- Replace/augment current gating score with epistemic proxy.
+- Decision policy: answer vs retrieve_more vs abstain.
+- Add smooth thresholds (avoid brittle hard cutoffs).
+Deliverable: end-to-end adaptive behavior with reduced hallucinations.
+
+Phase 4: Domain Stress Tests
+Goal: test under ambiguity and conflict-heavy domains.
+- Energy (IEA/IRENA/EIA) and Macro (IMF/WorldBank/UN) conflict sets.
+- Add “shifted domain” set with policy or tech ambiguity.
+- Compare coverage vs hallucination trade-offs.
+Deliverable: domain generalization results + failure taxonomy.
+
+Phase 5: Robustness & Reliability Layer
+Goal: incorporate verifier-based signals as supporting evidence.
+- Fuse hallucination detector / verifier outputs into gating score.
+- Confidence fusion: weighted sum or learned logistic gate.
+- Measure robustness to adversarial or contradictory retrievals.
+Deliverable: stability under contradiction and adversarial prompts.
+
+Phase 6: Theoretical Framing & Reporting
+Goal: connect practice to the intended stochastic modeling narrative.
+- Position as approximate posterior sampling (logit/rep space).
+- Justify why this is an epistemic proxy for gating decisions.
+- Report calibration and abstention trade-offs as core findings.
+Deliverable: paper-quality rationale + metrics tables.
+
+Phase 7: Long-Run Extensions (optional)
+- Weight-space SGLD revisited with longer training and larger datasets.
+- Larger models (3B–7B) if resources permit.
+- Controlled ablations on uncertainty-driven retrieval policies.
+Deliverable: optional full posterior narrative (if it becomes stable).
 
 ## Success Criteria (Draft)
 - Langevin sampler is stable (no divergence) and produces non-degenerate samples.
@@ -87,20 +339,22 @@ Stage 3: Integrate with Adaptive Gating
 - Hard success thresholds (ECE, F1, hallucination rate) for go/no-go?
 
 ## Roadmap (Next 2–3 Weeks)
-Week 1 — Consolidate Evidence
-- Freeze configs for energy + macro (current EBCAR settings).
-- Summarize ablations in one table (baseline vs gating off vs retrieve_more vs abstain).
-- Curate 5–10 qualitative conflict examples with short commentary.
+Week 1 — Baseline Lock + Decision (done)
+- Default configs: logit‑MI (Energy thr=0.90, Macro thr=0.80).
+- Coverage fallback: consistency-only (sc=0.50) for Energy + Macro.
+- Ablations complete: nogate vs consistency-only vs MC Dropout + consistency vs logit‑MI.
+- Write the decision summary + one results table.
+- (Optional) Curate 5–10 conflict examples with short commentary.
 
-Week 2 — Langevin Readiness
-- Define success thresholds (ECE/coverage/abstain trade-off).
-- Implement toy Langevin diagnostic (sanity check on mixing).
-- Warm-start SGLD from AdamW LoRA checkpoint and re-evaluate.
+Week 2 — Posterior Sampling Pilot (toy + NLI)
+- Implement toy Langevin (1D Gaussian) to validate stability + calibration.
+- Prototype SGLD/SGHMC on DeBERTa NLI mini (LoRA parameters only).
+- Report ECE/Brier vs proxy baselines (MC Dropout / consistency-only).
 
-Week 3 — End-to-End Validation
-- Plug uncertainty into gating on AmbigQA-scale sample.
-- Compare against proxy baselines (temperature ensemble/self-consistency).
-- Draft experiment section (methods + results snapshot).
+Week 3 — Integration + Compare
+- Use posterior uncertainty as a gating signal (answer/retrieve_more/abstain).
+- Compare vs consistency-only baseline on Energy + Macro (50Q).
+- Freeze a go/no‑go decision for full LLM‑scale Langevin.
 
 Must‑Have
 - One strong ablation table + conflict examples for two domains.
@@ -109,6 +363,44 @@ Must‑Have
 Nice‑to‑Have
 - Extra domain or larger sample sizes.
 - Visualization of trade-off curves (coverage vs abstain).
+
+## Roadmap (Month 2–6, Long-Horizon)
+Month 2 — Epistemic Signal Hardening
+- Calibrate logit‑MI thresholds per domain (Energy vs Macro) with 50–100Q sweeps.
+- Add representation‑space sampling (pooler/CLS layer) and compare vs logit‑MI.
+- Build a simple “uncertainty report” artifact: MI histogram + coverage curve.
+Deliverable: stable epistemic proxy with clear operating region.
+
+Month 3 — RAG Policy Optimization
+- Move from fixed thresholds to soft decision policy:
+  - e.g., weighted score = a*MI + b*(1-consistency) + c*contradiction_rate.
+- Fit simple logistic gate on small labeled set (answer vs abstain).
+- Add “retrieve_more” budget policy (max retries vs expected gain).
+Deliverable: policy‑driven gating that beats threshold baselines.
+
+Month 4 — Generator‑Side Uncertainty (LLM)
+- Extend sampling to generator:
+  - Next‑token logit sampling with short Langevin steps.
+  - Compare to self‑consistency / temperature ensembles on same prompts.
+- Measure impact on answer quality + abstain decisions.
+Deliverable: evidence that epistemic proxy generalizes beyond NLI.
+
+Month 5 — Robustness & Domain Transfer
+- New conflict‑heavy domain (policy/tech) with 50Q+.
+- Stress tests: contradictory retrieval, noisy contexts, missing sources.
+- Ablate against “retrieve_more only” and “abstain only”.
+Deliverable: generalization results + failure taxonomy.
+
+Month 6 — Paper/Thesis Package
+- Final ablation tables + figures (coverage vs risk).
+- Narrative: “approximate posterior sampling in logit/rep space for adaptive RAG”.
+- Decide submission target / thesis chapter structure.
+Deliverable: camera‑ready experiment package.
+
+### Decision Gates
+- After Month 2: keep logit‑MI vs move fully to representation‑space?
+- After Month 4: if generator‑side uncertainty is weak, narrow scope to NLI‑proxy.
+- After Month 5: if domain transfer fails, refocus on one domain with deeper analysis.
 
 ## Direction Memo (Differentiation + Advancement)
 Goal: Stay differentiated from generic RAG while pushing uncertainty forward.
@@ -151,11 +443,25 @@ Research Queue (to push beyond current baselines)
 - `config/sgld_lora_pilot_ambigqa_mini.yaml` (LoRA + SGLD, mini dataset).
 - `config/adamw_lora_sanity_ambigqa_mini.yaml` (LoRA + AdamW sanity check, mini dataset).
 - `config/sgld_lora_swag_collect_ambigqa_mini.yaml` (LoRA-SWAG snapshot collection).
+- `config/gating_energy_ebcar_mcdropout.yaml` (Energy gating with MC Dropout).
+- `config/gating_energy_ebcar_consistency_only_sc050.yaml` (Energy source-consistency only, sc=0.50; coverage fallback).
+- `config/gating_energy_ebcar_logit_mi_sc009.yaml` (Energy logit‑MI gating; epistemic default, thr=0.90).
+- `config/gating_energy_ebcar_mcdropout_consistency_sc050.yaml` (Energy source-consistency + MC Dropout, sc=0.50).
+- `config/gating_energy_ebcar_mcdropout_consistency_sc060.yaml` (Energy source-consistency, sc=0.60).
+- `config/gating_energy_ebcar_mcdropout_consistency_sc070.yaml` (Energy source-consistency, sc=0.70).
 - `config/gating_energy_ebcar_swag.yaml` (Energy gating with SWAG uncertainty).
 - `config/gating_energy_ebcar_swag_ns10.yaml` (Energy SWAG sensitivity, n=10).
 - `config/gating_energy_ebcar_swag_entropy.yaml` (Energy SWAG gating using entropy).
+- `config/gating_energy_ebcar_abstain.yaml` (Energy abstain-only gating).
+- `config/gating_macro_ebcar_mcdropout.yaml` (Macro gating with MC Dropout).
+- `config/gating_macro_ebcar_consistency_only_sc050.yaml` (Macro source-consistency only, sc=0.50; coverage fallback).
+- `config/gating_macro_ebcar_logit_mi_sc009.yaml` (Macro logit‑MI gating; epistemic default, thr=0.80).
+- `config/gating_macro_ebcar_mcdropout_consistency_sc050.yaml` (Macro source-consistency + MC Dropout, sc=0.50).
+- `config/gating_macro_ebcar_mcdropout_consistency_sc060.yaml` (Macro source-consistency, sc=0.60).
+- `config/gating_macro_ebcar_mcdropout_consistency_sc070.yaml` (Macro source-consistency, sc=0.70).
 - `config/gating_macro_ebcar_swag.yaml` (Macro gating with SWAG uncertainty).
 - `config/gating_macro_ebcar_swag_entropy.yaml` (Macro SWAG gating using entropy).
+- `config/gating_macro_ebcar_abstain.yaml` (Macro abstain-only gating).
 - Existing pilots for comparison remain:
   - `config/adamw_pilot_ambigqa_mini.yaml`
   - `config/sgld_pilot_ambigqa_mini.yaml`
@@ -196,19 +502,18 @@ Outcome:
 
 ### Toy Langevin Sanity (1D Gaussian)
 Run (local check):
-- 1D target N(0,1), eta=0.01, burn-in=1000, steps=6000
+- `PYTHONPATH=. venv312/bin/python scripts/toy_langevin_sanity.py`
 
-Result:
-- mean ≈ 0.142, std ≈ 1.043 (close to N(0,1))
+Result (seed=7):
+- ULA: eta=0.01, burn-in=1000, steps=6000 → mean -0.018, std 0.925
+- ULA: eta=0.005, burn-in=5000, steps=30000 → mean -0.010, std 0.987
+- ULA: eta=0.01, burn-in=5000, steps=30000 → mean -0.004, std 0.988
+- MALA: eta=0.05, burn-in=2000, steps=20000 → mean -0.004, std 0.988, accept 0.998
+- MALA: eta=0.10, burn-in=2000, steps=20000 → mean 0.003, std 0.995, accept 0.993
 
-Note:
-- Mean offset likely due to short chain; longer chain or smaller eta should reduce bias.
-- Longer chain checks:
-  - eta=0.005, burn-in=5000, steps=30000 → mean ≈ -0.037, std ≈ 0.839
-  - eta=0.01, burn-in=5000, steps=30000 → mean ≈ -0.026, std ≈ 0.861
-- Interpretation: unadjusted Langevin shows discretization bias in variance; consider smaller eta and/or MALA if strict correctness is required.
-- MALA sanity (eta=0.05, burn-in=2000, steps=20000): mean ≈ 0.026, std ≈ 1.009, accept ≈ 1.00
-- MALA sanity (eta=0.1, burn-in=2000, steps=20000): mean ≈ 0.023, std ≈ 1.010, accept ≈ 0.99
+Interpretation:
+- ULA shows variance bias at larger eta; smaller eta improves variance.
+- MALA corrects bias better at moderate eta (acceptance ~0.99).
 
 ### Prior Sweep (Higher Noise, Pre-`modules_to_save`)
 Results file:
@@ -304,11 +609,12 @@ Notes:
 
 | Model | Accuracy | F1_macro | F1_weighted | ECE | Brier |
 |---|---:|---:|---:|---:|---:|
-| AdamW LoRA sanity | 0.7780 | 0.7404 | 0.7471 | 0.0209 | 0.2694 |
-| SGLD warm-start (noise=5e-5) | 0.7780 | 0.7404 | 0.7471 | 0.0194 | 0.2693 |
+| AdamW LoRA sanity | 0.2650 | 0.2094 | 0.2055 | 0.3491 | 0.9116 |
+| SGLD warm-start (noise=5e-5) | 0.2700 | 0.2132 | 0.2093 | 0.3449 | 0.9070 |
 
 Notes:
-- SGLD warm-start gives a small ECE improvement; other metrics are effectively identical.
+- Both checkpoints underpredict the neutral class; accuracy is well below expected.
+- Prior higher metrics were from a different run and are treated as stale.
 
 ### Gating Prototype (Qwen2.5-1.5B, designprojectfinal.pdf)
 - Demo config: `config/gating_demo.yaml`
@@ -398,21 +704,79 @@ MC Dropout threshold sweep (Energy, 50 Q):
 - uncertainty=0.42 → abstain 10/50 (0.20)
 - uncertainty=0.50 → abstain 0/50 (0.00)
 
-## Final Recommendation (Current Snapshot)
-- Use MC Dropout gating as the main uncertainty method for the paper.
-- Energy: `gating_energy_ebcar_mcdropout.yaml` with uncertainty_threshold=0.42 (balanced abstain 0.20).
-- Macro: `gating_macro_ebcar_mcdropout.yaml` (abstain 0.18); SWAG n=5 shows no gain.
-- Keep LoRA-SWAG results as an appendix/ablation (n=5 vs n=10).
+Source-consistency sweep (20 Q, retrieve_more):
+- Energy: sc=0.50 → 4/20 (0.20), sc=0.60 → 12/20 (0.60), sc=0.70 → 16/20 (0.80)
+- Macro: sc=0.50 → 2/20 (0.10), sc=0.60 → 10/20 (0.50), sc=0.70 → 17/20 (0.85)
 
-Final runs (Energy/Macro, 50 Q, MC Dropout):
-- Energy: abstain 13/50 (0.26), actions none=37, retrieve_more=13.
+Source-consistency distribution (50 Q, top_k=5):
+- Energy: min=0.276, mean=0.555, median=0.569, max=0.872
+- Macro: min=0.377, mean=0.573, median=0.579, max=0.728
+
+Source-consistency (50 Q, threshold=0.50, retrieve_more):
+- Energy: abstain 14/50 (0.28), actions none=36, retrieve_more=14.
 - Macro: abstain 9/50 (0.18), actions none=41, retrieve_more=9.
+
+## Final Recommendation (Current Snapshot)
+- Default for demos:
+  - Energy: logit‑MI gating → `gating_energy_ebcar_logit_mi_sc009.yaml` (abstain 35/50).
+  - Macro: logit‑MI gating → `gating_macro_ebcar_logit_mi_sc009.yaml` (abstain 22/50).
+- Representation-space (experimental only):
+  - Energy: `gating_energy_ebcar_rep_mi_sc004.yaml` (abstain 45/50).
+  - Macro: `gating_macro_ebcar_rep_mi_sc004.yaml` (abstain 44/50).
+- Coverage-first fallback:
+  - Energy: source-consistency only (sc=0.50) → `gating_energy_ebcar_consistency_only_sc050.yaml` (abstain 14/50).
+  - Macro: source-consistency only (sc=0.50) → `gating_macro_ebcar_consistency_only_sc050.yaml` (abstain 9/50).
+- Safety variant: MC Dropout + source-consistency (more conservative).
+  - Energy: `gating_energy_ebcar_mcdropout_consistency_sc050.yaml` (abstain 31/50).
+  - Macro: `gating_macro_ebcar_mcdropout_consistency_sc050.yaml` (abstain 36/50).
+- Energy logit‑MI threshold sensitivity:
+  - thr=0.70 → abstain 46/50
+  - thr=0.85 → abstain 22/50
+  - thr=0.90 → abstain 21/50 (historical calibration run)
+- Keep LoRA-SWAG results as appendix/ablation (n=5 vs n=10).
+- MC Dropout-only configs remain as ablations (historical thresholds, not default).
+
+Final runs (Energy/Macro, 50 Q, default + safety):
+- Default (epistemic, current): Energy 35/50, Macro 22/50.
+- Experimental rep-MI: Energy 45/50, Macro 44/50.
+- Safety (MC Dropout + consistency): Energy 31/50, Macro 36/50.
+- Coverage fallback: Energy 14/50, Macro 9/50.
+- Experimental: Energy logit‑MI 46/50 (thr=0.70) or 22/50 (thr=0.85).
 
 ## Final Results Table (50 Q)
 | Domain | Method | Config | Abstain | Actions (none/retrieve_more) |
 |---|---|---|---|---|
-| Energy | MC Dropout (final) | `gating_energy_ebcar_mcdropout.yaml` | 13/50 (0.26) | 37 / 13 |
-| Macro | MC Dropout (final) | `gating_macro_ebcar_mcdropout.yaml` | 9/50 (0.18) | 41 / 9 |
+| Energy | Logit‑MI (default) | `gating_energy_ebcar_logit_mi_sc009.yaml` | 35/50 (0.70) | 15 / 35 |
+| Macro | Logit‑MI (default) | `gating_macro_ebcar_logit_mi_sc009.yaml` | 22/50 (0.44) | 28 / 22 |
+| Energy | Rep‑MI (experimental) | `gating_energy_ebcar_rep_mi_sc004.yaml` | 45/50 (0.90) | 5 / 45 |
+| Macro | Rep‑MI (experimental) | `gating_macro_ebcar_rep_mi_sc004.yaml` | 44/50 (0.88) | 6 / 44 |
+| Energy | Consistency-only (coverage fallback) | `gating_energy_ebcar_consistency_only_sc050.yaml` | 14/50 (0.28) | 36 / 14 |
+| Energy | Logit‑MI (experimental, thr=0.70) | `gating_energy_ebcar_logit_mi_sc009.yaml` | 46/50 (0.92) | 4 / 46 |
+| Energy | Logit‑MI (experimental, thr=0.85) | `gating_energy_ebcar_logit_mi_sc009.yaml` | 22/50 (0.44) | 28 / 22 |
+| Macro | Consistency-only (baseline) | `gating_macro_ebcar_consistency_only_sc050.yaml` | 9/50 (0.18) | 41 / 9 |
+| Energy | MC Dropout + Consistency (safety) | `gating_energy_ebcar_mcdropout_consistency_sc050.yaml` | 31/50 (0.62) | 19 / 31 |
+| Macro | MC Dropout + Consistency (safety) | `gating_macro_ebcar_mcdropout_consistency_sc050.yaml` | 36/50 (0.72) | 14 / 36 |
+
+Note:
+- Energy logit‑MI 50Q runs are now available for 0.70 / 0.85 / 0.90.
+- Macro logit‑MI 50Q runs are available for 0.70 and 0.80 (same abstain rate on current set).
+
+## Gating Ablation (50 Q)
+| Domain | Strategy | Config | Abstain | Actions |
+|---|---|---|---|---|
+| Energy | nogate | `gating_energy_ebcar_nogate.yaml` | 0/50 (0.00) | none=50 |
+| Energy | retrieve_more (default, epistemic) | `gating_energy_ebcar_logit_mi_sc009.yaml` | 35/50 (0.70) | none=15, retrieve_more=35 |
+| Energy | retrieve_more (rep-MI, experimental) | `gating_energy_ebcar_rep_mi_sc004.yaml` | 45/50 (0.90) | none=5, retrieve_more=45 |
+| Energy | retrieve_more (coverage fallback) | `gating_energy_ebcar_consistency_only_sc050.yaml` | 14/50 (0.28) | none=36, retrieve_more=14 |
+| Energy | retrieve_more (safety) | `gating_energy_ebcar_mcdropout_consistency_sc050.yaml` | 31/50 (0.62) | none=19, retrieve_more=31 |
+| Energy | retrieve_more (logit‑MI, experimental thr=0.70) | `gating_energy_ebcar_logit_mi_sc009.yaml` | 46/50 (0.92) | none=4, retrieve_more=46 |
+| Energy | abstain | `gating_energy_ebcar_abstain.yaml` | 22/50 (0.44) | none=28, abstain=22 |
+| Macro | nogate | `gating_macro_ebcar_nogate.yaml` | 0/50 (0.00) | none=50 |
+| Macro | retrieve_more (default) | `gating_macro_ebcar_logit_mi_sc009.yaml` | 22/50 (0.44) | none=28, retrieve_more=22 |
+| Macro | retrieve_more (rep-MI, experimental) | `gating_macro_ebcar_rep_mi_sc004.yaml` | 44/50 (0.88) | none=6, retrieve_more=44 |
+| Macro | retrieve_more (baseline) | `gating_macro_ebcar_consistency_only_sc050.yaml` | 9/50 (0.18) | none=41, retrieve_more=9 |
+| Macro | retrieve_more (safety) | `gating_macro_ebcar_mcdropout_consistency_sc050.yaml` | 36/50 (0.72) | none=14, retrieve_more=36 |
+| Macro | abstain | `gating_macro_ebcar_abstain.yaml` | 23/50 (0.46) | none=27, abstain=23 |
 
 ## Qualitative Examples (Gating Decisions)
 Energy (EIA/IRENA/Shell, EBCAR):
@@ -471,7 +835,7 @@ Corpus (PDFs):
 - `data/domain_macro/raw/un_wesp_2025_midyear.pdf`
 
 Notes:
-- IMF WEO PDFs were blocked by the IMF CDN in this environment; skipped for now.
+- IMF WEO PDFs were initially blocked by the IMF CDN; later added via manual download.
 
 Indexing:
 - `config/gating_macro_ebcar.yaml` → `./data/vector_db/macro_outlooks` (collection `rag_macro_outlooks`)

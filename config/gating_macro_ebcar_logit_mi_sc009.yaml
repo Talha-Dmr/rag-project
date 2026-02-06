@@ -1,0 +1,60 @@
+# Macro domain: logit-space MI gating (hybrid energy).
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cuda
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/gating_demo
+    collection_name: rag_gating_demo
+
+llm:
+  model_name: Qwen/Qwen2.5-1.5B-Instruct
+  device: cuda
+  max_tokens: 256
+
+retrieval:
+  k: 5
+  score_threshold: 0.0
+
+reranker:
+  type: ebcar
+  top_k: 5
+
+hallucination_detector:
+  model_path: models/checkpoints/adamw_lora_sanity_ambigqa_mini/best_model
+  base_model: microsoft/deberta-v3-small
+  mc_dropout_samples: 1
+  logit_sampling:
+    enabled: true
+    steps: 40
+    step_size: 0.03
+    noise_std: 0.1
+    energy: hybrid
+    prior_strength: 1.0
+    entropy_weight: 0.5
+
+sources:
+  consistency_top_k: 5
+
+# Gating config
+# Use MI as uncertainty; threshold tuned from sweep (~0.009 mean)
+
+
+gating:
+  enabled: true
+  strategy: retrieve_more
+  max_retries: 2
+  k_multiplier: 2.0
+  max_k: 20
+  # Macro logit-MI latest 50Q run gives 22/50 abstain at this setting.
+  contradiction_rate_threshold: 0.80
+  contradiction_prob_threshold: 0.5
+  uncertainty_source: logit_mi
+  uncertainty_threshold: 0.02
+  source_consistency_threshold: 0.35
+  source_consistency_top_k: 5
+  abstain_message: "I don't have enough reliable information to answer that."

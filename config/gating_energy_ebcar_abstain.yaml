@@ -1,4 +1,4 @@
-# Macro outlooks domain (World Bank + UN WESP + IMF WEO) — MC Dropout baseline
+# Energy outlooks domain (EIA + Shell)
 
 data_loader:
   type: pdf
@@ -22,8 +22,8 @@ embeddings:
 vector_store:
   type: chroma
   config:
-    persist_directory: ${VECTOR_DB_PATH:./data/vector_db/macro_outlooks}
-    collection_name: rag_macro_outlooks
+    persist_directory: ${VECTOR_DB_PATH:./data/vector_db/energy_outlooks}
+    collection_name: rag_energy_outlooks
 
 llm:
   model_name: Qwen/Qwen2.5-1.5B-Instruct
@@ -75,4 +75,4 @@ gating:
   max_retries: 2
   k_multiplier: 2.0
   max_k: 20
-  abstain_message: "Bu soruya guvenilir sekilde yanit veremiyorum."
+  abstain_message: "Bu soruya güvenilir şekilde yanıt veremiyorum."

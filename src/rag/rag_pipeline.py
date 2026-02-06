@@ -4,6 +4,7 @@ Main RAG Pipeline orchestrator.
 
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+import numpy as np
 from src.dataset.data_manager import DataManager
 from src.chunking.base_chunker import ChunkerFactory
 from src.embeddings.base_embedder import EmbedderFactory
@@ -140,6 +141,18 @@ class RAGPipeline:
                     uncertainties.append(result.get("uncertainty_variance", 0.0))
                 elif uncertainty_source == "contradiction_variance":
                     uncertainties.append(result.get("contradiction_variance", 0.0))
+                elif uncertainty_source == "logit_mi":
+                    uncertainties.append(result.get("uncertainty_logit_mi", 0.0))
+                elif uncertainty_source == "logit_variance":
+                    uncertainties.append(result.get("uncertainty_logit_variance", 0.0))
+                elif uncertainty_source == "logit_entropy":
+                    uncertainties.append(result.get("uncertainty_logit_entropy", 0.0))
+                elif uncertainty_source == "rep_mi":
+                    uncertainties.append(result.get("uncertainty_rep_mi", 0.0))
+                elif uncertainty_source == "rep_variance":
+                    uncertainties.append(result.get("uncertainty_rep_variance", 0.0))
+                elif uncertainty_source == "rep_entropy":
+                    uncertainties.append(result.get("uncertainty_rep_entropy", 0.0))
                 else:
                     max_prob = max(scores.values())
                     uncertainties.append(1.0 - max_prob)
@@ -176,6 +189,38 @@ class RAGPipeline:
             "mean_score": sum(scores) / len(scores)
         }
 
+    def _compute_source_consistency(
+        self,
+        retrieved_docs: List[Dict[str, Any]],
+        top_k: Optional[int] = None
+    ) -> Optional[float]:
+        if not retrieved_docs:
+            return None
+
+        max_docs = int(top_k or self.source_config.get("consistency_top_k", 5))
+        docs = retrieved_docs[:max_docs]
+        texts = [doc.get("content", "") for doc in docs if doc.get("content")]
+        if len(texts) < 2:
+            return 1.0
+
+        try:
+            embeddings = self.embedder.embed_batch(texts)
+            vectors = np.array(embeddings, dtype=float)
+            if vectors.ndim != 2 or vectors.shape[0] < 2:
+                return None
+
+            norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            vectors = vectors / norms
+            sim = vectors @ vectors.T
+            tri = sim[np.triu_indices(sim.shape[0], k=1)]
+            if tri.size == 0:
+                return 1.0
+            return float(tri.mean())
+        except Exception as e:
+            logger.warning(f"Failed to compute source consistency: {e}")
+            return None
+
     def _merge_gating_config(self, override: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         if not override:
             return dict(self.gating_config)
@@ -188,6 +233,7 @@ class RAGPipeline:
         contradiction_rate = stats.get("contradiction_rate", 0.0)
         contradiction_prob = stats.get("contradiction_prob_mean", 0.0)
         uncertainty = stats.get("uncertainty_mean", 0.0)
+        source_consistency = stats.get("source_consistency")
         max_retrieval_score = stats.get("retrieval_max_score", 1.0)
         mean_retrieval_score = stats.get("retrieval_mean_score", 1.0)
 
@@ -196,12 +242,16 @@ class RAGPipeline:
         uncertainty_threshold = gating_config.get("uncertainty_threshold", 0.3)
         min_retrieval_score = gating_config.get("min_retrieval_score")
         min_mean_retrieval_score = gating_config.get("min_mean_retrieval_score")
+        source_consistency_threshold = gating_config.get("source_consistency_threshold")
 
         retrieval_low = False
         if isinstance(min_retrieval_score, (int, float)) and max_retrieval_score < float(min_retrieval_score):
             retrieval_low = True
         if isinstance(min_mean_retrieval_score, (int, float)) and mean_retrieval_score < float(min_mean_retrieval_score):
             retrieval_low = True
+        if isinstance(source_consistency_threshold, (int, float)) and source_consistency is not None:
+            if source_consistency < float(source_consistency_threshold):
+                retrieval_low = True
 
         should_gate = (
             contradiction_rate >= contradiction_rate_threshold or
@@ -245,7 +295,10 @@ class RAGPipeline:
         logger.info(f"Processing query: {query_text[:100]}...")
 
         gating_config = self._merge_gating_config(gating)
-        gating_enabled = bool(gating_config.get("enabled", False)) and bool(self.hallucination_detector)
+        source_consistency_gate = gating_config.get("source_consistency_threshold") is not None
+        gating_enabled = bool(gating_config.get("enabled", False)) and (
+            bool(self.hallucination_detector) or source_consistency_gate
+        )
         gating_action = "none"
         gating_stats = None
         gating_attempts = 0
@@ -284,6 +337,12 @@ class RAGPipeline:
             logger.info(f"Retrieved {len(retrieved_docs)} documents")
 
             retrieval_stats = self._compute_retrieval_stats(retrieved_docs)
+            source_consistency = None
+            if gating_enabled and gating_config.get("source_consistency_threshold") is not None:
+                source_consistency = self._compute_source_consistency(
+                    retrieved_docs,
+                    gating_config.get("source_consistency_top_k")
+                )
 
             # Generate answer
             logger.info("Generating answer...")
@@ -337,15 +396,26 @@ class RAGPipeline:
                 detection_result = None
 
             # Adaptive gating
-            if gating_enabled and detection_result:
-                gating_stats = self._compute_uncertainty_stats(
-                    detection_result,
-                    gating_config.get("uncertainty_source")
-                )
-                gating_stats.update({
+            if gating_enabled:
+                gating_stats = {
                     "retrieval_max_score": retrieval_stats.get("max_score", 0.0),
-                    "retrieval_mean_score": retrieval_stats.get("mean_score", 0.0)
-                })
+                    "retrieval_mean_score": retrieval_stats.get("mean_score", 0.0),
+                    "source_consistency": source_consistency
+                }
+                if detection_result:
+                    gating_stats.update(
+                        self._compute_uncertainty_stats(
+                            detection_result,
+                            gating_config.get("uncertainty_source")
+                        )
+                    )
+                else:
+                    gating_stats.update({
+                        "contradiction_rate": 0.0,
+                        "contradiction_prob_mean": 0.0,
+                        "uncertainty_mean": 0.0
+                    })
+
                 decision = self._decide_gating_action(gating_stats, gating_config)
 
                 if decision == "retrieve_more" and gating_attempts < max_retries:
@@ -380,7 +450,8 @@ class RAGPipeline:
                 'thresholds': {
                     'contradiction_rate': gating_config.get("contradiction_rate_threshold"),
                     'contradiction_prob': gating_config.get("contradiction_prob_threshold"),
-                    'uncertainty': gating_config.get("uncertainty_threshold")
+                    'uncertainty': gating_config.get("uncertainty_threshold"),
+                    'source_consistency': gating_config.get("source_consistency_threshold")
                 },
                 'stats': gating_stats
             }
@@ -561,17 +632,19 @@ class RAGPipeline:
 
                 logger.info(f"Loading hallucination detector from: {model_path}")
                 hallucination_detector = HallucinationDetector(
-                    model_path=model_path,
-                    max_length=detector_config.get(
-                        'max_length',
-                        training_config.get('data', {}).get('max_seq_length', 256)
-                    ),
-                    device=detector_config.get('device'),
-                    base_model=detector_config.get('base_model'),
-                    lora_config=detector_config.get('lora'),
-                    mc_dropout_samples=detector_config.get('mc_dropout_samples', 1),
-                    swag_config=detector_config.get('swag')
-                )
+                        model_path=model_path,
+                        max_length=detector_config.get(
+                            'max_length',
+                            training_config.get('data', {}).get('max_seq_length', 256)
+                        ),
+                        device=detector_config.get('device'),
+                        base_model=detector_config.get('base_model'),
+                        lora_config=detector_config.get('lora'),
+                        mc_dropout_samples=detector_config.get('mc_dropout_samples', 1),
+                        swag_config=detector_config.get('swag'),
+                        logit_sampling_config=detector_config.get('logit_sampling'),
+                        representation_sampling_config=detector_config.get('representation_sampling')
+                    )
                 logger.info("Hallucination detector loaded successfully")
 
             except Exception as e:

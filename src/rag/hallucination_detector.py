@@ -6,6 +6,7 @@ by performing NLI (Natural Language Inference) between context and answer.
 """
 
 import torch
+import torch.nn.functional as F
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from typing import List, Dict, Any, Optional
 from pathlib import Path
@@ -42,7 +43,9 @@ class HallucinationDetector:
         base_model: Optional[str] = None,
         lora_config: Optional[Dict[str, Any]] = None,
         mc_dropout_samples: int = 1,
-        swag_config: Optional[Dict[str, Any]] = None
+        swag_config: Optional[Dict[str, Any]] = None,
+        logit_sampling_config: Optional[Dict[str, Any]] = None,
+        representation_sampling_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize hallucination detector.
@@ -65,6 +68,13 @@ class HallucinationDetector:
         self.swag_param_names = []
         self.swag_param_cache = {}
         self.swag_base_params = {}
+        self.logit_sampling_config = logit_sampling_config or {}
+        self.logit_sampling_enabled = bool(self.logit_sampling_config.get("enabled", False))
+        self.representation_sampling_config = representation_sampling_config or {}
+        self.representation_sampling_enabled = bool(
+            self.representation_sampling_config.get("enabled", False)
+        )
+        self._classifier_module = None
 
         # Set device
         if device is None:
@@ -75,10 +85,45 @@ class HallucinationDetector:
         # Load model and tokenizer
         logger.info(f"Loading hallucination detector from: {model_path}")
         self._load_model()
+        if self.representation_sampling_enabled:
+            try:
+                self._classifier_module = self._resolve_classifier_module()
+            except Exception as e:
+                logger.warning(
+                    "Representation sampling requested but classifier head was not resolved: %s",
+                    e
+                )
+                self.representation_sampling_enabled = False
         if self.swag_enabled:
             self._setup_swag()
 
         logger.info(f"Hallucination detector initialized on {self.device}")
+        if self.logit_sampling_enabled:
+            logger.info("Logit sampling enabled: %s", self.logit_sampling_config)
+        if self.representation_sampling_enabled:
+            logger.info("Representation sampling enabled: %s", self.representation_sampling_config)
+
+    def _resolve_classifier_module(self) -> torch.nn.Module:
+        """Find classifier head across plain HF and PEFT wrapped models."""
+        candidates = []
+        if hasattr(self.model, "classifier"):
+            candidates.append(getattr(self.model, "classifier"))
+        if hasattr(self.model, "base_model"):
+            base_model = getattr(self.model, "base_model")
+            if hasattr(base_model, "classifier"):
+                candidates.append(getattr(base_model, "classifier"))
+            if hasattr(base_model, "model") and hasattr(base_model.model, "classifier"):
+                candidates.append(getattr(base_model.model, "classifier"))
+
+        for mod in candidates:
+            if isinstance(mod, torch.nn.Module):
+                return mod
+
+        for name, mod in self.model.named_modules():
+            if name.endswith("classifier"):
+                return mod
+
+        raise RuntimeError("Could not find classifier head for representation sampling.")
 
     def _load_model(self) -> None:
         """Load model and tokenizer."""
@@ -129,7 +174,14 @@ class HallucinationDetector:
                 device=self.device,
                 lora_config=lora_config
             )
-            self.model.load_state_dict(torch.load(model_pt, map_location=self.device))
+            state = torch.load(model_pt, map_location=self.device)
+            missing, unexpected = self.model.load_state_dict(state, strict=False)
+            if missing or unexpected:
+                logger.warning(
+                    "Checkpoint load (strict=False). Missing keys: %s | Unexpected keys: %s",
+                    missing,
+                    unexpected
+                )
             self.model.eval()
 
             logger.info("Loaded model from training checkpoint")
@@ -243,6 +295,136 @@ class HallucinationDetector:
 
         return probs_sum / float(self.mc_dropout_samples)
 
+    def _logit_sampling_metrics(self, base_logits: torch.Tensor) -> Dict[str, torch.Tensor]:
+        cfg = self.logit_sampling_config
+        steps = int(cfg.get("steps", 30))
+        step_size = float(cfg.get("step_size", 0.03))
+        noise_std = float(cfg.get("noise_std", 0.1))
+        prior_strength = float(cfg.get("prior_strength", 1.0))
+        entropy_weight = float(cfg.get("entropy_weight", 0.5))
+        energy = cfg.get("energy", "hybrid")
+
+        base_logits = base_logits.detach()
+        base_probs = torch.softmax(base_logits, dim=-1)
+        logits = base_logits.clone()
+        samples = []
+
+        for _ in range(steps):
+            logits = logits.detach().requires_grad_(True)
+            probs = torch.softmax(logits, dim=-1)
+            entropy = -(probs * probs.clamp_min(1e-12).log()).sum(dim=-1).mean()
+
+            if energy == "entropy":
+                energy_val = -entropy
+            elif energy == "prior_l2":
+                energy_val = 0.5 * (logits - base_logits).pow(2).mean()
+            elif energy == "prior_kl":
+                energy_val = F.kl_div(
+                    F.log_softmax(logits, dim=-1),
+                    base_probs,
+                    reduction="batchmean"
+                )
+            else:
+                prior = 0.5 * (logits - base_logits).pow(2).mean()
+                energy_val = prior_strength * prior - entropy_weight * entropy
+
+            grad = torch.autograd.grad(energy_val, logits)[0]
+            logits = logits - step_size * grad + torch.randn_like(logits) * noise_std
+            samples.append(torch.softmax(logits, dim=-1).detach())
+
+        stacked = torch.stack(samples, dim=0)
+        mean_probs = stacked.mean(dim=0)
+        ent = -(mean_probs * mean_probs.clamp_min(1e-12).log()).sum(dim=-1)
+        mean_ent = -(stacked * stacked.clamp_min(1e-12).log()).sum(dim=-1).mean(dim=0)
+        mi = ent - mean_ent
+        var = stacked.var(dim=0).mean(dim=-1)
+        return {"mi": mi, "variance": var, "entropy": ent}
+
+    def _representation_sampling_metrics(
+        self,
+        base_logits: torch.Tensor,
+        base_representation: torch.Tensor
+    ) -> Dict[str, torch.Tensor]:
+        cfg = self.representation_sampling_config
+        steps = int(cfg.get("steps", 30))
+        step_size = float(cfg.get("step_size", 0.02))
+        noise_std = float(cfg.get("noise_std", 0.05))
+        prior_strength = float(cfg.get("prior_strength", 1.0))
+        entropy_weight = float(cfg.get("entropy_weight", 0.5))
+        energy = cfg.get("energy", "hybrid")
+
+        if self._classifier_module is None:
+            raise RuntimeError("Classifier module unavailable for representation sampling.")
+
+        base_logits = base_logits.detach()
+        base_probs = torch.softmax(base_logits, dim=-1)
+        base_z = base_representation.detach()
+        z = base_z.clone()
+        samples = []
+
+        for _ in range(steps):
+            z = z.detach().requires_grad_(True)
+            logits = self._classifier_module(z)
+            probs = torch.softmax(logits, dim=-1)
+            entropy = -(probs * probs.clamp_min(1e-12).log()).sum(dim=-1).mean()
+
+            if energy == "entropy":
+                energy_val = -entropy
+            elif energy == "prior_l2":
+                energy_val = 0.5 * (z - base_z).pow(2).mean()
+            elif energy == "prior_kl":
+                energy_val = F.kl_div(
+                    F.log_softmax(logits, dim=-1),
+                    base_probs,
+                    reduction="batchmean"
+                )
+            else:
+                prior = 0.5 * (z - base_z).pow(2).mean()
+                energy_val = prior_strength * prior - entropy_weight * entropy
+
+            grad = torch.autograd.grad(energy_val, z)[0]
+            z = z - step_size * grad + torch.randn_like(z) * noise_std
+            samples.append(torch.softmax(self._classifier_module(z), dim=-1).detach())
+
+        stacked = torch.stack(samples, dim=0)
+        mean_probs = stacked.mean(dim=0)
+        ent = -(mean_probs * mean_probs.clamp_min(1e-12).log()).sum(dim=-1)
+        mean_ent = -(stacked * stacked.clamp_min(1e-12).log()).sum(dim=-1).mean(dim=0)
+        mi = ent - mean_ent
+        var = stacked.var(dim=0).mean(dim=-1)
+        return {"mi": mi, "variance": var, "entropy": ent}
+
+    def _forward_with_classifier_input(
+        self,
+        inputs: Dict[str, torch.Tensor]
+    ) -> (torch.Tensor, torch.Tensor):
+        if self._classifier_module is None:
+            raise RuntimeError("Classifier module unavailable for representation sampling.")
+
+        rep_cache: Dict[str, torch.Tensor] = {}
+
+        def capture(
+            _module: torch.nn.Module,
+            module_input: tuple,
+            _module_output: torch.Tensor
+        ) -> None:
+            if module_input:
+                rep_cache["z"] = module_input[0].detach()
+
+        hook_handle = self._classifier_module.register_forward_hook(capture)
+        try:
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                base_logits = outputs.logits
+        finally:
+            hook_handle.remove()
+
+        base_z = rep_cache.get("z")
+        if base_z is None:
+            raise RuntimeError("Could not capture classifier input representation.")
+
+        return base_logits, base_z
+
     def detect(
         self,
         premise: str,
@@ -277,11 +459,32 @@ class HallucinationDetector:
         # Move to device
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        pred = self._predict_probs(inputs)
-        if isinstance(pred, tuple):
-            probs, var = pred
+        if self.logit_sampling_enabled or self.representation_sampling_enabled:
+            rep_metrics = None
+            if self.representation_sampling_enabled:
+                base_logits, base_z = self._forward_with_classifier_input(inputs)
+            else:
+                with torch.no_grad():
+                    base_logits = self.model(**inputs).logits
+                base_z = None
+            with torch.no_grad():
+                probs = torch.softmax(base_logits, dim=-1)
+            with torch.enable_grad():
+                logit_metrics = (
+                    self._logit_sampling_metrics(base_logits)
+                    if self.logit_sampling_enabled else None
+                )
+                if self.representation_sampling_enabled and base_z is not None:
+                    rep_metrics = self._representation_sampling_metrics(base_logits, base_z)
+            var = None
         else:
-            probs, var = pred, None
+            logit_metrics = None
+            rep_metrics = None
+            pred = self._predict_probs(inputs)
+            if isinstance(pred, tuple):
+                probs, var = pred
+            else:
+                probs, var = pred, None
 
         probs = probs[0]
         var_row = var[0] if var is not None else None
@@ -316,6 +519,22 @@ class HallucinationDetector:
                 result['contradiction_variance'] = float(
                     var_row[self.LABEL_CONTRADICTION].item()
                 )
+            if logit_metrics is not None:
+                mi_val = float(logit_metrics["mi"][0].item())
+                var_val = float(logit_metrics["variance"][0].item())
+                ent_val = float(logit_metrics["entropy"][0].item())
+                norm_ent = ent_val / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                result['uncertainty_logit_mi'] = mi_val
+                result['uncertainty_logit_variance'] = var_val
+                result['uncertainty_logit_entropy'] = norm_ent
+            if rep_metrics is not None:
+                mi_val = float(rep_metrics["mi"][0].item())
+                var_val = float(rep_metrics["variance"][0].item())
+                ent_val = float(rep_metrics["entropy"][0].item())
+                norm_ent = ent_val / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                result['uncertainty_rep_mi'] = mi_val
+                result['uncertainty_rep_variance'] = var_val
+                result['uncertainty_rep_entropy'] = norm_ent
 
         return result
 
@@ -359,11 +578,32 @@ class HallucinationDetector:
             # Move to device
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-            pred = self._predict_probs(inputs)
-            if isinstance(pred, tuple):
-                probs, var = pred
+            if self.logit_sampling_enabled or self.representation_sampling_enabled:
+                rep_metrics = None
+                if self.representation_sampling_enabled:
+                    base_logits, base_z = self._forward_with_classifier_input(inputs)
+                else:
+                    with torch.no_grad():
+                        base_logits = self.model(**inputs).logits
+                    base_z = None
+                with torch.no_grad():
+                    probs = torch.softmax(base_logits, dim=-1)
+                with torch.enable_grad():
+                    logit_metrics = (
+                        self._logit_sampling_metrics(base_logits)
+                        if self.logit_sampling_enabled else None
+                    )
+                    if self.representation_sampling_enabled and base_z is not None:
+                        rep_metrics = self._representation_sampling_metrics(base_logits, base_z)
+                var = None
             else:
-                probs, var = pred, None
+                logit_metrics = None
+                rep_metrics = None
+                pred = self._predict_probs(inputs)
+                if isinstance(pred, tuple):
+                    probs, var = pred
+                else:
+                    probs, var = pred, None
 
             # Process results
             for j in range(len(batch_premises)):
@@ -395,6 +635,22 @@ class HallucinationDetector:
                         result['contradiction_variance'] = float(
                             var_row[self.LABEL_CONTRADICTION].item()
                         )
+                    if logit_metrics is not None:
+                        mi_val = float(logit_metrics["mi"][j].item())
+                        var_val = float(logit_metrics["variance"][j].item())
+                        ent_val = float(logit_metrics["entropy"][j].item())
+                        norm_ent = ent_val / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                        result['uncertainty_logit_mi'] = mi_val
+                        result['uncertainty_logit_variance'] = var_val
+                        result['uncertainty_logit_entropy'] = norm_ent
+                    if rep_metrics is not None:
+                        mi_val = float(rep_metrics["mi"][j].item())
+                        var_val = float(rep_metrics["variance"][j].item())
+                        ent_val = float(rep_metrics["entropy"][j].item())
+                        norm_ent = ent_val / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                        result['uncertainty_rep_mi'] = mi_val
+                        result['uncertainty_rep_variance'] = var_val
+                        result['uncertainty_rep_entropy'] = norm_ent
 
                 all_results.append(result)
 

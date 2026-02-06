@@ -1,11 +1,20 @@
-# Mini pilot config for local 8GB VRAM: AmbigQA-only + DeBERTa v3 small.
-# Use with: python scripts/train_hallucination_model.py --config sgld_pilot_ambigqa_mini ...
+# Warm-start config for LoRA + SGLD (noise=5e-5) with class-weighted loss.
+# Use with: python scripts/train_hallucination_model.py --config sgld_lora_warmstart_ambigqa_mini_noise5e-5_weighted ...
 
 training:
   model:
     base_model: microsoft/deberta-v3-small
     num_labels: 3
     cache_dir: ./models/training
+    lora:
+      enabled: true
+      r: 8
+      lora_alpha: 16
+      lora_dropout: 0.05
+      bias: none
+      task_type: SEQ_CLS
+      target_modules: ["query_proj", "key_proj", "value_proj"]
+      modules_to_save: ["classifier", "pooler"]
 
   hyperparameters:
     learning_rate: 1.0e-5
@@ -17,8 +26,12 @@ training:
     max_grad_norm: 1.0
     mixed_precision: fp16
     optimizer: sgld
-    noise_scale: 0.1
+    noise_scale: 5.0e-5
     scheduler: linear
+    loss:
+      type: weighted_ce
+      class_weights: [1.0, 2.0, 1.0]
+      label_smoothing: 0.0
 
   data:
     max_seq_length: 128
@@ -29,7 +42,7 @@ training:
     balance_strategy: undersample
 
   checkpointing:
-    save_dir: ./models/checkpoints/sgld_pilot_ambigqa_mini
+    save_dir: ./models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_weighted
     save_strategy: best
     save_every_n_epochs: 1
     save_total_limit: 2
@@ -51,6 +64,6 @@ training:
 
   output:
     training_data_dir: ./data/training/nli_dataset_ambigqa_mini
-    checkpoint_dir: ./models/checkpoints/sgld_pilot_ambigqa_mini
-    final_model_dir: ./models/hallucination_detector_sgld_pilot_ambigqa_mini
+    checkpoint_dir: ./models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_weighted
+    final_model_dir: ./models/hallucination_detector_sgld_lora_warmstart_ambigqa_mini_noise5e-5_weighted
     logs_dir: ./logs/training

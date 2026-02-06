@@ -6,6 +6,7 @@ for 3-way NLI classification (entailment/neutral/contradiction).
 """
 
 import torch
+import torch.nn.functional as F
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -61,6 +62,12 @@ class HallucinationTrainer(BaseTrainer):
         self.optimizer_type = hyper_config.get('optimizer', 'adamw')
         self.scheduler_type = hyper_config.get('scheduler', 'linear')
         self.noise_scale = hyper_config.get('noise_scale', 1.0)
+        loss_config = hyper_config.get('loss', {})
+        self.loss_type = loss_config.get('type', 'ce')
+        self.loss_class_weights = loss_config.get('class_weights')
+        self.loss_focal_gamma = loss_config.get('gamma', 2.0)
+        self.loss_label_smoothing = loss_config.get('label_smoothing', 0.0)
+        self._loss_weights_tensor = None
 
         # SWAG (LoRA posterior approx)
         self.swag_config = config.get('swag', {})
@@ -85,6 +92,14 @@ class HallucinationTrainer(BaseTrainer):
         self.early_stopping_callback = None
 
         logger.info(f"Initialized HallucinationTrainer on device: {self.device}")
+        if self.loss_type != 'ce':
+            logger.info(
+                "Using custom loss: type=%s class_weights=%s gamma=%s label_smoothing=%s",
+                self.loss_type,
+                self.loss_class_weights,
+                self.loss_focal_gamma,
+                self.loss_label_smoothing
+            )
         if self.swag_enabled:
             logger.info(
                 "SWAG enabled: freq=%s start_step=%s max_snapshots=%s",
@@ -156,7 +171,53 @@ class HallucinationTrainer(BaseTrainer):
         if self.mixed_precision == 'fp16':
             self.scaler = setup_mixed_precision(enabled=True)
 
+        self._setup_loss()
+
         logger.info("Model built successfully")
+
+    def _setup_loss(self) -> None:
+        if self.loss_class_weights is not None:
+            if len(self.loss_class_weights) != self.num_labels:
+                raise ValueError(
+                    f"class_weights length {len(self.loss_class_weights)} "
+                    f"does not match num_labels {self.num_labels}"
+                )
+            self._loss_weights_tensor = torch.tensor(
+                self.loss_class_weights,
+                dtype=torch.float32,
+                device=self.device
+            )
+
+    def _compute_loss(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        if self.loss_type in ("ce", "cross_entropy"):
+            return F.cross_entropy(
+                logits,
+                labels,
+                weight=self._loss_weights_tensor,
+                label_smoothing=self.loss_label_smoothing
+            )
+
+        if self.loss_type == "weighted_ce":
+            return F.cross_entropy(
+                logits,
+                labels,
+                weight=self._loss_weights_tensor,
+                label_smoothing=self.loss_label_smoothing
+            )
+
+        if self.loss_type == "focal":
+            ce = F.cross_entropy(
+                logits,
+                labels,
+                weight=self._loss_weights_tensor,
+                reduction="none",
+                label_smoothing=self.loss_label_smoothing
+            )
+            pt = torch.exp(-ce)
+            loss = ((1 - pt) ** self.loss_focal_gamma) * ce
+            return loss.mean()
+
+        raise ValueError(f"Unknown loss type: {self.loss_type}")
 
     def train(
         self,
@@ -390,17 +451,15 @@ class HallucinationTrainer(BaseTrainer):
                 with torch.cuda.amp.autocast():
                     outputs = self.model(
                         input_ids=input_ids,
-                        attention_mask=attention_mask,
-                        labels=labels
+                        attention_mask=attention_mask
                     )
-                    loss = outputs.loss / self.gradient_accumulation_steps
+                    loss = self._compute_loss(outputs.logits, labels) / self.gradient_accumulation_steps
             else:
                 outputs = self.model(
                     input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    labels=labels
+                    attention_mask=attention_mask
                 )
-                loss = outputs.loss / self.gradient_accumulation_steps
+                loss = self._compute_loss(outputs.logits, labels) / self.gradient_accumulation_steps
 
             # Backward pass
             if self.scaler:
@@ -496,11 +555,10 @@ class HallucinationTrainer(BaseTrainer):
                 # Forward pass
                 outputs = self.model(
                     input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    labels=labels
+                    attention_mask=attention_mask
                 )
 
-                loss = outputs.loss
+                loss = self._compute_loss(outputs.logits, labels)
                 total_loss += loss.item()
                 num_batches += 1
 
@@ -633,14 +691,19 @@ class HallucinationTrainer(BaseTrainer):
 
         # Load model
         model_path = checkpoint_path / "model.pt"
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        # Explicitly allow full checkpoint loading (PyTorch 2.6 defaults to weights_only=True).
+        self.model.load_state_dict(
+            torch.load(model_path, map_location=self.device, weights_only=False)
+        )
 
         # Load optimizer
         optimizer_path = checkpoint_path / "optimizer.pt"
         optimizer_loaded = False
         if optimizer_path.exists() and self.optimizer:
             try:
-                optimizer_state = torch.load(optimizer_path, map_location=self.device)
+                optimizer_state = torch.load(
+                    optimizer_path, map_location=self.device, weights_only=False
+                )
                 loaded_groups = optimizer_state.get("param_groups", [{}])
                 loaded_keys = set(loaded_groups[0].keys()) if loaded_groups else set()
                 expected_keys = set(self.optimizer.param_groups[0].keys())
@@ -661,7 +724,7 @@ class HallucinationTrainer(BaseTrainer):
         state_path = checkpoint_path / "training_state.pt"
         state = {}
         if state_path.exists():
-            state = torch.load(state_path, map_location=self.device)
+            state = torch.load(state_path, map_location=self.device, weights_only=False)
 
             # Restore global step for batch checkpoints
             if 'global_step' in state:

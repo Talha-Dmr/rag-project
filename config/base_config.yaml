@@ -99,6 +99,11 @@ training:
     optimizer: adamw  # Options: adamw, adam, sgd, sgld
     noise_scale: 1.0  # Langevin noise scale (only for SGLD)
     scheduler: linear  # Options: linear, cosine, constant
+    loss:
+      type: ce  # ce | weighted_ce | focal
+      class_weights: null  # e.g., [1.0, 2.0, 1.0]
+      gamma: 2.0
+      label_smoothing: 0.0
 
   # Data configuration
   data:
@@ -115,14 +120,14 @@ training:
     save_strategy: best  # Options: epoch, best
     save_every_n_epochs: 1
     save_total_limit: 3
-    metric_for_best: val_f1_macro
+    metric_for_best: f1_macro
     mode: max  # Options: max, min
 
   # Early stopping configuration
   early_stopping:
     enabled: true
     patience: 3
-    metric: val_f1_macro
+    metric: f1_macro
     mode: max
     min_delta: 0.0001
 

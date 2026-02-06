@@ -38,10 +38,12 @@ def load_model_and_tokenizer(
     )
 
     # Load model
+    # Force fp32 weights so AMP + GradScaler work reliably.
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
         num_labels=num_labels,
-        cache_dir=cache_dir
+        cache_dir=cache_dir,
+        torch_dtype=torch.float32
     )
 
     # Optional LoRA

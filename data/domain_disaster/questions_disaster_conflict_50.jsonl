@@ -1,0 +1,50 @@
+{"id": "dq01", "type": "sanity", "query": "What is the purpose of seasonal climate outlooks?"}
+{"id": "dq02", "type": "sanity", "query": "What does disaster risk reduction mean in UNDRR terminology?"}
+{"id": "dq03", "type": "sanity", "query": "Why do hazard forecasts often include probability ranges?"}
+{"id": "dq04", "type": "sanity", "query": "What is the difference between hazard, exposure, and vulnerability?"}
+{"id": "dq05", "type": "sanity", "query": "What role do early warning systems play in disaster preparedness?"}
+{"id": "dq06", "type": "sanity", "query": "What is the primary objective of drought outlook interpretation in UNDRR guidance?"}
+{"id": "dq07", "type": "sanity", "query": "Which risk does UNDRR mainly address through flood return-period assumptions?"}
+{"id": "dq08", "type": "sanity", "query": "How does UNDRR define success criteria for heat attribution confidence?"}
+{"id": "dq09", "type": "sanity", "query": "What implementation constraint is emphasized by UNDRR for compound-hazard evacuation triggers?"}
+{"id": "dq10", "type": "sanity", "query": "Why does UNDRR treat early warning false-alarm tradeoff as a governance priority?"}
+{"id": "dq11", "type": "conflict", "query": "Do NOAA outlooks and IPCC regional assessments differ on near-term drought risk in some regions?"}
+{"id": "dq12", "type": "conflict", "query": "How do UNDRR and national agencies differ in prioritizing resilience investments under budget constraints?"}
+{"id": "dq13", "type": "conflict", "query": "Are heavy-precipitation risk projections consistent between WMO reports and regional climate studies?"}
+{"id": "dq14", "type": "conflict", "query": "Do sources agree on attribution confidence for recent extreme heat events?"}
+{"id": "dq15", "type": "conflict", "query": "How do climate-risk reports differ on return-period assumptions for flood planning?"}
+{"id": "dq16", "type": "conflict", "query": "Are wildfire outlook recommendations aligned across national meteorological and disaster agencies?"}
+{"id": "dq17", "type": "conflict", "query": "Do hazard reports differ on whether uncertainty is mostly model-based or data-scarcity-based?"}
+{"id": "dq18", "type": "conflict", "query": "How do sources diverge on low-probability high-impact scenario treatment in adaptation planning?"}
+{"id": "dq19", "type": "conflict", "query": "Are coastal risk projections consistent across sea-level scenario assumptions from different reports?"}
+{"id": "dq20", "type": "conflict", "query": "Do frameworks agree on thresholds for triggering evacuation advisories under compound hazards?"}
+{"id": "dq21", "type": "conflict", "query": "How do reports differ on confidence communication language for decision-makers?"}
+{"id": "dq22", "type": "conflict", "query": "Are recommendations aligned on balancing false alarms versus missed-event risk in early warning?"}
+{"id": "dq23", "type": "conflict", "query": "Do different sources rank adaptation options similarly when uncertainty is deep?"}
+{"id": "dq24", "type": "conflict", "query": "How do assessments differ on short-term versus long-term disaster financing priorities?"}
+{"id": "dq25", "type": "conflict", "query": "Do agencies disagree on which vulnerable populations should be prioritized under uncertain forecasts?"}
+{"id": "dq26", "type": "conflict", "query": "Do NOAA and IPCC differ on drought outlook interpretation when evidence certainty is low?"}
+{"id": "dq27", "type": "conflict", "query": "Are decision thresholds for flood return-period assumptions aligned between NOAA and IPCC in recent guidance?"}
+{"id": "dq28", "type": "conflict", "query": "When sources conflict on heat attribution confidence, which of NOAA and IPCC is more conservative?"}
+{"id": "dq29", "type": "conflict", "query": "How do NOAA and IPCC justify disagreement on compound-hazard evacuation triggers under uncertainty?"}
+{"id": "dq30", "type": "conflict", "query": "Do NOAA and IPCC recommend different operational actions for early warning false-alarm tradeoff in edge cases?"}
+{"id": "dq31", "type": "conflict", "query": "Do NOAA and IPCC differ on adaptation option ranking when evidence certainty is low?"}
+{"id": "dq32", "type": "conflict", "query": "Are decision thresholds for wildfire readiness thresholds aligned between NOAA and IPCC in recent guidance?"}
+{"id": "dq33", "type": "conflict", "query": "When sources conflict on coastal risk scenario selection, which of NOAA and IPCC is more conservative?"}
+{"id": "dq34", "type": "conflict", "query": "How do NOAA and IPCC justify disagreement on disaster financing priorities under uncertainty?"}
+{"id": "dq35", "type": "conflict", "query": "Do NOAA and IPCC recommend different operational actions for vulnerable-population prioritization in edge cases?"}
+{"id": "dq36", "type": "conflict", "query": "Do NOAA and UNDRR differ on drought outlook interpretation when evidence certainty is low?"}
+{"id": "dq37", "type": "conflict", "query": "Are decision thresholds for flood return-period assumptions aligned between NOAA and UNDRR in recent guidance?"}
+{"id": "dq38", "type": "conflict", "query": "When sources conflict on heat attribution confidence, which of NOAA and UNDRR is more conservative?"}
+{"id": "dq39", "type": "conflict", "query": "How do NOAA and UNDRR justify disagreement on compound-hazard evacuation triggers under uncertainty?"}
+{"id": "dq40", "type": "conflict", "query": "Do NOAA and UNDRR recommend different operational actions for early warning false-alarm tradeoff in edge cases?"}
+{"id": "dq41", "type": "conflict", "query": "Do NOAA and UNDRR differ on adaptation option ranking when evidence certainty is low?"}
+{"id": "dq42", "type": "conflict", "query": "Are decision thresholds for wildfire readiness thresholds aligned between NOAA and UNDRR in recent guidance?"}
+{"id": "dq43", "type": "conflict", "query": "When sources conflict on coastal risk scenario selection, which of NOAA and UNDRR is more conservative?"}
+{"id": "dq44", "type": "conflict", "query": "How do NOAA and UNDRR justify disagreement on disaster financing priorities under uncertainty?"}
+{"id": "dq45", "type": "conflict", "query": "Do NOAA and UNDRR recommend different operational actions for vulnerable-population prioritization in edge cases?"}
+{"id": "dq46", "type": "conflict", "query": "Do NOAA and WMO differ on drought outlook interpretation when evidence certainty is low?"}
+{"id": "dq47", "type": "conflict", "query": "Are decision thresholds for flood return-period assumptions aligned between NOAA and WMO in recent guidance?"}
+{"id": "dq48", "type": "conflict", "query": "When sources conflict on heat attribution confidence, which of NOAA and WMO is more conservative?"}
+{"id": "dq49", "type": "conflict", "query": "How do NOAA and WMO justify disagreement on compound-hazard evacuation triggers under uncertainty?"}
+{"id": "dq50", "type": "conflict", "query": "Do NOAA and WMO recommend different operational actions for early warning false-alarm tradeoff in edge cases?"}

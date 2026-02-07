@@ -1,4 +1,4 @@
-# Disaster/climate risk domain: logit-space MI gating (initial thresholds).
+# Disaster/climate risk domain: logit-space MI gating (domain-tuned thresholds).
 
 embeddings:
   type: huggingface
@@ -46,7 +46,7 @@ gating:
   max_retries: 2
   k_multiplier: 2.0
   max_k: 20
-  contradiction_rate_threshold: 0.85
+  contradiction_rate_threshold: 1.01
   contradiction_prob_threshold: 0.5
   uncertainty_source: logit_mi
   uncertainty_threshold: 0.02

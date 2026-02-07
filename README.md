@@ -13,6 +13,15 @@ A highly modular Retrieval-Augmented Generation (RAG) system built with LangChai
 
 ## Results (Current Snapshot)
 
+- Active high-stakes trio (current primary track, 50Q seed each):
+  - Health: `config/gating_health_ebcar_logit_mi_sc009.yaml` -> abstain 4/50 (0.08)
+  - Financial regulation: `config/gating_finreg_ebcar_logit_mi_sc009.yaml` -> abstain 1/50 (0.02)
+  - Disaster/climate: `config/gating_disaster_ebcar_logit_mi_sc009.yaml` -> abstain 1/50 (0.02)
+- Decision:
+  - Keep high-stakes trio + balanced detector + logit-MI as active default path.
+  - Keep `disaster` domain-specific contradiction-rate override (`1.01`) as promoted calibration.
+  - Use Energy/Macro below as legacy ablation track.
+
 - Current defaults (epistemic track, latest 50Q rep-vs-logit ablation):
   - Energy (logit-MI): `config/gating_energy_ebcar_logit_mi_sc009.yaml` → abstain 35/50 (0.70)
   - Macro (logit-MI): `config/gating_macro_ebcar_logit_mi_sc009.yaml` → abstain 22/50 (0.44)

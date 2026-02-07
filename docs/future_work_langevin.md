@@ -15,48 +15,34 @@ Bayesian framing.
   - `config/gating_health_ebcar_logit_mi_sc009.yaml`
   - `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
   - `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
-- Initial seed question sets (20Q each):
-  - `data/domain_health/questions_health_conflict.jsonl`
-  - `data/domain_finreg/questions_finreg_conflict.jsonl`
-  - `data/domain_disaster/questions_disaster_conflict.jsonl`
+- Initial expanded question sets (50Q each):
+  - `data/domain_health/questions_health_conflict_50.jsonl`
+  - `data/domain_finreg/questions_finreg_conflict_50.jsonl`
+  - `data/domain_disaster/questions_disaster_conflict_50.jsonl`
 
 ## Executive Summary (Current Snapshot)
-- Main demo defaults (epistemic track):
-  - **Energy**: logit‑MI gating (contradiction_rate_threshold=0.90).
-  - **Macro**: logit‑MI gating (contradiction_rate_threshold=0.80).
-- Latest rep-vs-logit ablation (50Q, seed=7):
-  - Energy: logit‑MI 35/50 (0.70) vs rep‑MI 45/50 (0.90).
-  - Macro: logit‑MI 22/50 (0.44) vs rep‑MI 44/50 (0.88).
-  - Decision: keep logit‑MI as default and keep representation‑space MI experimental.
-- Consistency‑only baseline (50 Q):
-  - Energy: abstain 14/50 (0.28), actions none=36, retrieve_more=14.
-  - Macro: abstain 9/50 (0.18), actions none=41, retrieve_more=9.
-- Historical logit‑MI threshold sweep (older calibration run, 50 Q):
-  - Energy:
-    - threshold=0.70 → abstain 46/50 (0.92) → too conservative for default.
-    - threshold=0.85 → abstain 22/50 (0.44) → improved, still higher than consistency‑only.
-    - threshold=0.90 → abstain 21/50 (0.42) → selected for epistemic default.
-  - Macro: abstain 12/50 (0.24) in that run.
-- Safety variant (high abstain): MC Dropout + source-consistency (sc=0.50).
-  - Energy: abstain 31/50 (0.62).
-  - Macro: abstain 36/50 (0.72).
-- LoRA-SWAG is kept as ablation only; n=5 vs n=10 did not outperform MC Dropout on macro.
-- Entropy-based SWAG gating was unstable (all-abstain vs none-abstain depending on threshold).
-- Final configs (epistemic default): `gating_energy_ebcar_logit_mi_sc009.yaml`, `gating_macro_ebcar_logit_mi_sc009.yaml`.
-- Experimental configs (representation track): `gating_energy_ebcar_rep_mi_sc004.yaml`, `gating_macro_ebcar_rep_mi_sc004.yaml`.
-- Coverage-first alternative: `gating_energy_ebcar_consistency_only_sc050.yaml`, `gating_macro_ebcar_consistency_only_sc050.yaml`.
-- Safety variant: `gating_energy_ebcar_mcdropout_consistency_sc050.yaml`, `gating_macro_ebcar_mcdropout_consistency_sc050.yaml`.
-- Latest gating ablation (Feb 1, 2026):
-  - Energy set is 20Q (conflict-heavy); Macro is 50Q.
-  - Results summarized below (nogate vs retrieve_more vs abstain).
+- Active trio defaults (epistemic track, balanced detector + logit-MI):
+  - Health: `config/gating_health_ebcar_logit_mi_sc009.yaml`
+  - Financial regulation: `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
+  - Disaster/climate: `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
+- Latest 50Q seed run (`seed=7`):
+  - Health: abstain `4/50 (0.08)`, source_consistency `0.728`, contradiction_rate `0.00`
+  - FinReg: abstain `1/50 (0.02)`, source_consistency `0.715`, contradiction_rate `0.008`
+  - Disaster: abstain `1/50 (0.02)`, source_consistency `0.753`, contradiction_rate `0.00`
+- Decision:
+  - Keep logit-MI + balanced detector as active default on the high-stakes trio.
+  - Keep disaster domain override active: `contradiction_rate_threshold=1.01`.
+  - Continue representation-space and SWAG lines as epistemic R&D, not deployment default.
+- Legacy (Energy/Macro) remains available as historical ablation track and calibration reference.
 
 ## Current Execution Plan (1 -> 2 -> 3)
 This is the active plan aligned with the project goal (epistemic/Langevin-first adaptive RAG):
 
 1. Stabilize the epistemic proxy path (now)
 - Keep `logit-MI` as production epistemic default:
-  - Energy: `gating_energy_ebcar_logit_mi_sc009.yaml`
-  - Macro: `gating_macro_ebcar_logit_mi_sc009.yaml`
+  - Health: `gating_health_ebcar_logit_mi_sc009.yaml`
+  - FinReg: `gating_finreg_ebcar_logit_mi_sc009.yaml`
+  - Disaster: `gating_disaster_ebcar_logit_mi_sc009.yaml`
 - Keep `rep-MI` as experimental (do not switch default yet).
 - Keep contradiction-threshold overrides only for controlled stress tests, not for default demos.
 
@@ -64,7 +50,7 @@ This is the active plan aligned with the project goal (epistemic/Langevin-first 
 - Continue SGLD LoRA detector training/eval iterations (weighted/focal/class-balance variants).
 - Decision rule for promotion:
   - detector must improve macro quality without collapsing a class (especially `neutral` recall),
-  - and must preserve usable abstain/coverage behavior on Energy+Macro.
+  - and must preserve usable abstain/coverage behavior on the high-stakes trio.
 
 3. Promote representation-space only if it beats logit-space on decision metrics
 - Representation-space sampling remains research track.
@@ -77,11 +63,13 @@ This is the active plan aligned with the project goal (epistemic/Langevin-first 
 ### Command Runbook (single-line, no multiline wrapping)
 Use these when rerunning core checks:
 
-- Rep vs Logit ablation (both domains, 50Q):
+- High-stakes trio seed eval (active path, 50Q each):
+  - `cd /home/talha/projects/rag-project && ./scripts/run_high_stakes_seed_eval.sh all 50 7`
+- Rep vs Logit ablation (legacy Energy/Macro, 50Q):
   - `cd /home/talha/projects/rag-project && ./scripts/run_rep_vs_logit_ablation.sh 50 7`
-- Energy logit-MI with stricter contradiction gate (stress test):
+- Energy logit-MI with stricter contradiction gate (legacy stress test):
   - `cd /home/talha/projects/rag-project && env PYTHONPATH=. HF_HOME=./models/llm TRANSFORMERS_CACHE=./models/llm venv312/bin/python -u scripts/eval_grounding_proxy.py --config gating_energy_ebcar_logit_mi_sc009 --questions data/domain_energy/questions_energy_conflict_50.jsonl --limit 50 --seed 7 --contradiction-rate-threshold 0.90 --output evaluation_results/auto_eval/energy_logit_mi_50_thr090.json`
-- Macro logit-MI with stricter contradiction gate (stress test):
+- Macro logit-MI with stricter contradiction gate (legacy stress test):
   - `cd /home/talha/projects/rag-project && env PYTHONPATH=. HF_HOME=./models/llm TRANSFORMERS_CACHE=./models/llm venv312/bin/python -u scripts/eval_grounding_proxy.py --config gating_macro_ebcar_logit_mi_sc009 --questions data/domain_macro/questions_macro_conflict_50.jsonl --limit 50 --seed 7 --contradiction-rate-threshold 0.80 --output evaluation_results/auto_eval/macro_logit_mi_50_thr080.json`
 
 ### Detector Rebalance Pilot (Feb 7, 2026)

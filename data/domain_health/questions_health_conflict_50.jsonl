@@ -1,0 +1,50 @@
+{"id": "hq01", "type": "sanity", "query": "What is the main purpose of the WHO guideline development process?"}
+{"id": "hq02", "type": "sanity", "query": "What does CDC use MMWR recommendation reports for?"}
+{"id": "hq03", "type": "sanity", "query": "What is the role of evidence grading in NICE guidelines?"}
+{"id": "hq04", "type": "sanity", "query": "What does a living guideline mean in public health?"}
+{"id": "hq05", "type": "sanity", "query": "Why do clinical guidelines include strength-of-recommendation labels?"}
+{"id": "hq06", "type": "sanity", "query": "What is the primary objective of booster prioritization in WHO guidance?"}
+{"id": "hq07", "type": "sanity", "query": "Which risk does WHO mainly address through isolation duration?"}
+{"id": "hq08", "type": "sanity", "query": "How does WHO define success criteria for mask guidance by setting?"}
+{"id": "hq09", "type": "sanity", "query": "What implementation constraint is emphasized by WHO for antiviral eligibility for mild cases?"}
+{"id": "hq10", "type": "sanity", "query": "Why does WHO treat asymptomatic testing cadence as a governance priority?"}
+{"id": "hq11", "type": "conflict", "query": "Do WHO and CDC differ on when booster doses are prioritized for high-risk groups?"}
+{"id": "hq12", "type": "conflict", "query": "Are isolation-duration recommendations aligned between WHO and CDC across recent updates?"}
+{"id": "hq13", "type": "conflict", "query": "Do WHO and NICE differ on recommendations for antiviral use in mild outpatient cases?"}
+{"id": "hq14", "type": "conflict", "query": "How do WHO and CDC differ on mask recommendations in healthcare settings versus community settings?"}
+{"id": "hq15", "type": "conflict", "query": "Do WHO and ECDC use the same threshold logic for moving from containment to mitigation?"}
+{"id": "hq16", "type": "conflict", "query": "Are recommendations on asymptomatic testing frequency consistent across CDC and NICE guidance?"}
+{"id": "hq17", "type": "conflict", "query": "Do major guideline bodies differ on prophylactic treatment recommendations for immunocompromised patients?"}
+{"id": "hq18", "type": "conflict", "query": "How do WHO and CDC differ in handling low-certainty evidence when issuing strong recommendations?"}
+{"id": "hq19", "type": "conflict", "query": "Are pediatric vaccination interval recommendations consistent between WHO and national guidance?"}
+{"id": "hq20", "type": "conflict", "query": "Do guidelines agree on return-to-work criteria for healthcare workers after respiratory infection?"}
+{"id": "hq21", "type": "conflict", "query": "How do WHO and NICE differ on balancing individual benefit versus population-level benefit in guidance?"}
+{"id": "hq22", "type": "conflict", "query": "Are recommendations for travel-related screening and quarantine harmonized across WHO and CDC?"}
+{"id": "hq23", "type": "conflict", "query": "Do guideline sources differ on preferred endpoints for evaluating intervention effectiveness?"}
+{"id": "hq24", "type": "conflict", "query": "How do recommendations diverge when trial evidence conflicts with real-world observational evidence?"}
+{"id": "hq25", "type": "conflict", "query": "Do guideline bodies differ on when to issue conditional recommendations versus abstain due to uncertainty?"}
+{"id": "hq26", "type": "conflict", "query": "Do WHO and CDC differ on booster prioritization when evidence certainty is low?"}
+{"id": "hq27", "type": "conflict", "query": "Are decision thresholds for isolation duration aligned between WHO and CDC in recent guidance?"}
+{"id": "hq28", "type": "conflict", "query": "When sources conflict on mask guidance by setting, which of WHO and CDC is more conservative?"}
+{"id": "hq29", "type": "conflict", "query": "How do WHO and CDC justify disagreement on antiviral eligibility for mild cases under uncertainty?"}
+{"id": "hq30", "type": "conflict", "query": "Do WHO and CDC recommend different operational actions for asymptomatic testing cadence in edge cases?"}
+{"id": "hq31", "type": "conflict", "query": "Do WHO and CDC differ on pediatric vaccination interval when evidence certainty is low?"}
+{"id": "hq32", "type": "conflict", "query": "Are decision thresholds for return-to-work criteria for clinicians aligned between WHO and CDC in recent guidance?"}
+{"id": "hq33", "type": "conflict", "query": "When sources conflict on travel screening and quarantine, which of WHO and CDC is more conservative?"}
+{"id": "hq34", "type": "conflict", "query": "How do WHO and CDC justify disagreement on conditional recommendation criteria under uncertainty?"}
+{"id": "hq35", "type": "conflict", "query": "Do WHO and CDC recommend different operational actions for evidence certainty thresholds in edge cases?"}
+{"id": "hq36", "type": "conflict", "query": "Do WHO and NICE differ on booster prioritization when evidence certainty is low?"}
+{"id": "hq37", "type": "conflict", "query": "Are decision thresholds for isolation duration aligned between WHO and NICE in recent guidance?"}
+{"id": "hq38", "type": "conflict", "query": "When sources conflict on mask guidance by setting, which of WHO and NICE is more conservative?"}
+{"id": "hq39", "type": "conflict", "query": "How do WHO and NICE justify disagreement on antiviral eligibility for mild cases under uncertainty?"}
+{"id": "hq40", "type": "conflict", "query": "Do WHO and NICE recommend different operational actions for asymptomatic testing cadence in edge cases?"}
+{"id": "hq41", "type": "conflict", "query": "Do WHO and NICE differ on pediatric vaccination interval when evidence certainty is low?"}
+{"id": "hq42", "type": "conflict", "query": "Are decision thresholds for return-to-work criteria for clinicians aligned between WHO and NICE in recent guidance?"}
+{"id": "hq43", "type": "conflict", "query": "When sources conflict on travel screening and quarantine, which of WHO and NICE is more conservative?"}
+{"id": "hq44", "type": "conflict", "query": "How do WHO and NICE justify disagreement on conditional recommendation criteria under uncertainty?"}
+{"id": "hq45", "type": "conflict", "query": "Do WHO and NICE recommend different operational actions for evidence certainty thresholds in edge cases?"}
+{"id": "hq46", "type": "conflict", "query": "Do WHO and ECDC differ on booster prioritization when evidence certainty is low?"}
+{"id": "hq47", "type": "conflict", "query": "Are decision thresholds for isolation duration aligned between WHO and ECDC in recent guidance?"}
+{"id": "hq48", "type": "conflict", "query": "When sources conflict on mask guidance by setting, which of WHO and ECDC is more conservative?"}
+{"id": "hq49", "type": "conflict", "query": "How do WHO and ECDC justify disagreement on antiviral eligibility for mild cases under uncertainty?"}
+{"id": "hq50", "type": "conflict", "query": "Do WHO and ECDC recommend different operational actions for asymptomatic testing cadence in edge cases?"}

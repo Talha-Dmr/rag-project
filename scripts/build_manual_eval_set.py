@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build a small manual-eval set (Energy + Macro) with model outputs and sources.
+Build a small manual-eval set (multi-domain) with model outputs and sources.
 Writes both JSONL (full details) and CSV (label-friendly).
 """
 
@@ -99,8 +99,27 @@ def run_domain(
     return records
 
 
+def parse_domain_spec(value: str) -> Dict[str, str]:
+    parts = [p.strip() for p in value.split(",")]
+    if len(parts) != 3 or not all(parts):
+        raise ValueError(
+            "Invalid --domain format. Use: name,config,questions_path"
+        )
+    return {
+        "name": parts[0],
+        "config": parts[1],
+        "questions": parts[2],
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build manual evaluation set")
+    parser.add_argument(
+        "--domain",
+        action="append",
+        default=[],
+        help="Domain spec: name,config,questions_path (repeatable)",
+    )
     parser.add_argument("--energy-config", default="gating_energy_ebcar_consistency_only_sc050")
     parser.add_argument("--macro-config", default="gating_macro_ebcar_consistency_only_sc050")
     parser.add_argument("--energy-questions", default="data/domain_energy/questions_energy_conflict_50.jsonl")
@@ -113,24 +132,34 @@ def main() -> None:
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    energy_questions = load_questions(Path(args.energy_questions))
-    macro_questions = load_questions(Path(args.macro_questions))
+    if args.domain:
+        domain_specs = [parse_domain_spec(v) for v in args.domain]
+    else:
+        domain_specs = [
+            {
+                "name": "energy",
+                "config": args.energy_config,
+                "questions": args.energy_questions,
+            },
+            {
+                "name": "macro",
+                "config": args.macro_config,
+                "questions": args.macro_questions,
+            },
+        ]
 
     records = []
-    records.extend(run_domain(
-        "energy",
-        args.energy_config,
-        energy_questions,
-        args.per_domain,
-        args.seed
-    ))
-    records.extend(run_domain(
-        "macro",
-        args.macro_config,
-        macro_questions,
-        args.per_domain,
-        args.seed
-    ))
+    for spec in domain_specs:
+        questions = load_questions(Path(spec["questions"]))
+        records.extend(
+            run_domain(
+                spec["name"],
+                spec["config"],
+                questions,
+                args.per_domain,
+                args.seed,
+            )
+        )
 
     jsonl_path = out_dir / "manual_eval_set.jsonl"
     with jsonl_path.open("w", encoding="utf-8") as f:

@@ -69,13 +69,15 @@ def train_model(args: argparse.Namespace) -> None:
     training_config = config.get('training', {})
 
     # Override config with command-line arguments
-    if args.epochs:
+    if args.epochs is not None:
         training_config['hyperparameters']['max_epochs'] = args.epochs
-    if args.batch_size:
+    if args.batch_size is not None:
         training_config['hyperparameters']['batch_size'] = args.batch_size
-    if args.learning_rate:
+    if args.learning_rate is not None:
         training_config['hyperparameters']['learning_rate'] = args.learning_rate
-    if args.mixed_precision:
+    if args.gradient_accumulation_steps is not None:
+        training_config['hyperparameters']['gradient_accumulation_steps'] = args.gradient_accumulation_steps
+    if args.mixed_precision is not None:
         training_config['hyperparameters']['mixed_precision'] = args.mixed_precision
 
     # Data paths
@@ -157,7 +159,6 @@ def train_model(args: argparse.Namespace) -> None:
         logger.info(f"Best model saved to: {args.output_dir}")
 
         # Print final metrics
-        final_metrics = history['val_metrics'][-1]
         if history['val_metrics']:
             final_metrics = history['val_metrics'][-1]
             logger.info("\nFinal Validation Metrics:")

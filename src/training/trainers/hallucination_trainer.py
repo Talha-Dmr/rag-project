@@ -76,6 +76,8 @@ class HallucinationTrainer(BaseTrainer):
 
         # Data settings
         self.max_seq_length = data_config.get('max_seq_length', 256)
+        self.train_sampling_strategy = data_config.get('train_sampling_strategy', 'shuffle')
+        self.train_sampling_power = data_config.get('train_sampling_power', 1.0)
 
         # Training state
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -92,6 +94,12 @@ class HallucinationTrainer(BaseTrainer):
         self.early_stopping_callback = None
 
         logger.info(f"Initialized HallucinationTrainer on device: {self.device}")
+        if self.train_sampling_strategy != 'shuffle':
+            logger.info(
+                "Train sampling: strategy=%s power=%s",
+                self.train_sampling_strategy,
+                self.train_sampling_power
+            )
         if self.loss_type != 'ce':
             logger.info(
                 "Using custom loss: type=%s class_weights=%s gamma=%s label_smoothing=%s",
@@ -125,7 +133,9 @@ class HallucinationTrainer(BaseTrainer):
             batch_size=self.batch_size,
             max_length=self.max_seq_length,
             shuffle=True,
-            cache_dir=self.cache_dir
+            cache_dir=self.cache_dir,
+            sampling_strategy=self.train_sampling_strategy,
+            sampling_power=self.train_sampling_power
         )
 
         self.val_loader = create_dataloader(

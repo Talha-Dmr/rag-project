@@ -7,7 +7,7 @@ for 3-way classification (entailment/neutral/contradiction).
 
 import json
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, WeightedRandomSampler
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 from transformers import AutoTokenizer
@@ -235,7 +235,9 @@ def create_dataloader(
     max_length: int = 256,
     shuffle: bool = True,
     num_workers: int = 0,
-    cache_dir: Optional[str] = None
+    cache_dir: Optional[str] = None,
+    sampling_strategy: str = "shuffle",
+    sampling_power: float = 1.0
 ) -> torch.utils.data.DataLoader:
     """
     Create a DataLoader for NLI data.
@@ -248,6 +250,8 @@ def create_dataloader(
         shuffle: Whether to shuffle data
         num_workers: Number of worker processes
         cache_dir: Optional cache directory
+        sampling_strategy: Train-time sampling strategy: "shuffle" or "balanced"
+        sampling_power: Exponent for class-frequency reweighting in balanced mode
 
     Returns:
         DataLoader instance
@@ -259,10 +263,39 @@ def create_dataloader(
         cache_dir=cache_dir
     )
 
+    sampler = None
+    use_shuffle = shuffle
+    strategy = (sampling_strategy or "shuffle").lower().strip()
+
+    if strategy == "balanced" and shuffle:
+        label_counts = {0: 0, 1: 0, 2: 0}
+        for example in dataset.examples:
+            label_counts[example["label"]] += 1
+
+        sample_weights = []
+        for example in dataset.examples:
+            count = max(label_counts[example["label"]], 1)
+            # sampling_power=1.0 gives inverse-frequency weights.
+            weight = 1.0 / (float(count) ** float(sampling_power))
+            sample_weights.append(weight)
+
+        sampler = WeightedRandomSampler(
+            weights=torch.tensor(sample_weights, dtype=torch.double),
+            num_samples=len(sample_weights),
+            replacement=True
+        )
+        use_shuffle = False
+        logger.info(
+            "Using balanced sampler: counts=%s power=%.2f",
+            label_counts,
+            sampling_power
+        )
+
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
-        shuffle=shuffle,
+        shuffle=use_shuffle,
+        sampler=sampler,
         num_workers=num_workers,
         collate_fn=collate_nli_batch,
         pin_memory=True if torch.cuda.is_available() else False

@@ -18,6 +18,39 @@ from src.core.config_loader import load_config
 from src.rag.rag_pipeline import RAGPipeline
 
 
+def get_precheck_index_count(config: Dict) -> int | None:
+    """
+    Fast index-count check without loading full RAG stack.
+
+    Returns:
+      - int count for supported stores
+      - None when precheck is unavailable
+    """
+    vector_cfg = config.get("vector_store", {}) or {}
+    store_type = vector_cfg.get("type", "")
+    vector_store_config = vector_cfg.get("config", {}) or {}
+    if store_type != "chroma":
+        return None
+
+    persist_directory = vector_store_config.get("persist_directory") or vector_cfg.get("persist_directory")
+    collection_name = vector_store_config.get("collection_name") or vector_cfg.get("collection_name") or "documents"
+    if not persist_directory:
+        return None
+
+    try:
+        import chromadb
+        from chromadb.config import Settings
+
+        client = chromadb.PersistentClient(
+            path=persist_directory,
+            settings=Settings(anonymized_telemetry=False),
+        )
+        collection = client.get_collection(name=collection_name)
+        return int(collection.count())
+    except Exception:
+        return 0
+
+
 def load_questions(path: Path) -> List[Dict]:
     questions: List[Dict] = []
     with path.open("r", encoding="utf-8") as f:
@@ -63,6 +96,11 @@ def main() -> None:
     parser.add_argument("--uncertainty-threshold", type=float, default=None)
     parser.add_argument("--source-consistency-threshold", type=float, default=None)
     parser.add_argument("--uncertainty-source", default=None)
+    parser.add_argument(
+        "--allow-empty-index",
+        action="store_true",
+        help="Run even if vector collection is empty (not recommended).",
+    )
     args = parser.parse_args()
 
     questions = load_questions(Path(args.questions))
@@ -71,7 +109,19 @@ def main() -> None:
         questions = questions[: args.limit]
 
     config = load_config(args.config)
+    precheck_count = get_precheck_index_count(config)
+    if precheck_count == 0 and not args.allow_empty_index:
+        raise SystemExit(
+            "Vector collection is empty (0 docs). Index a corpus first or pass "
+            "--allow-empty-index to override."
+        )
     rag = RAGPipeline.from_config(config)
+    index_count = rag.vector_store.get_count()
+    if index_count == 0 and not args.allow_empty_index:
+        raise SystemExit(
+            "Vector collection is empty (0 docs). Index a corpus first or pass "
+            "--allow-empty-index to override."
+        )
 
     abstain_message = (
         config.get("gating", {}).get("abstain_message", "").strip()

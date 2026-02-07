@@ -50,11 +50,20 @@ models/
 *.pth
 
 # Data
-data/
+data/*
 *.csv
 *.json
 *.pdf
 *.txt
+!data/domain_health/
+!data/domain_health/README.md
+!data/domain_health/questions_health_conflict.jsonl
+!data/domain_finreg/
+!data/domain_finreg/README.md
+!data/domain_finreg/questions_finreg_conflict.jsonl
+!data/domain_disaster/
+!data/domain_disaster/README.md
+!data/domain_disaster/questions_disaster_conflict.jsonl
 
 # Vector DB
 *.chroma/

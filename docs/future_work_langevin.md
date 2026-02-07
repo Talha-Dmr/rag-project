@@ -5,6 +5,21 @@ Implement a Langevin-based uncertainty mechanism for the RAG system, accepting t
 complexity in exchange for stronger epistemic uncertainty estimates and a more rigorous
 Bayesian framing.
 
+## Active Domain Pivot (Feb 7, 2026)
+- Primary high-stakes domain set is now:
+  - Health guidelines (`domain_health`)
+  - Financial regulation/compliance (`domain_finreg`)
+  - Disaster and climate risk (`domain_disaster`)
+- Energy and Macro are retained as legacy baselines for comparison, not as the target final trio.
+- Initial configs for the new trio:
+  - `config/gating_health_ebcar_logit_mi_sc009.yaml`
+  - `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
+  - `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
+- Initial seed question sets (20Q each):
+  - `data/domain_health/questions_health_conflict.jsonl`
+  - `data/domain_finreg/questions_finreg_conflict.jsonl`
+  - `data/domain_disaster/questions_disaster_conflict.jsonl`
+
 ## Executive Summary (Current Snapshot)
 - Main demo defaults (epistemic track):
   - **Energy**: logit‑MI gating (contradiction_rate_threshold=0.90).
@@ -34,6 +49,81 @@ Bayesian framing.
 - Latest gating ablation (Feb 1, 2026):
   - Energy set is 20Q (conflict-heavy); Macro is 50Q.
   - Results summarized below (nogate vs retrieve_more vs abstain).
+
+## Current Execution Plan (1 -> 2 -> 3)
+This is the active plan aligned with the project goal (epistemic/Langevin-first adaptive RAG):
+
+1. Stabilize the epistemic proxy path (now)
+- Keep `logit-MI` as production epistemic default:
+  - Energy: `gating_energy_ebcar_logit_mi_sc009.yaml`
+  - Macro: `gating_macro_ebcar_logit_mi_sc009.yaml`
+- Keep `rep-MI` as experimental (do not switch default yet).
+- Keep contradiction-threshold overrides only for controlled stress tests, not for default demos.
+
+2. Improve detector quality without abandoning SGLD direction
+- Continue SGLD LoRA detector training/eval iterations (weighted/focal/class-balance variants).
+- Decision rule for promotion:
+  - detector must improve macro quality without collapsing a class (especially `neutral` recall),
+  - and must preserve usable abstain/coverage behavior on Energy+Macro.
+
+3. Promote representation-space only if it beats logit-space on decision metrics
+- Representation-space sampling remains research track.
+- Promotion criteria:
+  - equal or better conflict selectivity,
+  - equal or better coverage-risk tradeoff,
+  - stable MI signal across seeds/domains.
+- Until these hold, logit-MI remains the default epistemic signal.
+
+### Command Runbook (single-line, no multiline wrapping)
+Use these when rerunning core checks:
+
+- Rep vs Logit ablation (both domains, 50Q):
+  - `cd /home/talha/projects/rag-project && ./scripts/run_rep_vs_logit_ablation.sh 50 7`
+- Energy logit-MI with stricter contradiction gate (stress test):
+  - `cd /home/talha/projects/rag-project && env PYTHONPATH=. HF_HOME=./models/llm TRANSFORMERS_CACHE=./models/llm venv312/bin/python -u scripts/eval_grounding_proxy.py --config gating_energy_ebcar_logit_mi_sc009 --questions data/domain_energy/questions_energy_conflict_50.jsonl --limit 50 --seed 7 --contradiction-rate-threshold 0.90 --output evaluation_results/auto_eval/energy_logit_mi_50_thr090.json`
+- Macro logit-MI with stricter contradiction gate (stress test):
+  - `cd /home/talha/projects/rag-project && env PYTHONPATH=. HF_HOME=./models/llm TRANSFORMERS_CACHE=./models/llm venv312/bin/python -u scripts/eval_grounding_proxy.py --config gating_macro_ebcar_logit_mi_sc009 --questions data/domain_macro/questions_macro_conflict_50.jsonl --limit 50 --seed 7 --contradiction-rate-threshold 0.80 --output evaluation_results/auto_eval/macro_logit_mi_50_thr080.json`
+
+### Detector Rebalance Pilot (Feb 7, 2026)
+- Added balanced-sampling training config:
+  - `config/sgld_lora_warmstart_ambigqa_mini_noise5e-5_balanced.yaml`
+- Added balanced-detector gating configs:
+  - `config/gating_energy_ebcar_logit_mi_sc009_balanceddet.yaml`
+  - `config/gating_macro_ebcar_logit_mi_sc009_balanceddet.yaml`
+
+Test-set detector comparison (NLI mini test, 1000):
+
+| Detector | Accuracy | F1_macro | F1_neutral | ECE | Brier |
+| --- | --- | --- | --- | --- | --- |
+| SGLD warmstart (old) | 0.270 | 0.213 | 0.000 | 0.345 | 0.907 |
+| SGLD weighted CE | 0.338 | 0.215 | 0.000 | 0.078 | 0.688 |
+| SGLD balanced sampling | 0.335 | 0.312 | 0.425 | 0.041 | 0.670 |
+
+Key result:
+- Balanced sampling removes the neutral-class collapse while keeping calibration strong.
+- This is the strongest detector candidate so far for the SGLD track.
+
+20Q gating sanity check (logit-MI configs, same thresholds):
+
+| Domain | Old detector | Balanced detector |
+| --- | --- | --- |
+| Energy (thr=0.90) | abstain 6/20 (0.30) | abstain 6/20 (0.30) |
+| Macro (thr=0.80) | abstain 4/20 (0.20) | abstain 3/20 (0.15) |
+
+Decision update (Feb 7, 2026):
+- Promote balanced detector for active logit-MI defaults on existing domains:
+  - `config/gating_energy_ebcar_logit_mi_sc009.yaml`
+  - `config/gating_macro_ebcar_logit_mi_sc009.yaml`
+- Keep explicit balanced-tagged variants as compatibility aliases:
+  - `config/gating_energy_ebcar_logit_mi_sc009_balanceddet.yaml`
+  - `config/gating_macro_ebcar_logit_mi_sc009_balanceddet.yaml`
+
+Rationale:
+- Balanced detector is the strongest checkpoint on NLI mini test
+  (`f1_macro=0.312`, `ece=0.041`) and aligns better with the
+  epistemic/Langevin objective than AdamW fallback.
+- Operationally, this keeps the main logit-MI path consistent with the
+  posterior-sampling narrative while representation-space work continues as R&D.
 
 ### Gating Ablation (Feb 1, 2026)
 Energy (20Q):

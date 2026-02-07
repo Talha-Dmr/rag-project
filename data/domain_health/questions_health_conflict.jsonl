@@ -1,0 +1,20 @@
+{"id":"hq01","type":"sanity","query":"What is the main purpose of the WHO guideline development process?"}
+{"id":"hq02","type":"sanity","query":"What does CDC use MMWR recommendation reports for?"}
+{"id":"hq03","type":"sanity","query":"What is the role of evidence grading in NICE guidelines?"}
+{"id":"hq04","type":"sanity","query":"What does a living guideline mean in public health?"}
+{"id":"hq05","type":"sanity","query":"Why do clinical guidelines include strength-of-recommendation labels?"}
+{"id":"hq06","type":"conflict","query":"Do WHO and CDC differ on when booster doses are prioritized for high-risk groups?"}
+{"id":"hq07","type":"conflict","query":"Are isolation-duration recommendations aligned between WHO and CDC across recent updates?"}
+{"id":"hq08","type":"conflict","query":"Do WHO and NICE differ on recommendations for antiviral use in mild outpatient cases?"}
+{"id":"hq09","type":"conflict","query":"How do WHO and CDC differ on mask recommendations in healthcare settings versus community settings?"}
+{"id":"hq10","type":"conflict","query":"Do WHO and ECDC use the same threshold logic for moving from containment to mitigation?"}
+{"id":"hq11","type":"conflict","query":"Are recommendations on asymptomatic testing frequency consistent across CDC and NICE guidance?"}
+{"id":"hq12","type":"conflict","query":"Do major guideline bodies differ on prophylactic treatment recommendations for immunocompromised patients?"}
+{"id":"hq13","type":"conflict","query":"How do WHO and CDC differ in handling low-certainty evidence when issuing strong recommendations?"}
+{"id":"hq14","type":"conflict","query":"Are pediatric vaccination interval recommendations consistent between WHO and national guidance?"}
+{"id":"hq15","type":"conflict","query":"Do guidelines agree on return-to-work criteria for healthcare workers after respiratory infection?"}
+{"id":"hq16","type":"conflict","query":"How do WHO and NICE differ on balancing individual benefit versus population-level benefit in guidance?"}
+{"id":"hq17","type":"conflict","query":"Are recommendations for travel-related screening and quarantine harmonized across WHO and CDC?"}
+{"id":"hq18","type":"conflict","query":"Do guideline sources differ on preferred endpoints for evaluating intervention effectiveness?"}
+{"id":"hq19","type":"conflict","query":"How do recommendations diverge when trial evidence conflicts with real-world observational evidence?"}
+{"id":"hq20","type":"conflict","query":"Do guideline bodies differ on when to issue conditional recommendations versus abstain due to uncertainty?"}

@@ -1,4 +1,4 @@
-# Macro domain: logit-space MI gating (hybrid energy).
+# Health guidelines domain: logit-space MI gating (initial thresholds).
 
 embeddings:
   type: huggingface
@@ -8,8 +8,8 @@ embeddings:
 vector_store:
   type: chroma
   config:
-    persist_directory: ./data/vector_db/gating_demo
-    collection_name: rag_gating_demo
+    persist_directory: ./data/vector_db/domain_health
+    collection_name: rag_health
 
 llm:
   model_name: Qwen/Qwen2.5-1.5B-Instruct
@@ -25,7 +25,7 @@ reranker:
   top_k: 5
 
 hallucination_detector:
-  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_balanced/best_model
+  model_path: models/checkpoints/adamw_lora_sanity_ambigqa_mini/best_model
   base_model: microsoft/deberta-v3-small
   mc_dropout_samples: 1
   logit_sampling:
@@ -40,18 +40,13 @@ hallucination_detector:
 sources:
   consistency_top_k: 5
 
-# Gating config
-# Use MI as uncertainty; threshold tuned from sweep (~0.009 mean)
-
-
 gating:
   enabled: true
   strategy: retrieve_more
   max_retries: 2
   k_multiplier: 2.0
   max_k: 20
-  # Macro logit-MI latest 50Q run gives 22/50 abstain at this setting.
-  contradiction_rate_threshold: 0.80
+  contradiction_rate_threshold: 0.85
   contradiction_prob_threshold: 0.5
   uncertainty_source: logit_mi
   uncertainty_threshold: 0.02

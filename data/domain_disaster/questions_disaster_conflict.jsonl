@@ -1,0 +1,20 @@
+{"id":"dq01","type":"sanity","query":"What is the purpose of seasonal climate outlooks?"}
+{"id":"dq02","type":"sanity","query":"What does disaster risk reduction mean in UNDRR terminology?"}
+{"id":"dq03","type":"sanity","query":"Why do hazard forecasts often include probability ranges?"}
+{"id":"dq04","type":"sanity","query":"What is the difference between hazard, exposure, and vulnerability?"}
+{"id":"dq05","type":"sanity","query":"What role do early warning systems play in disaster preparedness?"}
+{"id":"dq06","type":"conflict","query":"Do NOAA outlooks and IPCC regional assessments differ on near-term drought risk in some regions?"}
+{"id":"dq07","type":"conflict","query":"How do UNDRR and national agencies differ in prioritizing resilience investments under budget constraints?"}
+{"id":"dq08","type":"conflict","query":"Are heavy-precipitation risk projections consistent between WMO reports and regional climate studies?"}
+{"id":"dq09","type":"conflict","query":"Do sources agree on attribution confidence for recent extreme heat events?"}
+{"id":"dq10","type":"conflict","query":"How do climate-risk reports differ on return-period assumptions for flood planning?"}
+{"id":"dq11","type":"conflict","query":"Are wildfire outlook recommendations aligned across national meteorological and disaster agencies?"}
+{"id":"dq12","type":"conflict","query":"Do hazard reports differ on whether uncertainty is mostly model-based or data-scarcity-based?"}
+{"id":"dq13","type":"conflict","query":"How do sources diverge on low-probability high-impact scenario treatment in adaptation planning?"}
+{"id":"dq14","type":"conflict","query":"Are coastal risk projections consistent across sea-level scenario assumptions from different reports?"}
+{"id":"dq15","type":"conflict","query":"Do frameworks agree on thresholds for triggering evacuation advisories under compound hazards?"}
+{"id":"dq16","type":"conflict","query":"How do reports differ on confidence communication language for decision-makers?"}
+{"id":"dq17","type":"conflict","query":"Are recommendations aligned on balancing false alarms versus missed-event risk in early warning?"}
+{"id":"dq18","type":"conflict","query":"Do different sources rank adaptation options similarly when uncertainty is deep?"}
+{"id":"dq19","type":"conflict","query":"How do assessments differ on short-term versus long-term disaster financing priorities?"}
+{"id":"dq20","type":"conflict","query":"Do agencies disagree on which vulnerable populations should be prioritized under uncertain forecasts?"}

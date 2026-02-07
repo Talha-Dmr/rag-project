@@ -1,0 +1,20 @@
+{"id":"fq01","type":"sanity","query":"What is the core objective of BCBS 239?"}
+{"id":"fq02","type":"sanity","query":"What does supervisory review aim to assess in bank risk governance?"}
+{"id":"fq03","type":"sanity","query":"Why is data lineage important in regulatory risk reporting?"}
+{"id":"fq04","type":"sanity","query":"What is the role of stress testing in prudential supervision?"}
+{"id":"fq05","type":"sanity","query":"What is model risk management in the context of banking regulation?"}
+{"id":"fq06","type":"conflict","query":"Do BIS and regional supervisors differ on expectations for near-real-time risk aggregation?"}
+{"id":"fq07","type":"conflict","query":"How do BCBS principles and local supervisory guidance differ on board-level accountability for data quality?"}
+{"id":"fq08","type":"conflict","query":"Are timelines for compliance with risk-data principles consistent across jurisdictions?"}
+{"id":"fq09","type":"conflict","query":"Do regulatory texts agree on proportionality for smaller banks under BCBS 239-style requirements?"}
+{"id":"fq10","type":"conflict","query":"How do supervisors differ on acceptable use of manual workarounds in regulatory reporting?"}
+{"id":"fq11","type":"conflict","query":"Do frameworks diverge on frequency and depth of independent validation for internal risk models?"}
+{"id":"fq12","type":"conflict","query":"Are expectations for climate-risk integration into ICAAP consistent across major regulators?"}
+{"id":"fq13","type":"conflict","query":"How do different regulators treat data controls for outsourced risk-reporting systems?"}
+{"id":"fq14","type":"conflict","query":"Do supervisors align on penalties or remediation thresholds for persistent data-quality deficiencies?"}
+{"id":"fq15","type":"conflict","query":"Are definitions of material risk-reporting errors harmonized across BIS-aligned and local guidance?"}
+{"id":"fq16","type":"conflict","query":"How do regulations differ on explainability requirements for AI-assisted credit risk models?"}
+{"id":"fq17","type":"conflict","query":"Do standards differ on retention requirements for audit trails in risk data systems?"}
+{"id":"fq18","type":"conflict","query":"How do supervisory sources diverge on intraday liquidity monitoring expectations?"}
+{"id":"fq19","type":"conflict","query":"Are data-governance requirements for cross-border banking groups consistent across supervisory bodies?"}
+{"id":"fq20","type":"conflict","query":"Do frameworks differ on when a compliance finding should trigger immediate capital planning impact?"}

@@ -25,7 +25,7 @@ reranker:
   top_k: 5
 
 hallucination_detector:
-  model_path: models/checkpoints/adamw_lora_sanity_ambigqa_mini/best_model
+  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_balanced/best_model
   base_model: microsoft/deberta-v3-small
   mc_dropout_samples: 1
   logit_sampling:

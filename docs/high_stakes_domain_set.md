@@ -13,7 +13,7 @@ Rationale:
 
 ## Current Assets
 
-- Configs (initial thresholds):
+- Configs (initial thresholds, balanced SGLD detector):
   - `config/gating_health_ebcar_logit_mi_sc009.yaml`
   - `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
   - `config/gating_disaster_ebcar_logit_mi_sc009.yaml`

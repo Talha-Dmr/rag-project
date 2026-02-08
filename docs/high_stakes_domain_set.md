@@ -59,19 +59,29 @@ Financial regulation:
 Disaster/climate:
 - `PYTHONPATH=. venv312/bin/python scripts/eval_grounding_proxy.py --config gating_disaster_ebcar_logit_mi_sc009 --questions data/domain_disaster/questions_disaster_conflict.jsonl --limit 20 --seed 7 --output evaluation_results/auto_eval/disaster_logit_mi_20.json`
 
-## Latest Seed Results (50Q each, Feb 7, 2026)
+## Latest Multi-Seed Results (50Q each, seeds 7/11/19, Feb 8, 2026)
 
-| Domain | Abstain | Source consistency | Contradiction rate | Uncertainty mean |
-| --- | --- | --- | --- | --- |
-| Health | 4/50 (0.08) | 0.728 | 0.00 | 0.0162 |
-| Financial regulation | 1/50 (0.02) | 0.715 | 0.008 | 0.0160 |
-| Disaster/climate | 1/50 (0.02) | 0.753 | 0.00 | 0.0162 |
+Source: `docs/stability_report.md` and `evaluation_results/auto_eval/seed_stability_summary.json`
+
+| Domain | Abstain rate (mean +- std) | Min-Max | Retrieve-more (mean +- std) | Contradiction rate (mean +- std) | Source consistency |
+| --- | --- | --- | --- | --- | --- |
+| Health | 0.073 +- 0.077 | 0.00 - 0.18 | 0.073 +- 0.077 | 0.187 +- 0.261 | 0.728 |
+| Financial regulation | 0.360 +- 0.440 | 0.00 - 0.98 | 0.360 +- 0.440 | 0.504 +- 0.407 | 0.715 |
+| Disaster/climate | 0.073 +- 0.025 | 0.04 - 0.10 | 0.073 +- 0.025 | 0.545 +- 0.392 | 0.753 |
 
 Interpretation:
-- The balanced detector + logit-MI path gives low abstain on all three high-stakes domains at 50Q.
-- Disaster outlier behavior was fixed by a single domain-specific contradiction-rate override.
+- `health`: relatively stable with low-to-moderate abstain.
+- `disaster`: abstain behavior is stable/low after override, but contradiction signal can vary by seed.
+- `finreg`: unstable under seed changes (extreme abstain in one seed).
 
 Decision:
-- Keep `logit_mi` + balanced detector as default for this trio.
+- Keep `logit_mi` + balanced detector as the default path.
 - Keep disaster override (`contradiction_rate_threshold: 1.01`) active.
-- Next pass: multi-seed confirmation (seed sweep) before any further threshold changes.
+- Promote finreg override to `contradiction_rate_threshold: 1.01` based on targeted sweep; keep monitoring with multi-seed checks.
+- Finreg 50Q seed-19 confirmation:
+  - old (`0.85`): `abstain_rate=0.98`, `contradiction_rate=0.996`
+  - new (`1.01`): `abstain_rate=0.04`, `contradiction_rate=0.016`
+- Finreg quick cross-seed check (`limit=20`, new threshold):
+  - `seed=7`: `abstain_rate=0.05`, `contradiction_rate=0.00`
+  - `seed=11`: `abstain_rate=0.00`, `contradiction_rate=0.00`
+  - `seed=19`: `abstain_rate=0.05`, `contradiction_rate=0.00`

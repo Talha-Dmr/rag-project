@@ -74,3 +74,27 @@ Otherwise keep global defaults and mark domain as unresolved.
 - Confirmed result: `abstain_rate=0.02` on 50Q with stable detector behavior
 
 This is a valid outlier-fix under this policy: single-threshold override, same detector and retrieval stack.
+
+## FinReg Outlier Update (Feb 8, 2026)
+
+- Domain: `finreg`
+- Prior multi-seed 50Q behavior (`seeds=7/11/19`) flagged the domain as unstable outlier:
+  - abstain_rate: `0.00`, `0.10`, `0.98`
+  - contradiction_rate (stats_all): `0.00`, `0.516`, `0.996`
+- Targeted threshold sweep completed on finreg (`seed=19`, `limit=20`) with detector/retrieval fixed:
+  - `0.85` -> `abstain_rate=0.15`, `contradiction_rate=0.24`
+  - `0.95` -> `abstain_rate=0.15`, `contradiction_rate=0.31`
+  - `1.01` -> `abstain_rate=0.05`, `contradiction_rate=0.00` (best)
+  - `1.10` -> `abstain_rate=0.05`, `contradiction_rate=0.19`
+- Decision:
+  - Promote `contradiction_rate_threshold=1.01` for `finreg` config.
+  - Continue to keep detector and retrieval stack unchanged.
+- Confirmation:
+  - 50Q confirm run for `seed=19` completed:
+    - before (`0.85` baseline): `abstain_rate=0.98`, `contradiction_rate=0.996`
+    - after (`1.01` override): `abstain_rate=0.04`, `contradiction_rate=0.016`
+  - Quick cross-seed recheck (`limit=20`) under new threshold:
+    - `seed=7`: `abstain_rate=0.05`, `contradiction_rate=0.00`
+    - `seed=11`: `abstain_rate=0.00`, `contradiction_rate=0.00`
+    - `seed=19`: `abstain_rate=0.05`, `contradiction_rate=0.00`
+  - Next gate: full 50Q multi-seed rerun (`seeds=7/11/19`) under the new threshold.

@@ -25,13 +25,16 @@ Bayesian framing.
   - Health: `config/gating_health_ebcar_logit_mi_sc009.yaml`
   - Financial regulation: `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
   - Disaster/climate: `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
-- Latest 50Q seed run (`seed=7`):
-  - Health: abstain `4/50 (0.08)`, source_consistency `0.728`, contradiction_rate `0.00`
-  - FinReg: abstain `1/50 (0.02)`, source_consistency `0.715`, contradiction_rate `0.008`
-  - Disaster: abstain `1/50 (0.02)`, source_consistency `0.753`, contradiction_rate `0.00`
+- Latest 50Q multi-seed sweep (`seeds=7/11/19`):
+  - Health: abstain mean `0.073` (std `0.077`), source_consistency `0.728`
+  - FinReg: abstain mean `0.360` (std `0.440`), source_consistency `0.715`
+  - Disaster: abstain mean `0.073` (std `0.025`), source_consistency `0.753`
+  - Full table: `docs/stability_report.md`
 - Decision:
-  - Keep logit-MI + balanced detector as active default on the high-stakes trio.
+  - Keep logit-MI + balanced detector as active default path.
   - Keep disaster domain override active: `contradiction_rate_threshold=1.01`.
+  - Promote finreg to calibrated override: `contradiction_rate_threshold=1.01` (selected by targeted sweep, confirmed on 50Q seed-19).
+  - Finreg quick cross-seed sanity check (`limit=20`, seeds `7/11/19`) is clean after override; full 50Q multi-seed confirm is next.
   - Continue representation-space and SWAG lines as epistemic R&D, not deployment default.
 - Legacy (Energy/Macro) remains available as historical ablation track and calibration reference.
 
@@ -44,7 +47,7 @@ This is the active plan aligned with the project goal (epistemic/Langevin-first 
   - FinReg: `gating_finreg_ebcar_logit_mi_sc009.yaml`
   - Disaster: `gating_disaster_ebcar_logit_mi_sc009.yaml`
 - Keep `rep-MI` as experimental (do not switch default yet).
-- Keep contradiction-threshold overrides only for controlled stress tests, not for default demos.
+- Keep domain overrides minimal and policy-driven (`disaster` + `finreg`), and re-check with periodic multi-seed stability runs.
 
 2. Improve detector quality without abandoning SGLD direction
 - Continue SGLD LoRA detector training/eval iterations (weighted/focal/class-balance variants).

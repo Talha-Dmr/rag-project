@@ -1,0 +1,36 @@
+# OpenRouter free-router test config (small local integration smoke tests).
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cuda
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/openrouter_quick
+    collection_name: rag_openrouter_quick
+
+llm:
+  type: openrouter
+  model_name: openrouter/free
+  base_url: https://openrouter.ai/api/v1/chat/completions
+  api_key_env: OPENROUTER_API_KEY
+  site_url: https://localhost/rag-project
+  app_name: rag-project-local
+  timeout_sec: 120
+  max_tokens: 128
+  temperature: 0.2
+  top_p: 0.9
+
+retrieval:
+  k: 3
+  score_threshold: 0.0
+
+hallucination_detector:
+  enabled: false
+
+gating:
+  enabled: false
+  abstain_message: "I don't have enough reliable information to answer that."
+

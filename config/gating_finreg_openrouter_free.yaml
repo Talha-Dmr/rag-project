@@ -1,0 +1,53 @@
+# Financial regulation/compliance domain config using OpenRouter free tier for quick tests.
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cuda
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg
+    collection_name: rag_finreg
+
+llm:
+  type: openrouter
+  model_name: qwen/qwen3-4b:free
+  base_url: https://openrouter.ai/api/v1/chat/completions
+  api_key_env: OPENROUTER_API_KEY
+  site_url: https://localhost/rag-project
+  app_name: rag-project-local
+  timeout_sec: 120
+  max_tokens: 128
+  temperature: 0.2
+  top_p: 0.9
+
+retrieval:
+  k: 5
+  score_threshold: 0.0
+
+reranker:
+  type: ebcar
+  top_k: 5
+
+hallucination_detector:
+  enabled: false
+
+sources:
+  consistency_top_k: 5
+
+gating:
+  enabled: false
+  strategy: retrieve_more
+  max_retries: 2
+  k_multiplier: 2.0
+  max_k: 20
+  contradiction_rate_threshold: 0.40
+  contradiction_prob_threshold: 0.5
+  uncertainty_source: logit_mi
+  uncertainty_threshold: 0.02
+  source_consistency_threshold: 0.35
+  source_consistency_top_k: 5
+  abstain_message: "I don't have enough reliable information to answer that."
+

@@ -26,6 +26,7 @@ venv312/
 env/
 ENV/
 .venv
+.venv310/
 
 # Poetry
 poetry.lock

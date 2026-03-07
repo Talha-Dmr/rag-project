@@ -12,6 +12,7 @@ from src.embeddings.base_embedder import EmbedderFactory
 from src.reranking.base_reranker import RerankerFactory
 from src.vector_stores.base_store import VectorStoreFactory
 from src.rag.llm_wrapper import HuggingFaceLLM
+from src.rag.openrouter_llm import OpenRouterLLM
 from src.rag.retriever import Retriever
 from src.core.base_classes import BaseReranker
 from src.core.logger import get_logger
@@ -755,7 +756,11 @@ class RAGPipeline:
 
         # LLM
         llm_config = config.get('llm', {})
-        llm = HuggingFaceLLM(llm_config)
+        llm_type = str(llm_config.get("type", "huggingface")).strip().lower()
+        if llm_type in {"openrouter", "api", "openai_compatible"}:
+            llm = OpenRouterLLM(llm_config)
+        else:
+            llm = HuggingFaceLLM(llm_config)
 
         # Retriever
         retriever = Retriever(

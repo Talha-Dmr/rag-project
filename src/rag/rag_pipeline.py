@@ -4,6 +4,7 @@ Main RAG Pipeline orchestrator.
 
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+from collections import OrderedDict
 import numpy as np
 from src.dataset.data_manager import DataManager
 from src.chunking.base_chunker import ChunkerFactory
@@ -62,6 +63,10 @@ class RAGPipeline:
         self.hallucination_detector = hallucination_detector
         self.gating_config = gating_config or {}
         self.source_config = source_config or {}
+        self._source_embedding_cache_size = int(
+            self.source_config.get("embedding_cache_size", 20000)
+        )
+        self._source_embedding_cache: "OrderedDict[str, np.ndarray]" = OrderedDict()
 
         if hallucination_detector:
             logger.info("RAG Pipeline initialized with hallucination detection")
@@ -130,11 +135,25 @@ class RAGPipeline:
             }
 
         contradiction_probs = []
+        entailment_probs = []
+        neutral_probs = []
+        conflict_masses = []
         uncertainties = []
+        label_counts = {
+            "entailment": 0,
+            "neutral": 0,
+            "contradiction": 0,
+        }
         for result in individual:
             scores = result.get("scores")
             if scores:
-                contradiction_probs.append(scores.get("contradiction", 0.0))
+                entailment_prob = float(scores.get("entailment", 0.0))
+                neutral_prob = float(scores.get("neutral", 0.0))
+                contradiction_prob = float(scores.get("contradiction", 0.0))
+                contradiction_probs.append(contradiction_prob)
+                entailment_probs.append(entailment_prob)
+                neutral_probs.append(neutral_prob)
+                conflict_masses.append(min(entailment_prob, contradiction_prob))
                 if uncertainty_source == "entropy":
                     uncertainties.append(result.get("uncertainty_entropy", 0.0))
                 elif uncertainty_source == "variance":
@@ -160,13 +179,54 @@ class RAGPipeline:
                 contradiction_probs.append(1.0 if result.get("is_hallucination") else 0.0)
                 uncertainties.append(1.0 - result.get("confidence", 0.0))
 
+            label = result.get("label")
+            if label in label_counts:
+                label_counts[label] += 1
+
         contradiction_prob_mean = sum(contradiction_probs) / len(contradiction_probs)
         uncertainty_mean = sum(uncertainties) / len(uncertainties)
+        contradiction_prob_std = float(np.std(np.array(contradiction_probs, dtype=float)))
+        entailment_prob_mean = (
+            float(sum(entailment_probs) / len(entailment_probs))
+            if entailment_probs else 0.0
+        )
+        neutral_prob_mean = (
+            float(sum(neutral_probs) / len(neutral_probs))
+            if neutral_probs else 0.0
+        )
+        conflict_mass_mean = (
+            float(sum(conflict_masses) / len(conflict_masses))
+            if conflict_masses else 0.0
+        )
+
+        total_labels = sum(label_counts.values())
+        if total_labels > 0:
+            dist = np.array(
+                [
+                    label_counts["entailment"],
+                    label_counts["neutral"],
+                    label_counts["contradiction"],
+                ],
+                dtype=float
+            ) / float(total_labels)
+            nonzero = dist[dist > 0.0]
+            label_entropy = float(-(nonzero * np.log(nonzero)).sum() / np.log(3.0))
+            label_disagreement = float(1.0 - dist.max())
+        else:
+            label_entropy = 0.0
+            label_disagreement = 0.0
 
         return {
             "contradiction_rate": detection_result.get("hallucination_score", 0.0),
             "contradiction_prob_mean": contradiction_prob_mean,
-            "uncertainty_mean": uncertainty_mean
+            "uncertainty_mean": uncertainty_mean,
+            # Additional conflict/ambiguity signals for aleatoric modeling.
+            "entailment_prob_mean": entailment_prob_mean,
+            "neutral_prob_mean": neutral_prob_mean,
+            "contradiction_prob_std": contradiction_prob_std,
+            "conflict_mass_mean": conflict_mass_mean,
+            "label_entropy": label_entropy,
+            "label_disagreement": label_disagreement,
         }
 
     def _compute_retrieval_stats(self, retrieved_docs: List[Dict[str, Any]]) -> Dict[str, float]:
@@ -204,8 +264,7 @@ class RAGPipeline:
             return 1.0
 
         try:
-            embeddings = self.embedder.embed_batch(texts)
-            vectors = np.array(embeddings, dtype=float)
+            vectors = self._get_cached_source_embeddings(texts)
             if vectors.ndim != 2 or vectors.shape[0] < 2:
                 return None
 
@@ -221,6 +280,36 @@ class RAGPipeline:
             logger.warning(f"Failed to compute source consistency: {e}")
             return None
 
+    def _get_cached_source_embeddings(self, texts: List[str]) -> np.ndarray:
+        vectors: List[Optional[np.ndarray]] = [None] * len(texts)
+        misses: List[str] = []
+        miss_indices: List[int] = []
+
+        for idx, text in enumerate(texts):
+            cached = self._source_embedding_cache.get(text)
+            if cached is not None:
+                self._source_embedding_cache.move_to_end(text)
+                vectors[idx] = cached
+            else:
+                misses.append(text)
+                miss_indices.append(idx)
+
+        if misses:
+            embedded = self.embedder.embed_batch(misses)
+            for idx, text, vec in zip(miss_indices, misses, embedded):
+                arr = np.asarray(vec, dtype=float)
+                vectors[idx] = arr
+                self._source_embedding_cache[text] = arr
+                self._source_embedding_cache.move_to_end(text)
+                while len(self._source_embedding_cache) > self._source_embedding_cache_size:
+                    self._source_embedding_cache.popitem(last=False)
+
+        dense_vectors = [
+            vec if vec is not None else np.asarray(self.embedder.embed_text(texts[i]), dtype=float)
+            for i, vec in enumerate(vectors)
+        ]
+        return np.array(dense_vectors, dtype=float)
+
     def _merge_gating_config(self, override: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         if not override:
             return dict(self.gating_config)
@@ -228,6 +317,79 @@ class RAGPipeline:
         merged = dict(self.gating_config)
         merged.update(override)
         return merged
+
+    def _clamp01(self, x: Optional[float], default: float = 0.0) -> float:
+        if not isinstance(x, (int, float)):
+            return float(default)
+        return float(min(1.0, max(0.0, x)))
+
+    def _risk_budgeted_action(self, stats: Dict[str, float], gating_config: Dict[str, Any]) -> str:
+        """
+        Cost-aware 3-action controller: answer vs retrieve_more vs abstain.
+
+        This is intentionally simple and config-driven so we can iterate without changing
+        the baseline stack. It fuses multiple risk signals into a single risk score and
+        then chooses the lowest-cost action.
+        """
+        # Risk signals (all normalized/clamped to [0,1] where possible)
+        contradiction_rate = self._clamp01(stats.get("contradiction_rate", 0.0))
+        contradiction_prob = self._clamp01(stats.get("contradiction_prob_mean", 0.0))
+        uncertainty = self._clamp01(stats.get("uncertainty_mean", 0.0))
+        source_consistency = stats.get("source_consistency")
+        sc = self._clamp01(source_consistency, default=1.0)
+
+        retrieval_max = self._clamp01(stats.get("retrieval_max_score", 0.0))
+        retrieval_mean = self._clamp01(stats.get("retrieval_mean_score", 0.0))
+
+        weights = gating_config.get("risk_weights") or {}
+        w_cr = float(weights.get("contradiction_rate", 1.0))
+        w_cp = float(weights.get("contradiction_prob", 0.0))
+        w_u = float(weights.get("uncertainty", 0.0))
+        w_inc = float(weights.get("inconsistency", 0.0))  # uses (1 - source_consistency)
+        w_ret = float(weights.get("retrieval_weakness", 0.0))  # uses (1 - retrieval_max)
+
+        risk = (
+            w_cr * contradiction_rate
+            + w_cp * contradiction_prob
+            + w_u * uncertainty
+            + w_inc * (1.0 - sc)
+            + w_ret * (1.0 - retrieval_max)
+        )
+
+        # Action costs
+        # - answer_cost: proportional to risk
+        # - retrieve_more: pay a fixed cost + assume risk shrinks by a factor
+        # - abstain: fixed cost (coverage penalty)
+        retrieve_more_cost = float(gating_config.get("retrieve_more_cost", 0.10))
+        retrieve_more_risk_factor = float(gating_config.get("retrieve_more_risk_factor", 0.75))
+        abstain_cost = float(gating_config.get("abstain_cost", 0.35))
+
+        answer_cost = risk
+        retrieve_cost = retrieve_more_cost + retrieve_more_risk_factor * risk
+
+        # Optional guard: if retrieval quality is already very weak, retrieving more is unlikely to help.
+        min_rm = gating_config.get("retrieve_more_min_retrieval_max")
+        min_rmean = gating_config.get("retrieve_more_min_retrieval_mean")
+        if isinstance(min_rm, (int, float)) and retrieval_max < float(min_rm):
+            retrieve_cost = float("inf")
+        if isinstance(min_rmean, (int, float)) and retrieval_mean < float(min_rmean):
+            retrieve_cost = float("inf")
+
+        # Store for downstream reporting (eval scripts ignore unknown keys safely).
+        stats["risk_score"] = float(risk)
+        stats["policy_cost_answer"] = float(answer_cost)
+        stats["policy_cost_retrieve_more"] = float(retrieve_cost)
+        stats["policy_cost_abstain"] = float(abstain_cost)
+
+        # Choose minimal cost action.
+        # Tie-breaker is safety-biased: abstain > retrieve_more > answer.
+        costs = {
+            "none": answer_cost,
+            "retrieve_more": retrieve_cost,
+            "abstain": abstain_cost,
+        }
+        best = min(costs.items(), key=lambda kv: (kv[1], 0 if kv[0] == "abstain" else 1 if kv[0] == "retrieve_more" else 2))
+        return best[0]
 
     def _decide_gating_action(self, stats: Dict[str, float], gating_config: Dict[str, Any]) -> str:
         contradiction_rate = stats.get("contradiction_rate", 0.0)
@@ -253,6 +415,11 @@ class RAGPipeline:
             if source_consistency < float(source_consistency_threshold):
                 retrieval_low = True
 
+        strategy = gating_config.get("strategy", "abstain")
+        if strategy == "risk_budgeted":
+            # Policy is 3-action and does not require a separate should_gate precheck.
+            return self._risk_budgeted_action(stats, gating_config)
+
         should_gate = (
             contradiction_rate >= contradiction_rate_threshold or
             contradiction_prob >= contradiction_prob_threshold or
@@ -263,7 +430,7 @@ class RAGPipeline:
         if not should_gate:
             return "none"
 
-        return gating_config.get("strategy", "abstain")
+        return strategy
 
     def query(
         self,
@@ -622,11 +789,14 @@ class RAGPipeline:
         training_config = config.get('training', {})
         model_path = training_config.get('output', {}).get('final_model_dir')
         detector_config = config.get('hallucination_detector', {})
+        detector_enabled = bool(detector_config.get('enabled', True))
 
         if detector_config:
             model_path = detector_config.get('model_path', model_path)
 
-        if model_path and Path(model_path).exists():
+        if not detector_enabled:
+            logger.info("Hallucination detector disabled in config")
+        elif model_path and Path(model_path).exists():
             try:
                 from src.rag.hallucination_detector import HallucinationDetector
 
@@ -639,7 +809,7 @@ class RAGPipeline:
                         ),
                         device=detector_config.get('device'),
                         base_model=detector_config.get('base_model'),
-                        lora_config=detector_config.get('lora'),
+                        lora_config=detector_config.get('lora') or detector_config.get('lora_config'),
                         mc_dropout_samples=detector_config.get('mc_dropout_samples', 1),
                         swag_config=detector_config.get('swag'),
                         logit_sampling_config=detector_config.get('logit_sampling'),

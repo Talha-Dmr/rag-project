@@ -1,4 +1,5 @@
-# Health guidelines domain: logit-space MI gating (calibrated thresholds).
+# Health guidelines domain: logit-space MI gating (experimental detector variant: neutral-guard).
+# Keep gating thresholds aligned with the locked baseline; only the detector checkpoint differs.
 
 embeddings:
   type: huggingface
@@ -25,7 +26,8 @@ reranker:
   top_k: 5
 
 hallucination_detector:
-  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_balanced/best_model
+  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_neutralguard/best_model
+  device: cuda
   base_model: microsoft/deberta-v3-small
   mc_dropout_samples: 1
   logit_sampling:
@@ -46,7 +48,6 @@ gating:
   max_retries: 2
   k_multiplier: 2.0
   max_k: 20
-  # Calibrated on 50Q x seeds (7/11/19): reduces contradiction risk with small coverage cost.
   contradiction_rate_threshold: 0.40
   contradiction_prob_threshold: 0.5
   uncertainty_source: logit_mi

@@ -1,37 +1,47 @@
-# High-Stakes 3-Domain Set (Active)
+# High-Stakes Domain Set (Current)
 
 This project now uses a high-stakes domain mix designed for stronger uncertainty-aware RAG evaluation:
 
-1. Health guidelines (`domain_health`)
-2. Financial regulation/compliance (`domain_finreg`)
-3. Disaster and climate risk (`domain_disaster`)
+1. Health guidelines (`domain_health`) - primary
+2. Disaster and climate risk (`domain_disaster`) - primary
+3. Financial regulation/compliance (`domain_finreg`) - stress-test track
 
 Rationale:
 - High decision cost if answers are wrong.
 - Natural source conflict and uncertainty in all three domains.
 - Better domain-shift coverage than keeping both macro and energy together.
+- FinReg is retained as a higher-drift stress-test coverage track.
 
 ## Current Assets
 
-- Configs (balanced SGLD detector, domain-tuned where needed):
-  - `config/gating_health_ebcar_logit_mi_sc009.yaml`
-  - `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
-  - `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
-  - Note: `disaster` uses `contradiction_rate_threshold: 1.01` (promoted override).
-- Bootstrap corpus builder:
-  - `scripts/build_high_stakes_bootstrap_corpora.py`
-- Question seeds (20Q each):
-  - `data/domain_health/questions_health_conflict.jsonl`
-  - `data/domain_finreg/questions_finreg_conflict.jsonl`
-  - `data/domain_disaster/questions_disaster_conflict.jsonl`
+Canonical baseline reference:
+- `docs/baseline_locked.md`
+
+Locked default domain configs:
+- `config/gating_health_ebcar_logit_mi_sc009.yaml`
+- `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
+- `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
+
+Bootstrap corpus builder:
+- `scripts/build_high_stakes_bootstrap_corpora.py`
+
+Question sets:
+- Health:
+  - 20Q: `data/domain_health/questions_health_conflict.jsonl`
+  - 50Q: `data/domain_health/questions_health_conflict_50.jsonl`
+- FinReg:
+  - 20Q: `data/domain_finreg/questions_finreg_conflict.jsonl`
+  - 50Q: `data/domain_finreg/questions_finreg_conflict_50.jsonl`
+- Disaster:
+  - 20Q: `data/domain_disaster/questions_disaster_conflict.jsonl`
+  - 50Q: `data/domain_disaster/questions_disaster_conflict_50.jsonl`
 
 ## Recommended Next Execution Order
 
 1. Index one domain corpus at a time into its dedicated vector store directory.
-2. Run proxy grounding eval on the 20Q seed set.
-3. Tune thresholds per domain (especially contradiction and source-consistency).
-4. Expand each seed set to 50Q after first stable pass.
-5. Run cross-domain ablation:
+2. Run proxy grounding eval on the 20Q seed set for quick sanity checks.
+3. Expand each seed set to 50Q and confirm on `seed=7,11,19` after any config/domain change.
+4. Run controlled cross-domain ablation only when change justification exists:
    - `nogate` vs `retrieve_more` vs `abstain`
    - `logit_mi` vs `rep_mi` (same question slices)
 
@@ -45,6 +55,7 @@ Index first (required):
 
 Single-command helper:
 - `./scripts/run_high_stakes_seed_eval.sh all 20 7`
+- `./scripts/run_high_stakes_seed_matrix.sh 50 50 7,11,19 all`
 
 Note:
 - `eval_grounding_proxy.py` now stops early if the target collection is empty.
@@ -59,29 +70,10 @@ Financial regulation:
 Disaster/climate:
 - `PYTHONPATH=. venv312/bin/python scripts/eval_grounding_proxy.py --config gating_disaster_ebcar_logit_mi_sc009 --questions data/domain_disaster/questions_disaster_conflict.jsonl --limit 20 --seed 7 --output evaluation_results/auto_eval/disaster_logit_mi_20.json`
 
-## Latest Multi-Seed Results (50Q each, seeds 7/11/19, Feb 8, 2026)
+## Canonical Reports
 
-Source: `docs/stability_report.md` and `evaluation_results/auto_eval/seed_stability_summary.json`
+Do not copy metric tables into this doc (they drift quickly). Use the canonical generated reports:
 
-| Domain | Abstain rate (mean +- std) | Min-Max | Retrieve-more (mean +- std) | Contradiction rate (mean +- std) | Source consistency |
-| --- | --- | --- | --- | --- | --- |
-| Health | 0.073 +- 0.077 | 0.00 - 0.18 | 0.073 +- 0.077 | 0.187 +- 0.261 | 0.728 |
-| Financial regulation | 0.360 +- 0.440 | 0.00 - 0.98 | 0.360 +- 0.440 | 0.504 +- 0.407 | 0.715 |
-| Disaster/climate | 0.073 +- 0.025 | 0.04 - 0.10 | 0.073 +- 0.025 | 0.545 +- 0.392 | 0.753 |
-
-Interpretation:
-- `health`: relatively stable with low-to-moderate abstain.
-- `disaster`: abstain behavior is stable/low after override, but contradiction signal can vary by seed.
-- `finreg`: unstable under seed changes (extreme abstain in one seed).
-
-Decision:
-- Keep `logit_mi` + balanced detector as the default path.
-- Keep disaster override (`contradiction_rate_threshold: 1.01`) active.
-- Promote finreg override to `contradiction_rate_threshold: 1.01` based on targeted sweep; keep monitoring with multi-seed checks.
-- Finreg 50Q seed-19 confirmation:
-  - old (`0.85`): `abstain_rate=0.98`, `contradiction_rate=0.996`
-  - new (`1.01`): `abstain_rate=0.04`, `contradiction_rate=0.016`
-- Finreg quick cross-seed check (`limit=20`, new threshold):
-  - `seed=7`: `abstain_rate=0.05`, `contradiction_rate=0.00`
-  - `seed=11`: `abstain_rate=0.00`, `contradiction_rate=0.00`
-  - `seed=19`: `abstain_rate=0.05`, `contradiction_rate=0.00`
+- Stability (50Q x seeds 7/11/19): `docs/stability_report_50_default.md`
+- Calibration policy: `docs/calibration_policy.md`
+- Detector ablation (balanced vs focal): `docs/detector_ablation_report_50.md`

@@ -1,4 +1,5 @@
-# Health guidelines domain: logit-space MI gating (calibrated thresholds).
+# Disaster/climate risk domain: logit-space MI gating (experimental detector variant: focal).
+# Keep gating thresholds aligned with the locked baseline; only the detector checkpoint differs.
 
 embeddings:
   type: huggingface
@@ -8,8 +9,8 @@ embeddings:
 vector_store:
   type: chroma
   config:
-    persist_directory: ./data/vector_db/domain_health
-    collection_name: rag_health
+    persist_directory: ./data/vector_db/domain_disaster
+    collection_name: rag_disaster
 
 llm:
   model_name: Qwen/Qwen2.5-1.5B-Instruct
@@ -25,7 +26,7 @@ reranker:
   top_k: 5
 
 hallucination_detector:
-  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_balanced/best_model
+  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_focal/best_model
   base_model: microsoft/deberta-v3-small
   mc_dropout_samples: 1
   logit_sampling:
@@ -46,8 +47,7 @@ gating:
   max_retries: 2
   k_multiplier: 2.0
   max_k: 20
-  # Calibrated on 50Q x seeds (7/11/19): reduces contradiction risk with small coverage cost.
-  contradiction_rate_threshold: 0.40
+  contradiction_rate_threshold: 1.01
   contradiction_prob_threshold: 0.5
   uncertainty_source: logit_mi
   uncertainty_threshold: 0.02

@@ -4,6 +4,7 @@ HuggingFace embeddings implementation using sentence-transformers.
 
 from typing import List, Dict, Any, Optional
 import numpy as np
+import os
 from sentence_transformers import SentenceTransformer
 from src.core.base_classes import BaseEmbedder
 from src.embeddings.base_embedder import register_embedder
@@ -25,15 +26,30 @@ class HuggingFaceEmbedder(BaseEmbedder):
         self.device = self.config.get('device', 'cpu')
         self.cache_folder = self.config.get('cache_folder', None)
         self.batch_size = self.config.get('batch_size', 32)
+        self.local_files_only = bool(
+            self.config.get(
+                'local_files_only',
+                os.getenv('HF_HUB_OFFLINE', '').strip().lower() in {'1', 'true', 'yes', 'on'}
+            )
+        )
 
         logger.info(f"Loading embedding model: {self.model_name} on {self.device}")
 
         try:
-            self.model = SentenceTransformer(
-                self.model_name,
-                device=self.device,
-                cache_folder=self.cache_folder
-            )
+            try:
+                self.model = SentenceTransformer(
+                    self.model_name,
+                    device=self.device,
+                    cache_folder=self.cache_folder,
+                    local_files_only=self.local_files_only
+                )
+            except TypeError:
+                # Backward compatibility for older sentence-transformers versions.
+                self.model = SentenceTransformer(
+                    self.model_name,
+                    device=self.device,
+                    cache_folder=self.cache_folder
+                )
             logger.info(f"Successfully loaded model: {self.model_name}")
         except Exception as e:
             logger.error(f"Failed to load model {self.model_name}: {e}")

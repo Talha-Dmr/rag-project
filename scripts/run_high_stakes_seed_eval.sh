@@ -8,6 +8,7 @@ DOMAIN="${1:-all}"    # health | finreg | disaster | all
 LIMIT="${2:-20}"
 SEED="${3:-7}"
 SET_SIZE="${4:-20}"   # 20 | 50
+PYTHON_BIN="${PYTHON_BIN:-venv312/bin/python}"
 
 if [[ "$DOMAIN" != "health" && "$DOMAIN" != "finreg" && "$DOMAIN" != "disaster" && "$DOMAIN" != "all" ]]; then
   echo "Invalid domain: $DOMAIN"
@@ -45,36 +46,52 @@ run_eval() {
   questions="$(question_file "$domain")"
 
   env PYTHONPATH=. HF_HOME=./models/llm TRANSFORMERS_CACHE=./models/llm \
-    venv312/bin/python -u scripts/eval_grounding_proxy.py \
+    HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}" \
+    LOG_LEVEL="${LOG_LEVEL:-WARNING}" \
+    TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}" \
+    HF_HUB_DISABLE_TELEMETRY="${HF_HUB_DISABLE_TELEMETRY:-1}" \
+    HF_HUB_DISABLE_PROGRESS_BARS="${HF_HUB_DISABLE_PROGRESS_BARS:-1}" \
+    PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}" \
+    "$PYTHON_BIN" -u scripts/eval_grounding_proxy.py \
       --config "$config" \
       --questions "$questions" \
       --limit "$LIMIT" \
       --seed "$SEED" \
-      --output "$output" | tee "$log_file"
+      --output "$output" 2>&1 | tee "$log_file"
 }
+
+output_suffix() {
+  if [[ "$LIMIT" == "$SET_SIZE" ]]; then
+    echo ""
+  else
+    echo "_limit${LIMIT}"
+  fi
+}
+
+SUFFIX="$(output_suffix)"
 
 if [[ "$DOMAIN" == "health" || "$DOMAIN" == "all" ]]; then
   run_eval \
     "gating_health_ebcar_logit_mi_sc009" \
     "health" \
-    "evaluation_results/auto_eval/health_logit_mi_${LIMIT}.json" \
-    "/tmp/health_logit_mi_${LIMIT}.log"
+    "evaluation_results/auto_eval/health_logit_mi_${SET_SIZE}_seed${SEED}${SUFFIX}.json" \
+    "/tmp/health_logit_mi_${SET_SIZE}_seed${SEED}${SUFFIX}.log"
 fi
 
 if [[ "$DOMAIN" == "finreg" || "$DOMAIN" == "all" ]]; then
   run_eval \
     "gating_finreg_ebcar_logit_mi_sc009" \
     "finreg" \
-    "evaluation_results/auto_eval/finreg_logit_mi_${LIMIT}.json" \
-    "/tmp/finreg_logit_mi_${LIMIT}.log"
+    "evaluation_results/auto_eval/finreg_logit_mi_${SET_SIZE}_seed${SEED}${SUFFIX}.json" \
+    "/tmp/finreg_logit_mi_${SET_SIZE}_seed${SEED}${SUFFIX}.log"
 fi
 
 if [[ "$DOMAIN" == "disaster" || "$DOMAIN" == "all" ]]; then
   run_eval \
     "gating_disaster_ebcar_logit_mi_sc009" \
     "disaster" \
-    "evaluation_results/auto_eval/disaster_logit_mi_${LIMIT}.json" \
-    "/tmp/disaster_logit_mi_${LIMIT}.log"
+    "evaluation_results/auto_eval/disaster_logit_mi_${SET_SIZE}_seed${SEED}${SUFFIX}.json" \
+    "/tmp/disaster_logit_mi_${SET_SIZE}_seed${SEED}${SUFFIX}.log"
 fi
 
 echo "Done. Domain=${DOMAIN} limit=${LIMIT} seed=${SEED} set_size=${SET_SIZE}"

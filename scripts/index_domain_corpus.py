@@ -6,6 +6,7 @@ Index a corpus into the vector store defined by a config.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from src.core.config_loader import load_config
@@ -26,6 +27,14 @@ def main() -> None:
         action="store_true",
         help="Recursively scan directories when corpus is a folder.",
     )
+    parser.add_argument(
+        "--index-only",
+        action="store_true",
+        help=(
+            "Force lightweight indexing mode: disable hallucination detector and use a tiny "
+            "CPU LLM to avoid heavyweight model/tokenizer requirements."
+        ),
+    )
     args = parser.parse_args()
 
     corpus_path = Path(args.corpus)
@@ -33,6 +42,21 @@ def main() -> None:
         raise SystemExit(f"Corpus path not found: {corpus_path}")
 
     config = load_config(args.config)
+
+    # Indexing does not require generation or detector inference; keep it lightweight/stable.
+    # This also avoids tokenizer/version mismatches on ephemeral environments (e.g., cloud pods).
+    index_only = args.index_only or os.getenv("INDEX_ONLY", "1") == "1"
+    if index_only:
+        llm_cfg = dict(config.get("llm", {}) or {})
+        llm_cfg["model_name"] = os.getenv("INDEX_LLM_MODEL", "sshleifer/tiny-gpt2")
+        llm_cfg["device"] = os.getenv("INDEX_LLM_DEVICE", "cpu")
+        llm_cfg["max_tokens"] = int(os.getenv("INDEX_LLM_MAX_TOKENS", "16"))
+        config["llm"] = llm_cfg
+
+        detector_cfg = dict(config.get("hallucination_detector", {}) or {})
+        detector_cfg["enabled"] = False
+        config["hallucination_detector"] = detector_cfg
+
     rag = RAGPipeline.from_config(config)
 
     before = rag.vector_store.get_count()

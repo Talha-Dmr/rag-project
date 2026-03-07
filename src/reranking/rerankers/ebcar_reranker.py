@@ -1,5 +1,6 @@
 import math
 from typing import Any, Dict, List, Optional, Sequence
+from collections import OrderedDict
 
 import numpy as np
 
@@ -35,10 +36,6 @@ class EBCARReranker(BaseReranker):
         self.feature_weights = {**self.DEFAULT_WEIGHTS, **weights_override}
         self.length_normalizer = float(self.config.get('length_normalizer', 120.0))
 
-        # embedder (mGTE embedding için)
-        embedder_name = self.config.get("embedder_name", "mgte")
-        self.embedder = EmbedderFactory.create(embedder_name)
-
         self._embedder: Optional[BaseEmbedder] = None
         embedder_candidate = self.config.get('embedder')
         if isinstance(embedder_candidate, BaseEmbedder) or (
@@ -55,11 +52,14 @@ class EBCARReranker(BaseReranker):
         if embedder_cfg is None and isinstance(embedder_candidate, dict):
             embedder_cfg = embedder_candidate
         self.embedder_config = embedder_cfg or {}
+        self.embedding_cache_size = int(self.config.get("embedding_cache_size", 20000))
+        self._doc_embedding_cache: "OrderedDict[str, np.ndarray]" = OrderedDict()
 
         logger.info(
-            'Initialized EBCAR reranker (embedder=%s, owns_embedder=%s)',
+            'Initialized EBCAR reranker (embedder=%s, owns_embedder=%s, cache_size=%s)',
             self.embedder_type,
             self._embedder is None,
+            self.embedding_cache_size,
         )
 
     def rerank(
@@ -117,21 +117,45 @@ class EBCARReranker(BaseReranker):
         documents: Sequence[Dict[str, Any]]
     ) -> List[np.ndarray]:
         texts = [doc['content'] for doc in documents]
-        vectors: List[np.ndarray] = []
+        vectors: List[Optional[np.ndarray]] = [None] * len(texts)
+        misses: List[str] = []
+        miss_indices: List[int] = []
 
-        try:
-            batch_vectors = embedder.embed_batch(texts)
-        except NotImplementedError:
-            batch_vectors = None
-        except Exception as exc:
-            logger.warning('Batch embedding failed (%s), falling back to per-item encoding', exc)
-            batch_vectors = None
+        for i, text in enumerate(texts):
+            cached = self._doc_embedding_cache.get(text)
+            if cached is not None:
+                self._doc_embedding_cache.move_to_end(text)
+                vectors[i] = cached
+            else:
+                misses.append(text)
+                miss_indices.append(i)
 
-        if batch_vectors is not None and len(batch_vectors) == len(texts):
-            vectors = [self._to_vector(vec) for vec in batch_vectors]
-        else:
-            vectors = [self._to_vector(embedder.embed_text(text)) for text in texts]
-        return vectors
+        if misses:
+            try:
+                batch_vectors = embedder.embed_batch(misses)
+            except NotImplementedError:
+                batch_vectors = None
+            except Exception as exc:
+                logger.warning(
+                    'Batch embedding failed (%s), falling back to per-item encoding',
+                    exc
+                )
+                batch_vectors = None
+
+            if batch_vectors is not None and len(batch_vectors) == len(misses):
+                new_vectors = [self._to_vector(vec) for vec in batch_vectors]
+            else:
+                new_vectors = [self._to_vector(embedder.embed_text(text)) for text in misses]
+
+            for idx, text, vec in zip(miss_indices, misses, new_vectors):
+                vectors[idx] = vec
+                self._doc_embedding_cache[text] = vec
+                self._doc_embedding_cache.move_to_end(text)
+                while len(self._doc_embedding_cache) > self.embedding_cache_size:
+                    self._doc_embedding_cache.popitem(last=False)
+
+        return [vec if vec is not None else self._to_vector(embedder.embed_text(texts[i]))
+                for i, vec in enumerate(vectors)]
 
     @staticmethod
     def _to_vector(raw_vector: Any) -> np.ndarray:

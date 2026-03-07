@@ -104,6 +104,8 @@ training:
       class_weights: null  # e.g., [1.0, 2.0, 1.0]
       gamma: 2.0
       label_smoothing: 0.0
+      neutral_boost_weight: 0.0  # >0 enables neutral margin regularization
+      neutral_margin: 0.0  # margin target for neutral vs max(non-neutral)
 
   # Data configuration
   data:

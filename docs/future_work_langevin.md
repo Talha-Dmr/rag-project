@@ -5,63 +5,98 @@ Implement a Langevin-based uncertainty mechanism for the RAG system, accepting t
 complexity in exchange for stronger epistemic uncertainty estimates and a more rigorous
 Bayesian framing.
 
-## Active Domain Pivot (Feb 7, 2026)
-- Primary high-stakes domain set is now:
-  - Health guidelines (`domain_health`)
-  - Financial regulation/compliance (`domain_finreg`)
-  - Disaster and climate risk (`domain_disaster`)
-- Energy and Macro are retained as legacy baselines for comparison, not as the target final trio.
-- Initial configs for the new trio:
+## Status (Feb 14, 2026): Locked Baseline (Do Not Drift)
+This document is the "future work" track. The current baseline is **locked** to avoid churn.
+
+Locked defaults (high-stakes trio):
+- Domains:
+  - Health guidelines (`domain_health`) [primary]
+  - Disaster and climate risk (`domain_disaster`) [primary]
+  - Financial regulation/compliance (`domain_finreg`) [stress-test]
+- Default configs:
   - `config/gating_health_ebcar_logit_mi_sc009.yaml`
-  - `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
   - `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
-- Initial expanded question sets (50Q each):
-  - `data/domain_health/questions_health_conflict_50.jsonl`
-  - `data/domain_finreg/questions_finreg_conflict_50.jsonl`
-  - `data/domain_disaster/questions_disaster_conflict_50.jsonl`
+  - `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
+- Default epistemic signal: `logit_mi`
+- Default detector variant: `balanced`
 
-## Executive Summary (Current Snapshot)
-- Active trio defaults (epistemic track, balanced detector + logit-MI):
-  - Health: `config/gating_health_ebcar_logit_mi_sc009.yaml`
-  - Financial regulation: `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
-  - Disaster/climate: `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
-- Latest 50Q multi-seed sweep (`seeds=7/11/19`):
-  - Health: abstain mean `0.073` (std `0.077`), source_consistency `0.728`
-  - FinReg: abstain mean `0.360` (std `0.440`), source_consistency `0.715`
-  - Disaster: abstain mean `0.073` (std `0.025`), source_consistency `0.753`
-  - Full table: `docs/stability_report.md`
-- Decision:
-  - Keep logit-MI + balanced detector as active default path.
-  - Keep disaster domain override active: `contradiction_rate_threshold=1.01`.
-  - Promote finreg to calibrated override: `contradiction_rate_threshold=1.01` (selected by targeted sweep, confirmed on 50Q seed-19).
-  - Finreg quick cross-seed sanity check (`limit=20`, seeds `7/11/19`) is clean after override; full 50Q multi-seed confirm is next.
-  - Continue representation-space and SWAG lines as epistemic R&D, not deployment default.
-- Legacy (Energy/Macro) remains available as historical ablation track and calibration reference.
+Evidence snapshots:
+- 50Q x seeds (7/11/19) stability: `docs/stability_report_50_default.md`
+- Balanced vs focal detector ablation: `docs/detector_ablation_report_50.md`
 
-## Current Execution Plan (1 -> 2 -> 3)
-This is the active plan aligned with the project goal (epistemic/Langevin-first adaptive RAG):
+Non-default / experimental (must be explicitly opted into):
+- `config/gating_*_ebcar_logit_mi_sc009_focaldet.yaml`
+- `config/gating_*_ebcar_logit_mi_sc009_neutralguarddet.yaml`
 
-1. Stabilize the epistemic proxy path (now)
-- Keep `logit-MI` as production epistemic default:
-  - Health: `gating_health_ebcar_logit_mi_sc009.yaml`
-  - FinReg: `gating_finreg_ebcar_logit_mi_sc009.yaml`
-  - Disaster: `gating_disaster_ebcar_logit_mi_sc009.yaml`
-- Keep `rep-MI` as experimental (do not switch default yet).
-- Keep domain overrides minimal and policy-driven (`disaster` + `finreg`), and re-check with periodic multi-seed stability runs.
+Legacy evaluation tracks (not baseline):
+- Energy/Macro remain available as conflict-heavy ablations, but they are not part of the locked
+  high-stakes baseline for this cycle.
 
-2. Improve detector quality without abandoning SGLD direction
-- Continue SGLD LoRA detector training/eval iterations (weighted/focal/class-balance variants).
-- Decision rule for promotion:
-  - detector must improve macro quality without collapsing a class (especially `neutral` recall),
-  - and must preserve usable abstain/coverage behavior on the high-stakes trio.
+## Immediate Next Work (4 -> 5)
+This is the active plan aligned with the designprojectfinal.pdf objective: stochastic confidence
+for adaptive gating (answer / retrieve_more / abstain), without destabilizing the baseline.
 
-3. Promote representation-space only if it beats logit-space on decision metrics
-- Representation-space sampling remains research track.
-- Promotion criteria:
-  - equal or better conflict selectivity,
-  - equal or better coverage-risk tradeoff,
-  - stable MI signal across seeds/domains.
-- Until these hold, logit-MI remains the default epistemic signal.
+4. Epistemic comparison (the core thesis claim)
+Goal: strengthen the epistemic/Langevin narrative with a disciplined comparison of uncertainty
+signals under the same fixed RAG stack.
+- Signals to compare (same question sets, same retrieval/rerank/detector):
+  - logit-space MI (`logit_mi`, current default)
+  - representation-space MI (`rep_mi`, experimental)
+  - MC-dropout uncertainty (predictive entropy / MI proxy, detector-side)
+  - self-consistency (generator-side ensemble; if implemented, otherwise document as future)
+- Evaluation rule:
+  - calibrate each signal to a comparable operating point (target abstain band),
+  - then compare risk metrics (contradiction proxies) and cost (latency / retrieve_more).
+- Deliverable:
+  - one table per domain + one aggregated table (mean/std across seeds),
+  - explicit "default stays logit_mi" or "promote rep_mi" decision gate.
+
+### Current Evidence (Feb 14, 2026): Logit-MI vs Rep-MI (20Q, seed=7)
+These runs keep the same RAG stack (retrieval/rerank/LLM/detector) and only swap the epistemic
+signal source (`logit_mi` vs `rep_mi`).
+
+Outputs:
+- Health:
+  - logit: `evaluation_results/auto_eval/ablation_health_logit_mi_20_seed7.json`
+  - rep: `evaluation_results/auto_eval/ablation_health_rep_mi_20_seed7.json`
+- FinReg:
+  - logit: `evaluation_results/auto_eval/ablation_finreg_logit_mi_20_seed7.json`
+  - rep: `evaluation_results/auto_eval/ablation_finreg_rep_mi_20_seed7.json`
+- Disaster:
+  - logit: `evaluation_results/auto_eval/ablation_disaster_logit_mi_20_seed7.json`
+  - rep: `evaluation_results/auto_eval/ablation_disaster_rep_mi_20_seed7.json`
+
+Summary (stats_all):
+
+| Domain | Signal | abstain_rate | retrieve_more_rate | contradiction_rate | uncertainty_mean |
+| --- | --- | ---: | ---: | ---: | ---: |
+| health | logit_mi | 0.50 | 0.50 | 0.32 | 0.0184 |
+| health | rep_mi | 0.75 | 0.75 | 0.05 | 0.0062 |
+| finreg | logit_mi | 0.05 | 0.05 | 0.01 | 0.0164 |
+| finreg | rep_mi | 0.75 | 0.75 | 0.00 | 0.0056 |
+| disaster | logit_mi | 0.05 | 0.05 | 0.00 | 0.0165 |
+| disaster | rep_mi | 0.80 | 0.80 | 0.00 | 0.0056 |
+
+Interpretation:
+- `rep_mi` as currently configured is **far too conservative** for gating (very high abstain).
+- This is consistent with a mis-calibrated `uncertainty_threshold` for `rep_mi`
+  (currently `0.004` in `config/gating_*_ebcar_rep_mi_sc009.yaml`).
+- Default decision is unchanged: keep `logit_mi` as baseline epistemic signal.
+
+Next action to make this comparison fair (minimal):
+- Calibrate `rep_mi` threshold(s) to match a target abstain band (e.g. 0.05-0.15) and rerun the
+  same 20Q slice; only then compare contradiction proxy vs compute cost.
+
+5. Posterior-sampling track (Langevin, staged)
+Goal: move from proxy epistemic signals toward a real posterior story, without betting the project
+on a brittle full-model sampler.
+- Stage 0: toy Langevin validation + acceptance criteria (stability, calibration sanity).
+- Stage 1: adapter-level posterior approximations (LoRA-SGLD/SWAG/ensembles) on the detector.
+- Stage 2: logit/representation-space Langevin as a practical posterior proxy for gating.
+- Stage 3 (optional): generator-side uncertainty (self-consistency / logit-space sampling).
+
+Guardrail (to avoid "we keep rerunning the same thing"):
+- We do not run new sweeps unless they produce a decision for (4) or a new method for (5).
 
 ### Command Runbook (single-line, no multiline wrapping)
 Use these when rerunning core checks:
@@ -88,6 +123,7 @@ Test-set detector comparison (NLI mini test, 1000):
 | --- | --- | --- | --- | --- | --- |
 | SGLD warmstart (old) | 0.270 | 0.213 | 0.000 | 0.345 | 0.907 |
 | SGLD weighted CE | 0.338 | 0.215 | 0.000 | 0.078 | 0.688 |
+| SGLD focal | 0.343 | 0.215 | 0.070 | 0.062 | 0.673 |
 | SGLD balanced sampling | 0.335 | 0.312 | 0.425 | 0.041 | 0.670 |
 
 Key result:
@@ -115,6 +151,43 @@ Rationale:
   epistemic/Langevin objective than AdamW fallback.
 - Operationally, this keeps the main logit-MI path consistent with the
   posterior-sampling narrative while representation-space work continues as R&D.
+
+Detector sprint update (Feb 9, 2026):
+- Focal-loss detector evaluated on the same mini test set:
+  - `accuracy=0.343`, `f1_macro=0.215`, `f1_neutral=0.070`, `ece=0.062`, `brier=0.673`.
+- Current ranking for epistemic track:
+  - Best class-balance behavior: `balanced sampling` (highest `f1_macro` and `f1_neutral`).
+  - Best raw accuracy: `focal`, but still weaker neutral recovery than balanced.
+- Keep balanced detector as active default; keep focal as candidate backup.
+
+Detector sprint update (Feb 12, 2026, neutral-guard pilot):
+- New config:
+  - `config/sgld_lora_warmstart_ambigqa_mini_noise5e-5_neutralguard.yaml`
+- Added neutral-class margin regularizer in trainer loss path:
+  - `neutral_boost_weight`, `neutral_margin`
+- Mini test-set result (`evaluation_results/eval_sgld_lora_warmstart_5e-5_neutralguard/test_metrics.json`):
+  - `accuracy=0.297`, `f1_macro=0.263`, `f1_neutral=0.402`, `f1_contradiction=0.175`, `ece=0.080`, `brier=0.680`.
+- Interpretation:
+  - Neutral collapse is mitigated relative to weighted/focal.
+  - But balanced sampling remains stronger overall (`f1_macro=0.312`, `ece=0.041`).
+- Decision:
+  - Keep `balanced` as default production detector.
+  - Keep neutral-guard as R&D branch for future detector experiments.
+  - Additional 20Q RAG sanity (`seed=7`, health/finreg/disaster) confirms mixed behavior and
+    a critical finreg contradiction spike (`1.00`), so neutral-guard is not eligible for default promotion.
+
+Balanced vs focal detector A/B (Feb 9, 2026, high-stakes trio, 20Q x seeds `7/11/19`):
+- Full report: `docs/detector_ablation_report.md`
+- Aggregated results (all domains/seeds):
+  - `balanced`: abstain `0.161`, contradiction `0.266`, contradiction_prob `0.340`
+  - `focal`: abstain `0.056`, contradiction `0.351`, contradiction_prob `0.348`
+- Domain-level signal:
+  - `disaster`: focal sharply increases contradiction (`0.760` vs `0.263`)
+  - `finreg`: both are close, balanced slightly safer on contradiction (`0.000` vs `0.007`)
+  - `health`: focal lowers abstain, but one balanced seed (`seed=7`) is extreme and should be treated as instability signal, not ignored.
+- Decision remains unchanged:
+  - Keep `balanced` as default high-stakes detector.
+  - Keep `focal` as secondary/coverage-oriented candidate only.
 
 ### Gating Ablation (Feb 1, 2026)
 Energy (20Q):
@@ -343,10 +416,13 @@ weight-space SGLD remains unstable.
 
 Phase 0: Baseline Snapshot (done)
 - Current RAG + gating baseline established.
-- Logit‑MI configs are default for epistemic demos
-  (`gating_energy_ebcar_logit_mi_sc009.yaml`, `gating_macro_ebcar_logit_mi_sc009.yaml`).
-- Consistency-only configs are kept as coverage-first fallback.
-- MC Dropout + consistency retained as safety variant.
+- Locked high-stakes baseline (logit-MI + balanced detector) is established for:
+  - `gating_health_ebcar_logit_mi_sc009.yaml`
+  - `gating_disaster_ebcar_logit_mi_sc009.yaml`
+  - `gating_finreg_ebcar_logit_mi_sc009.yaml`
+- Energy/Macro configs remain as legacy conflict-heavy ablations (non-default).
+- Consistency-only and MC-dropout variants remain as research baselines for the epistemic
+  comparison (not promoted unless they pass the same stability gates).
 
 Phase 1: Epistemic Signal Design (logit/representation sampling)
 Goal: replace unstable weight-space SGLD with a stable approximate posterior signal.
@@ -379,7 +455,8 @@ Deliverable: end-to-end adaptive behavior with reduced hallucinations.
 
 Phase 4: Domain Stress Tests
 Goal: test under ambiguity and conflict-heavy domains.
-- Energy (IEA/IRENA/EIA) and Macro (IMF/WorldBank/UN) conflict sets.
+- High-stakes trio (health / finreg / disaster) is the primary reporting set.
+- Energy (IEA/IRENA/EIA) and Macro (IMF/WorldBank/UN) remain as legacy conflict-heavy sets.
 - Add “shifted domain” set with policy or tech ambiguity.
 - Compare coverage vs hallucination trade-offs.
 Deliverable: domain generalization results + failure taxonomy.
@@ -421,21 +498,21 @@ Deliverable: optional full posterior narrative (if it becomes stable).
 
 ## Roadmap (Next 2–3 Weeks)
 Week 1 — Baseline Lock + Decision (done)
-- Default configs: logit‑MI (Energy thr=0.90, Macro thr=0.80).
-- Coverage fallback: consistency-only (sc=0.50) for Energy + Macro.
-- Ablations complete: nogate vs consistency-only vs MC Dropout + consistency vs logit‑MI.
-- Write the decision summary + one results table.
-- (Optional) Curate 5–10 conflict examples with short commentary.
+- Locked defaults for the high-stakes trio (logit-MI + balanced detector).
+- Stability evidence: 50Q x seeds (7/11/19) + detector ablation.
+- Documented "non-default" experimental variants (focaldet / neutralguarddet).
 
-Week 2 — Posterior Sampling Pilot (toy + NLI)
-- Implement toy Langevin (1D Gaussian) to validate stability + calibration.
-- Prototype SGLD/SGHMC on DeBERTa NLI mini (LoRA parameters only).
-- Report ECE/Brier vs proxy baselines (MC Dropout / consistency-only).
+Week 2 — Epistemic Comparison Sprint (item 4)
+- Compare uncertainty signals under the **same fixed RAG stack**:
+  - logit-MI vs rep-MI vs MC-dropout (detector-side) vs self-consistency (if available).
+- Calibrate each method to the same operating band (target abstain band), then compare:
+  - risk proxies (contradiction), coverage, retrieve_more rate, and runtime cost.
+- Output: one comparison table per domain + aggregate summary + promotion decision gate.
 
-Week 3 — Integration + Compare
-- Use posterior uncertainty as a gating signal (answer/retrieve_more/abstain).
-- Compare vs consistency-only baseline on Energy + Macro (50Q).
-- Freeze a go/no‑go decision for full LLM‑scale Langevin.
+Week 3 — Posterior Sampling Pilot (item 5, staged)
+- Implement toy Langevin sanity (stability, mixing, basic calibration sanity).
+- Prototype adapter-level posterior approximations for the detector (LoRA SGLD/SWAG/ensemble).
+- Output: "go/no-go" note for whether true Langevin is worth pursuing beyond proxies.
 
 Must‑Have
 - One strong ablation table + conflict examples for two domains.
@@ -447,7 +524,9 @@ Nice‑to‑Have
 
 ## Roadmap (Month 2–6, Long-Horizon)
 Month 2 — Epistemic Signal Hardening
-- Calibrate logit‑MI thresholds per domain (Energy vs Macro) with 50–100Q sweeps.
+- Calibrate operating points per domain (health / finreg / disaster) only when needed:
+  - to compare epistemic signals fairly (same target abstain band),
+  - or when adding a new domain / observing drift/regression.
 - Add representation‑space sampling (pooler/CLS layer) and compare vs logit‑MI.
 - Build a simple “uncertainty report” artifact: MI histogram + coverage curve.
 Deliverable: stable epistemic proxy with clear operating region.

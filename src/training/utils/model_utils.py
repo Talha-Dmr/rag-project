@@ -15,7 +15,8 @@ def load_model_and_tokenizer(
     num_labels: int = 3,
     cache_dir: Optional[str] = None,
     device: Optional[str] = None,
-    lora_config: Optional[Dict[str, Any]] = None
+    lora_config: Optional[Dict[str, Any]] = None,
+    local_files_only: bool = False
 ) -> Tuple[torch.nn.Module, any]:
     """
     Load pre-trained model and tokenizer.
@@ -34,7 +35,8 @@ def load_model_and_tokenizer(
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
         model_name,
-        cache_dir=cache_dir
+        cache_dir=cache_dir,
+        local_files_only=local_files_only
     )
 
     # Load model
@@ -43,7 +45,8 @@ def load_model_and_tokenizer(
         model_name,
         num_labels=num_labels,
         cache_dir=cache_dir,
-        torch_dtype=torch.float32
+        torch_dtype=torch.float32,
+        local_files_only=local_files_only
     )
 
     # Optional LoRA

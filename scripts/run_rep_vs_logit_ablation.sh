@@ -22,6 +22,11 @@ fi
 export PYTHONPATH=.
 export HF_HOME="./models/llm"
 export TRANSFORMERS_CACHE="./models/llm"
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+export LOG_LEVEL="${LOG_LEVEL:-WARNING}"
+export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
+export HF_HUB_DISABLE_TELEMETRY="${HF_HUB_DISABLE_TELEMETRY:-1}"
+export HF_HUB_DISABLE_PROGRESS_BARS="${HF_HUB_DISABLE_PROGRESS_BARS:-1}"
 
 run_eval() {
   local config="$1"

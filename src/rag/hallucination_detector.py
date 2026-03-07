@@ -11,6 +11,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,9 @@ class HallucinationDetector:
             self.representation_sampling_config.get("enabled", False)
         )
         self._classifier_module = None
+        self.local_files_only = (
+            os.getenv("HF_HUB_OFFLINE", "").strip().lower() in {"1", "true", "yes", "on"}
+        )
 
         # Set device
         if device is None:
@@ -172,7 +176,8 @@ class HallucinationDetector:
                 num_labels=3,
                 cache_dir=None,
                 device=self.device,
-                lora_config=lora_config
+                lora_config=lora_config,
+                local_files_only=self.local_files_only
             )
             state = torch.load(model_pt, map_location=self.device)
             missing, unexpected = self.model.load_state_dict(state, strict=False)
@@ -189,8 +194,14 @@ class HallucinationDetector:
 
         # Case 2: HF export
         try:
-            self.model = AutoModelForSequenceClassification.from_pretrained(str(model_dir))
-            self.tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_dir))
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                str(tokenizer_dir),
+                local_files_only=self.local_files_only
+            )
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                str(model_dir),
+                local_files_only=self.local_files_only
+            )
 
             self.model.eval()
             self.model = self.model.to(self.device)

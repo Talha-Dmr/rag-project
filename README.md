@@ -13,16 +13,32 @@ A highly modular Retrieval-Augmented Generation (RAG) system built with LangChai
 
 ## Results (Current Snapshot)
 
-- Active high-stakes trio (current primary track, 50Q seed each):
-  - Health: `config/gating_health_ebcar_logit_mi_sc009.yaml` -> abstain 4/50 (0.08)
-  - Financial regulation: `config/gating_finreg_ebcar_logit_mi_sc009.yaml` -> abstain 1/50 (0.02)
-  - Disaster/climate: `config/gating_disaster_ebcar_logit_mi_sc009.yaml` -> abstain 1/50 (0.02)
-- Decision:
-  - Keep high-stakes trio + balanced detector + logit-MI as active default path.
-  - Keep `disaster` domain-specific contradiction-rate override (`1.01`) as promoted calibration.
-  - Use Energy/Macro below as legacy ablation track.
+### Locked Defaults (High-Stakes Track)
 
-- Current defaults (epistemic track, latest 50Q rep-vs-logit ablation):
+This section defines the **current locked default stack** for high-stakes usage in this iteration.
+
+- Canonical baseline doc: `docs/baseline_locked.md`
+- Domains (3-domain mix):
+  - Primary: Health `config/gating_health_ebcar_logit_mi_sc009.yaml`
+  - Primary: Disaster/climate `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
+  - Stress-test: Financial regulation `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
+- Default epistemic signal: `logit_mi`
+- Default detector variant: `balanced` (SGLD NLI detector checkpoint referenced by the configs)
+- Evidence (50Q, seeds `7/11/19`):
+  - Stability: `docs/stability_report_50_default.md`
+  - Detector ablation (balanced vs focal): `docs/detector_ablation_report_50.md`
+- Not default:
+  - `*_focaldet.yaml` and `*_neutralguarddet.yaml` configs are **experimental** and must not be used as defaults.
+  - Energy/Macro results below are **legacy ablation track** (not part of the current high-stakes baseline).
+
+Decision (frozen for this iteration):
+- Keep **balanced detector + logit-MI** as the active default path.
+- Keep FinReg as **stress-test** (not primary KPI gate in this iteration).
+- Stop additional threshold sweeps for this cycle unless a regression is observed.
+
+### Legacy / Explorations (Not Defaults)
+
+Current defaults (epistemic track, legacy 50Q rep-vs-logit ablation):
   - Energy (logit-MI): `config/gating_energy_ebcar_logit_mi_sc009.yaml` → abstain 35/50 (0.70)
   - Macro (logit-MI): `config/gating_macro_ebcar_logit_mi_sc009.yaml` → abstain 22/50 (0.44)
 - Representation-space track (experimental):

@@ -4,12 +4,20 @@ LLM wrapper for HuggingFace models.
 
 from typing import List, Dict, Any, Optional
 import re
+import os
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from src.core.base_classes import BaseLLM
 from src.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 class HuggingFaceLLM(BaseLLM):
@@ -23,10 +31,18 @@ class HuggingFaceLLM(BaseLLM):
         self.model_name = self.config.get('model_name', 'meta-llama/Llama-2-7b-chat-hf')
         self.device = self.config.get('device', 'cpu')
         self.cache_folder = self.config.get('cache_folder', None)
-        self.max_new_tokens = self.config.get('max_new_tokens', 512)
+        # Backward-compatible alias:
+        # many configs use `max_tokens`; prefer explicit `max_new_tokens` when present.
+        self.max_new_tokens = self.config.get(
+            'max_new_tokens',
+            self.config.get('max_tokens', 512)
+        )
         self.temperature = self.config.get('temperature', 0.7)
         self.top_p = self.config.get('top_p', 0.9)
         self.load_in_8bit = self.config.get('load_in_8bit', False)
+        self.local_files_only = bool(
+            self.config.get("local_files_only", _env_truthy("HF_HUB_OFFLINE"))
+        )
 
         logger.info(f"Loading LLM: {self.model_name} on {self.device}")
 
@@ -34,7 +50,8 @@ class HuggingFaceLLM(BaseLLM):
             # Load tokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(
                 self.model_name,
-                cache_dir=self.cache_folder
+                cache_dir=self.cache_folder,
+                local_files_only=self.local_files_only,
             )
 
             # Set pad token if not set
@@ -44,7 +61,8 @@ class HuggingFaceLLM(BaseLLM):
             # Load model
             model_kwargs = {
                 'cache_dir': self.cache_folder,
-                'torch_dtype': torch.float16 if self.device == 'cuda' else torch.float32,
+                'dtype': torch.float16 if self.device == 'cuda' else torch.float32,
+                'local_files_only': self.local_files_only,
             }
 
             if self.load_in_8bit and self.device == 'cuda':
@@ -106,15 +124,33 @@ class HuggingFaceLLM(BaseLLM):
 
             # Generate
             with torch.no_grad():
-                outputs = self.model.generate(
-                    **inputs,
-                    max_new_tokens=max_tokens,
-                    temperature=temperature,
-                    top_p=self.top_p,
-                    do_sample=temperature > 0,
-                    pad_token_id=self.tokenizer.pad_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id
-                )
+                generate_kwargs = {
+                    "max_new_tokens": max_tokens,
+                    "do_sample": temperature > 0,
+                    "pad_token_id": self.tokenizer.pad_token_id,
+                    "eos_token_id": self.tokenizer.eos_token_id,
+                    # Mitigates occasional invalid probs on some GPU/dtype/model combos.
+                    "remove_invalid_values": True,
+                    "renormalize_logits": True,
+                }
+                if temperature > 0:
+                    generate_kwargs["temperature"] = temperature
+                    generate_kwargs["top_p"] = self.top_p
+
+                try:
+                    outputs = self.model.generate(**inputs, **generate_kwargs)
+                except RuntimeError as rte:
+                    message = str(rte).lower()
+                    if "probability tensor contains" not in message:
+                        raise
+                    logger.warning(
+                        "Sampling failed with invalid probabilities; retrying with greedy decoding."
+                    )
+                    fallback_kwargs = dict(generate_kwargs)
+                    fallback_kwargs["do_sample"] = False
+                    fallback_kwargs.pop("temperature", None)
+                    fallback_kwargs.pop("top_p", None)
+                    outputs = self.model.generate(**inputs, **fallback_kwargs)
 
             # Decode output
             generated_text = self.tokenizer.decode(

@@ -67,6 +67,8 @@ class HallucinationTrainer(BaseTrainer):
         self.loss_class_weights = loss_config.get('class_weights')
         self.loss_focal_gamma = loss_config.get('gamma', 2.0)
         self.loss_label_smoothing = loss_config.get('label_smoothing', 0.0)
+        self.loss_neutral_boost_weight = loss_config.get('neutral_boost_weight', 0.0)
+        self.loss_neutral_margin = loss_config.get('neutral_margin', 0.0)
         self._loss_weights_tensor = None
 
         # SWAG (LoRA posterior approx)
@@ -107,6 +109,12 @@ class HallucinationTrainer(BaseTrainer):
                 self.loss_class_weights,
                 self.loss_focal_gamma,
                 self.loss_label_smoothing
+            )
+        if self.loss_neutral_boost_weight > 0.0:
+            logger.info(
+                "Neutral margin regularization enabled: weight=%s margin=%s",
+                self.loss_neutral_boost_weight,
+                self.loss_neutral_margin
             )
         if self.swag_enabled:
             logger.info(
@@ -199,21 +207,24 @@ class HallucinationTrainer(BaseTrainer):
             )
 
     def _compute_loss(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        base_loss: torch.Tensor
         if self.loss_type in ("ce", "cross_entropy"):
-            return F.cross_entropy(
+            base_loss = F.cross_entropy(
                 logits,
                 labels,
                 weight=self._loss_weights_tensor,
                 label_smoothing=self.loss_label_smoothing
             )
+            return self._apply_neutral_regularization(logits, labels, base_loss)
 
         if self.loss_type == "weighted_ce":
-            return F.cross_entropy(
+            base_loss = F.cross_entropy(
                 logits,
                 labels,
                 weight=self._loss_weights_tensor,
                 label_smoothing=self.loss_label_smoothing
             )
+            return self._apply_neutral_regularization(logits, labels, base_loss)
 
         if self.loss_type == "focal":
             ce = F.cross_entropy(
@@ -224,10 +235,42 @@ class HallucinationTrainer(BaseTrainer):
                 label_smoothing=self.loss_label_smoothing
             )
             pt = torch.exp(-ce)
-            loss = ((1 - pt) ** self.loss_focal_gamma) * ce
-            return loss.mean()
+            base_loss = (((1 - pt) ** self.loss_focal_gamma) * ce).mean()
+            return self._apply_neutral_regularization(logits, labels, base_loss)
 
         raise ValueError(f"Unknown loss type: {self.loss_type}")
+
+    def _apply_neutral_regularization(
+        self,
+        logits: torch.Tensor,
+        labels: torch.Tensor,
+        base_loss: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Encourage neutral examples to keep a margin over non-neutral logits.
+
+        This directly targets the observed "neutral collapse" failure mode while
+        preserving the base CE/focal objective.
+        """
+        if self.loss_neutral_boost_weight <= 0.0:
+            return base_loss
+
+        # Label mapping is fixed across the project: 0=entailment, 1=neutral, 2=contradiction.
+        neutral_mask = labels == 1
+        if not torch.any(neutral_mask):
+            return base_loss
+
+        neutral_logits = logits[neutral_mask, 1]
+        non_neutral_logits = torch.stack(
+            (logits[neutral_mask, 0], logits[neutral_mask, 2]),
+            dim=1
+        )
+        strongest_non_neutral = non_neutral_logits.max(dim=1).values
+
+        neutral_margin_loss = F.relu(
+            strongest_non_neutral - neutral_logits + self.loss_neutral_margin
+        ).mean()
+        return base_loss + (self.loss_neutral_boost_weight * neutral_margin_loss)
 
     def train(
         self,

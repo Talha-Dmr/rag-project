@@ -1,0 +1,73 @@
+# Financial regulation/compliance domain: confidence-aware risk-budgeted gating.
+# Keeps the same stack, but uses a saturating risk combiner so "quiet detector"
+# cases can still route to retrieve_more when confidence/retrieval evidence is weak.
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cuda
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg
+    collection_name: rag_finreg
+
+llm:
+  model_name: Qwen/Qwen2.5-1.5B-Instruct
+  device: cuda
+  max_tokens: 256
+
+retrieval:
+  k: 5
+  score_threshold: 0.0
+
+reranker:
+  type: ebcar
+  top_k: 5
+
+hallucination_detector:
+  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_balanced/best_model
+  base_model: microsoft/deberta-v3-small
+  mc_dropout_samples: 1
+  logit_sampling:
+    enabled: true
+    steps: 40
+    step_size: 0.03
+    noise_std: 0.1
+    energy: hybrid
+    prior_strength: 1.0
+    entropy_weight: 0.5
+
+sources:
+  consistency_top_k: 5
+
+gating:
+  enabled: true
+  strategy: risk_budgeted
+  max_retries: 2
+  k_multiplier: 2.0
+  max_k: 20
+  uncertainty_source: logit_mi
+  source_consistency_top_k: 5
+  abstain_message: "I don't have enough reliable information to answer that."
+
+  risk_formula: saturating_union
+  uncertainty_scale: 0.05
+  base_risk_floor: 0.06
+
+  risk_weights:
+    contradiction_rate: 0.45
+    contradiction_prob: 0.28
+    uncertainty: 0.15
+    inconsistency: 0.20
+    retrieval_weakness: 0.25
+    low_confidence: 0.48
+    retrieval_gap: 0.18
+    ambiguity: 0.18
+
+  retrieve_more_cost: 0.05
+  retrieve_more_risk_factor: 0.50
+  abstain_cost: 0.50
+  retrieve_more_min_retrieval_max: 0.25
+  retrieve_more_min_retrieval_mean: 0.12

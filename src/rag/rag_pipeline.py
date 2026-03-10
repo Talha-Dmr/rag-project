@@ -341,6 +341,23 @@ class RAGPipeline:
 
         retrieval_max = self._clamp01(stats.get("retrieval_max_score", 0.0))
         retrieval_mean = self._clamp01(stats.get("retrieval_mean_score", 0.0))
+        retrieval_gap = self._clamp01(max(0.0, retrieval_max - retrieval_mean))
+        entailment_prob = self._clamp01(stats.get("entailment_prob_mean", 0.0))
+        neutral_prob = self._clamp01(stats.get("neutral_prob_mean", 0.0))
+        label_entropy = self._clamp01(stats.get("label_entropy", 0.0))
+        label_disagreement = self._clamp01(stats.get("label_disagreement", 0.0))
+        low_confidence = self._clamp01(
+            1.0 - max(entailment_prob, neutral_prob, contradiction_prob)
+        )
+        uncertainty_scale = float(gating_config.get("uncertainty_scale", 0.05))
+        if uncertainty_scale <= 0.0:
+            uncertainty_scale = 0.05
+        uncertainty_scaled = self._clamp01(uncertainty / uncertainty_scale)
+        ambiguity = self._clamp01(
+            0.50 * neutral_prob
+            + 0.25 * label_disagreement
+            + 0.25 * label_entropy
+        )
 
         weights = gating_config.get("risk_weights") or {}
         w_cr = float(weights.get("contradiction_rate", 1.0))
@@ -348,14 +365,39 @@ class RAGPipeline:
         w_u = float(weights.get("uncertainty", 0.0))
         w_inc = float(weights.get("inconsistency", 0.0))  # uses (1 - source_consistency)
         w_ret = float(weights.get("retrieval_weakness", 0.0))  # uses (1 - retrieval_max)
+        w_lc = float(weights.get("low_confidence", 0.0))
+        w_rg = float(weights.get("retrieval_gap", 0.0))
+        w_amb = float(weights.get("ambiguity", 0.0))
+        w_floor = float(gating_config.get("base_risk_floor", 0.0))
+        risk_formula = str(gating_config.get("risk_formula", "linear")).strip().lower()
 
-        risk = (
-            w_cr * contradiction_rate
-            + w_cp * contradiction_prob
-            + w_u * uncertainty
-            + w_inc * (1.0 - sc)
-            + w_ret * (1.0 - retrieval_max)
-        )
+        if risk_formula == "saturating_union":
+            components = [
+                self._clamp01(w_cr * contradiction_rate),
+                self._clamp01(w_cp * contradiction_prob),
+                self._clamp01(w_u * uncertainty_scaled),
+                self._clamp01(w_inc * (1.0 - sc)),
+                self._clamp01(w_ret * (1.0 - retrieval_max)),
+                self._clamp01(w_lc * low_confidence),
+                self._clamp01(w_rg * retrieval_gap),
+                self._clamp01(w_amb * ambiguity),
+            ]
+            remaining_safe = 1.0
+            for comp in components:
+                remaining_safe *= (1.0 - comp)
+            risk = self._clamp01(max(w_floor, 1.0 - remaining_safe))
+        else:
+            risk = (
+                w_cr * contradiction_rate
+                + w_cp * contradiction_prob
+                + w_u * uncertainty
+                + w_inc * (1.0 - sc)
+                + w_ret * (1.0 - retrieval_max)
+                + w_lc * low_confidence
+                + w_rg * retrieval_gap
+                + w_amb * ambiguity
+            )
+            risk = self._clamp01(max(w_floor, risk))
 
         # Action costs
         # - answer_cost: proportional to risk
@@ -381,6 +423,10 @@ class RAGPipeline:
         stats["policy_cost_answer"] = float(answer_cost)
         stats["policy_cost_retrieve_more"] = float(retrieve_cost)
         stats["policy_cost_abstain"] = float(abstain_cost)
+        stats["risk_low_confidence"] = float(low_confidence)
+        stats["risk_retrieval_gap"] = float(retrieval_gap)
+        stats["risk_ambiguity"] = float(ambiguity)
+        stats["risk_uncertainty_scaled"] = float(uncertainty_scaled)
 
         # Choose minimal cost action.
         # Tie-breaker is safety-biased: abstain > retrieve_more > answer.

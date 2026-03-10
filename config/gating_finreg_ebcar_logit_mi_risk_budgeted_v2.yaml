@@ -1,0 +1,65 @@
+# Financial regulation/compliance domain: risk-budgeted gating, tuned to prefer
+# retrieve_more over immediate abstain on medium-risk cases.
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cuda
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg
+    collection_name: rag_finreg
+
+llm:
+  model_name: Qwen/Qwen2.5-1.5B-Instruct
+  device: cuda
+  max_tokens: 256
+
+retrieval:
+  k: 5
+  score_threshold: 0.0
+
+reranker:
+  type: ebcar
+  top_k: 5
+
+hallucination_detector:
+  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_balanced/best_model
+  base_model: microsoft/deberta-v3-small
+  mc_dropout_samples: 1
+  logit_sampling:
+    enabled: true
+    steps: 40
+    step_size: 0.03
+    noise_std: 0.1
+    energy: hybrid
+    prior_strength: 1.0
+    entropy_weight: 0.5
+
+sources:
+  consistency_top_k: 5
+
+gating:
+  enabled: true
+  strategy: risk_budgeted
+  max_retries: 2
+  k_multiplier: 2.0
+  max_k: 20
+  uncertainty_source: logit_mi
+  source_consistency_top_k: 5
+  abstain_message: "I don't have enough reliable information to answer that."
+
+  risk_weights:
+    contradiction_rate: 0.55
+    contradiction_prob: 0.20
+    uncertainty: 0.15
+    inconsistency: 0.10
+    retrieval_weakness: 0.05
+
+  retrieve_more_cost: 0.07
+  retrieve_more_risk_factor: 0.60
+  abstain_cost: 0.44
+  retrieve_more_min_retrieval_max: 0.28
+  retrieve_more_min_retrieval_mean: 0.15

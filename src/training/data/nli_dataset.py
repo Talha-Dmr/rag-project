@@ -170,6 +170,24 @@ class NLIDataset(Dataset):
             'attention_mask': encoding['attention_mask'].squeeze(0),
             'label': torch.tensor(example['label'], dtype=torch.long)
         }
+        metadata = example.get('metadata') or {}
+        ann_type = metadata.get('ann_type')
+        item['is_fabricated'] = torch.tensor(
+            1 if metadata.get('fabricated') else 0,
+            dtype=torch.float32
+        )
+        item['is_mismatch'] = torch.tensor(
+            1 if metadata.get('mismatch') else 0,
+            dtype=torch.float32
+        )
+        item['is_multipleqas'] = torch.tensor(
+            1 if ann_type == 'multipleQAs' else 0,
+            dtype=torch.float32
+        )
+        item['is_singleanswer'] = torch.tensor(
+            1 if ann_type == 'singleAnswer' else 0,
+            dtype=torch.float32
+        )
 
         # Add token_type_ids if present (for some models)
         if 'token_type_ids' in encoding:
@@ -217,7 +235,11 @@ def collate_nli_batch(batch: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
     batched = {
         'input_ids': input_ids,
         'attention_mask': attention_mask,
-        'labels': labels
+        'labels': labels,
+        'is_fabricated': torch.stack([item['is_fabricated'] for item in batch]),
+        'is_mismatch': torch.stack([item['is_mismatch'] for item in batch]),
+        'is_multipleqas': torch.stack([item['is_multipleqas'] for item in batch]),
+        'is_singleanswer': torch.stack([item['is_singleanswer'] for item in batch]),
     }
 
     # Add token_type_ids if present

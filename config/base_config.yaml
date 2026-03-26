@@ -106,6 +106,10 @@ training:
       label_smoothing: 0.0
       neutral_boost_weight: 0.0  # >0 enables neutral margin regularization
       neutral_margin: 0.0  # margin target for neutral vs max(non-neutral)
+      contradiction_boost_weight: 0.0  # >0 encourages contradiction > neutral on contradiction examples
+      contradiction_margin: 0.0  # margin target for contradiction vs neutral
+      contradiction_multiqa_boost_weight: 0.0  # >0 applies contradiction-vs-neutral margin only on contradiction+multipleQAs examples
+      contradiction_multiqa_margin: 0.0  # margin target for contradiction+multipleQAs subset
 
   # Data configuration
   data:

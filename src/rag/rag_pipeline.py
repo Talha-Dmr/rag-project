@@ -39,7 +39,8 @@ class RAGPipeline:
         reranker_top_k: Optional[int] = None,
         hallucination_detector=None,
         gating_config: Optional[Dict[str, Any]] = None,
-        source_config: Optional[Dict[str, Any]] = None
+        source_config: Optional[Dict[str, Any]] = None,
+        hallucination_aggregation: str = "any",
     ):
         """
         Initialize RAG Pipeline
@@ -64,6 +65,7 @@ class RAGPipeline:
         self.hallucination_detector = hallucination_detector
         self.gating_config = gating_config or {}
         self.source_config = source_config or {}
+        self.hallucination_aggregation = hallucination_aggregation or "any"
         self._source_embedding_cache_size = int(
             self.source_config.get("embedding_cache_size", 20000)
         )
@@ -140,6 +142,8 @@ class RAGPipeline:
         neutral_probs = []
         conflict_masses = []
         uncertainties = []
+        confidences = []
+        top2_margins = []
         label_counts = {
             "entailment": 0,
             "neutral": 0,
@@ -176,9 +180,14 @@ class RAGPipeline:
                 else:
                     max_prob = max(scores.values())
                     uncertainties.append(1.0 - max_prob)
+                confidences.append(max(scores.values()))
+                sorted_probs = sorted(scores.values(), reverse=True)
+                if len(sorted_probs) >= 2:
+                    top2_margins.append(float(sorted_probs[0] - sorted_probs[1]))
             else:
                 contradiction_probs.append(1.0 if result.get("is_hallucination") else 0.0)
                 uncertainties.append(1.0 - result.get("confidence", 0.0))
+                confidences.append(float(result.get("confidence", 0.0)))
 
             label = result.get("label")
             if label in label_counts:
@@ -187,6 +196,12 @@ class RAGPipeline:
         contradiction_prob_mean = sum(contradiction_probs) / len(contradiction_probs)
         uncertainty_mean = sum(uncertainties) / len(uncertainties)
         contradiction_prob_std = float(np.std(np.array(contradiction_probs, dtype=float)))
+        contradiction_support_values = [
+            max(0.0, c - n) for c, n in zip(contradiction_probs, neutral_probs)
+        ] if contradiction_probs and neutral_probs else []
+        contradiction_soft_values = [
+            c * (1.0 - n) for c, n in zip(contradiction_probs, neutral_probs)
+        ] if contradiction_probs and neutral_probs else []
         entailment_prob_mean = (
             float(sum(entailment_probs) / len(entailment_probs))
             if entailment_probs else 0.0
@@ -198,6 +213,54 @@ class RAGPipeline:
         conflict_mass_mean = (
             float(sum(conflict_masses) / len(conflict_masses))
             if conflict_masses else 0.0
+        )
+        confidence_mean = (
+            float(sum(confidences) / len(confidences))
+            if confidences else 0.0
+        )
+        top2_margin_mean = (
+            float(sum(top2_margins) / len(top2_margins))
+            if top2_margins else 0.0
+        )
+        contradiction_neutral_gap_mean = (
+            float(
+                sum((c - n) for c, n in zip(contradiction_probs, neutral_probs))
+                / len(contradiction_probs)
+            )
+            if contradiction_probs and neutral_probs else 0.0
+        )
+        contradiction_support_mean = (
+            float(sum(contradiction_support_values) / len(contradiction_support_values))
+            if contradiction_support_values else 0.0
+        )
+        contradiction_soft_mean = (
+            float(sum(contradiction_soft_values) / len(contradiction_soft_values))
+            if contradiction_soft_values else 0.0
+        )
+        if contradiction_support_values:
+            top_k = max(1, int(np.ceil(len(contradiction_support_values) / 2.0)))
+            contradiction_support_topk = float(
+                sum(sorted(contradiction_support_values, reverse=True)[:top_k]) / top_k
+            )
+            contradiction_soft_topk = float(
+                sum(sorted(contradiction_soft_values, reverse=True)[:top_k]) / top_k
+            )
+        else:
+            contradiction_support_topk = 0.0
+            contradiction_soft_topk = 0.0
+        contradiction_weighted_rate = (
+            float(sum(
+                conf if result.get("label") == "contradiction" else 0.0
+                for conf, result in zip(confidences, individual)
+            ) / len(individual))
+            if individual and confidences else 0.0
+        )
+        entailment_neutral_gap_mean = (
+            float(
+                sum((e - n) for e, n in zip(entailment_probs, neutral_probs))
+                / len(entailment_probs)
+            )
+            if entailment_probs and neutral_probs else 0.0
         )
 
         total_labels = sum(label_counts.values())
@@ -219,7 +282,11 @@ class RAGPipeline:
 
         return {
             "contradiction_rate": detection_result.get("hallucination_score", 0.0),
+            "hard_contradiction_rate": detection_result.get("hard_contradiction_rate", 0.0),
             "contradiction_prob_mean": contradiction_prob_mean,
+            "hallucination_prob_mean": detection_result.get("hallucination_prob_mean", contradiction_prob_mean),
+            "hallucination_prob_topk": detection_result.get("hallucination_prob_topk", contradiction_prob_mean),
+            "contradiction_margin_mean": detection_result.get("contradiction_margin_mean", 0.0),
             "uncertainty_mean": uncertainty_mean,
             # Additional conflict/ambiguity signals for aleatoric modeling.
             "entailment_prob_mean": entailment_prob_mean,
@@ -228,7 +295,38 @@ class RAGPipeline:
             "conflict_mass_mean": conflict_mass_mean,
             "label_entropy": label_entropy,
             "label_disagreement": label_disagreement,
+            "confidence_mean": confidence_mean,
+            "top2_margin_mean": top2_margin_mean,
+            "entailment_rate": float(label_counts["entailment"]) / float(total_labels or 1),
+            "neutral_rate": float(label_counts["neutral"]) / float(total_labels or 1),
+            "contradiction_label_rate": float(label_counts["contradiction"]) / float(total_labels or 1),
+            "entailment_count": float(label_counts["entailment"]),
+            "neutral_count": float(label_counts["neutral"]),
+            "contradiction_count": float(label_counts["contradiction"]),
+            "contradiction_neutral_gap_mean": contradiction_neutral_gap_mean,
+            "contradiction_support_mean": contradiction_support_mean,
+            "contradiction_support_topk": contradiction_support_topk,
+            "contradiction_soft_mean": contradiction_soft_mean,
+            "contradiction_soft_topk": contradiction_soft_topk,
+            "contradiction_weighted_rate": contradiction_weighted_rate,
+            "entailment_neutral_gap_mean": entailment_neutral_gap_mean,
         }
+
+    def _get_selected_metric(
+        self,
+        stats: Dict[str, float],
+        gating_config: Dict[str, Any],
+        config_key: str,
+        default_key: str,
+        default: float = 0.0,
+    ) -> float:
+        metric_name = str(gating_config.get(config_key, default_key) or default_key)
+        value = stats.get(metric_name)
+        if not isinstance(value, (int, float)):
+            value = stats.get(default_key, default)
+            metric_name = default_key
+        stats[f"selected_{config_key}"] = float(value)
+        return float(value)
 
     def _compute_retrieval_stats(self, retrieved_docs: List[Dict[str, Any]]) -> Dict[str, float]:
         if not retrieved_docs:
@@ -333,9 +431,15 @@ class RAGPipeline:
         then chooses the lowest-cost action.
         """
         # Risk signals (all normalized/clamped to [0,1] where possible)
-        contradiction_rate = self._clamp01(stats.get("contradiction_rate", 0.0))
-        contradiction_prob = self._clamp01(stats.get("contradiction_prob_mean", 0.0))
-        uncertainty = self._clamp01(stats.get("uncertainty_mean", 0.0))
+        contradiction_rate = self._clamp01(self._get_selected_metric(
+            stats, gating_config, "contradiction_rate_metric", "contradiction_rate", 0.0
+        ))
+        contradiction_prob = self._clamp01(self._get_selected_metric(
+            stats, gating_config, "contradiction_prob_metric", "contradiction_prob_mean", 0.0
+        ))
+        uncertainty = self._clamp01(self._get_selected_metric(
+            stats, gating_config, "uncertainty_metric", "uncertainty_mean", 0.0
+        ))
         source_consistency = stats.get("source_consistency")
         sc = self._clamp01(source_consistency, default=1.0)
 
@@ -372,31 +476,33 @@ class RAGPipeline:
         risk_formula = str(gating_config.get("risk_formula", "linear")).strip().lower()
 
         if risk_formula == "saturating_union":
-            components = [
-                self._clamp01(w_cr * contradiction_rate),
-                self._clamp01(w_cp * contradiction_prob),
-                self._clamp01(w_u * uncertainty_scaled),
-                self._clamp01(w_inc * (1.0 - sc)),
-                self._clamp01(w_ret * (1.0 - retrieval_max)),
-                self._clamp01(w_lc * low_confidence),
-                self._clamp01(w_rg * retrieval_gap),
-                self._clamp01(w_amb * ambiguity),
-            ]
+            component_values = {
+                "contradiction_rate": self._clamp01(w_cr * contradiction_rate),
+                "contradiction_prob": self._clamp01(w_cp * contradiction_prob),
+                "uncertainty": self._clamp01(w_u * uncertainty_scaled),
+                "source_inconsistency": self._clamp01(w_inc * (1.0 - sc)),
+                "retrieval_weakness": self._clamp01(w_ret * (1.0 - retrieval_max)),
+                "low_confidence": self._clamp01(w_lc * low_confidence),
+                "retrieval_gap": self._clamp01(w_rg * retrieval_gap),
+                "ambiguity": self._clamp01(w_amb * ambiguity),
+            }
+            components = list(component_values.values())
             remaining_safe = 1.0
             for comp in components:
                 remaining_safe *= (1.0 - comp)
             risk = self._clamp01(max(w_floor, 1.0 - remaining_safe))
         else:
-            risk = (
-                w_cr * contradiction_rate
-                + w_cp * contradiction_prob
-                + w_u * uncertainty
-                + w_inc * (1.0 - sc)
-                + w_ret * (1.0 - retrieval_max)
-                + w_lc * low_confidence
-                + w_rg * retrieval_gap
-                + w_amb * ambiguity
-            )
+            component_values = {
+                "contradiction_rate": w_cr * contradiction_rate,
+                "contradiction_prob": w_cp * contradiction_prob,
+                "uncertainty": w_u * uncertainty,
+                "source_inconsistency": w_inc * (1.0 - sc),
+                "retrieval_weakness": w_ret * (1.0 - retrieval_max),
+                "low_confidence": w_lc * low_confidence,
+                "retrieval_gap": w_rg * retrieval_gap,
+                "ambiguity": w_amb * ambiguity,
+            }
+            risk = sum(component_values.values())
             risk = self._clamp01(max(w_floor, risk))
 
         # Action costs
@@ -427,6 +533,25 @@ class RAGPipeline:
         stats["risk_retrieval_gap"] = float(retrieval_gap)
         stats["risk_ambiguity"] = float(ambiguity)
         stats["risk_uncertainty_scaled"] = float(uncertainty_scaled)
+        stats["risk_component_contradiction_rate"] = float(component_values["contradiction_rate"])
+        stats["risk_component_contradiction_prob"] = float(component_values["contradiction_prob"])
+        stats["risk_component_uncertainty"] = float(component_values["uncertainty"])
+        stats["risk_component_source_inconsistency"] = float(component_values["source_inconsistency"])
+        stats["risk_component_retrieval_weakness"] = float(component_values["retrieval_weakness"])
+        stats["risk_component_low_confidence"] = float(component_values["low_confidence"])
+        stats["risk_component_retrieval_gap"] = float(component_values["retrieval_gap"])
+        stats["risk_component_ambiguity"] = float(component_values["ambiguity"])
+        stats["risk_detector_component"] = float(
+            component_values["contradiction_rate"]
+            + component_values["contradiction_prob"]
+            + component_values["uncertainty"]
+            + component_values["low_confidence"]
+            + component_values["ambiguity"]
+        )
+        stats["risk_retrieval_component"] = float(
+            component_values["retrieval_weakness"] + component_values["retrieval_gap"]
+        )
+        stats["risk_source_component"] = float(component_values["source_inconsistency"])
 
         # Choose minimal cost action.
         # Tie-breaker is safety-biased: abstain > retrieve_more > answer.
@@ -439,9 +564,15 @@ class RAGPipeline:
         return best[0]
 
     def _decide_gating_action(self, stats: Dict[str, float], gating_config: Dict[str, Any]) -> str:
-        contradiction_rate = stats.get("contradiction_rate", 0.0)
-        contradiction_prob = stats.get("contradiction_prob_mean", 0.0)
-        uncertainty = stats.get("uncertainty_mean", 0.0)
+        contradiction_rate = self._get_selected_metric(
+            stats, gating_config, "contradiction_rate_metric", "contradiction_rate", 0.0
+        )
+        contradiction_prob = self._get_selected_metric(
+            stats, gating_config, "contradiction_prob_metric", "contradiction_prob_mean", 0.0
+        )
+        uncertainty = self._get_selected_metric(
+            stats, gating_config, "uncertainty_metric", "uncertainty_mean", 0.0
+        )
         source_consistency = stats.get("source_consistency")
         max_retrieval_score = stats.get("retrieval_max_score", 1.0)
         mean_retrieval_score = stats.get("retrieval_mean_score", 1.0)
@@ -461,6 +592,20 @@ class RAGPipeline:
         if isinstance(source_consistency_threshold, (int, float)) and source_consistency is not None:
             if source_consistency < float(source_consistency_threshold):
                 retrieval_low = True
+
+        contradiction_rate_trigger = contradiction_rate >= contradiction_rate_threshold
+        contradiction_prob_trigger = contradiction_prob >= contradiction_prob_threshold
+        uncertainty_trigger = uncertainty >= uncertainty_threshold
+        source_consistency_trigger = (
+            isinstance(source_consistency_threshold, (int, float))
+            and source_consistency is not None
+            and source_consistency < float(source_consistency_threshold)
+        )
+        stats["gate_trigger_contradiction_rate"] = float(1.0 if contradiction_rate_trigger else 0.0)
+        stats["gate_trigger_contradiction_prob"] = float(1.0 if contradiction_prob_trigger else 0.0)
+        stats["gate_trigger_uncertainty"] = float(1.0 if uncertainty_trigger else 0.0)
+        stats["gate_trigger_retrieval_low"] = float(1.0 if retrieval_low else 0.0)
+        stats["gate_trigger_source_consistency"] = float(1.0 if source_consistency_trigger else 0.0)
 
         strategy = gating_config.get("strategy", "abstain")
         if strategy == "risk_budgeted":
@@ -487,7 +632,7 @@ class RAGPipeline:
         return_sources: bool = False,
         include_sources_in_answer: bool = False,
         detect_hallucinations: bool = True,
-        hallucination_aggregation: str = 'any',
+        hallucination_aggregation: Optional[str] = None,
         gating: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
@@ -507,6 +652,7 @@ class RAGPipeline:
             Dictionary with answer, optional context, and hallucination detection results
         """
         logger.info(f"Processing query: {query_text[:100]}...")
+        aggregation_mode = hallucination_aggregation or self.hallucination_aggregation or "any"
 
         gating_config = self._merge_gating_config(gating)
         source_consistency_gate = gating_config.get("source_consistency_threshold") is not None
@@ -576,7 +722,7 @@ class RAGPipeline:
                     detection_result = self.hallucination_detector.verify_answer_with_contexts(
                         answer=answer,
                         contexts=context_texts,
-                        aggregation=hallucination_aggregation
+                        aggregation=aggregation_mode
                     )
 
                     result['hallucination_detected'] = detection_result['is_hallucination']
@@ -586,6 +732,15 @@ class RAGPipeline:
                         'num_contradictions': detection_result['num_contradictions'],
                         'aggregation': detection_result['aggregation']
                     }
+                    for key in (
+                        "hard_contradiction_rate",
+                        "hallucination_prob_mean",
+                        "hallucination_prob_topk",
+                        "contradiction_margin_mean",
+                        "contradiction_neutral_gap_mean",
+                    ):
+                        if key in detection_result:
+                            result['hallucination_details'][key] = detection_result[key]
 
                     if detection_result['is_hallucination']:
                         logger.warning(
@@ -645,8 +800,7 @@ class RAGPipeline:
                     continue
 
                 if decision in {"abstain", "retrieve_more"}:
-                    if decision == "abstain":
-                        gating_action = "abstain"
+                    gating_action = decision
                     result['answer'] = abstain_message
                 else:
                     gating_action = "none"
@@ -662,10 +816,15 @@ class RAGPipeline:
                 'attempts': gating_attempts,
                 'k_used': current_k,
                 'thresholds': {
+                    'contradiction_rate_metric': gating_config.get("contradiction_rate_metric", "contradiction_rate"),
+                    'contradiction_prob_metric': gating_config.get("contradiction_prob_metric", "contradiction_prob_mean"),
+                    'uncertainty_metric': gating_config.get("uncertainty_metric", "uncertainty_mean"),
                     'contradiction_rate': gating_config.get("contradiction_rate_threshold"),
                     'contradiction_prob': gating_config.get("contradiction_prob_threshold"),
                     'uncertainty': gating_config.get("uncertainty_threshold"),
-                    'source_consistency': gating_config.get("source_consistency_threshold")
+                    'source_consistency': gating_config.get("source_consistency_threshold"),
+                    'min_retrieval_score': gating_config.get("min_retrieval_score"),
+                    'min_mean_retrieval_score': gating_config.get("min_mean_retrieval_score"),
                 },
                 'stats': gating_stats
             }
@@ -885,5 +1044,10 @@ class RAGPipeline:
             reranker_top_k=reranker_top_k,
             hallucination_detector=hallucination_detector,
             gating_config=config.get('gating', {}),
-            source_config=config.get('sources', {})
+            source_config=config.get('sources', {}),
+            hallucination_aggregation=(
+                config.get("hallucination_aggregation")
+                or detector_config.get("aggregation")
+                or "any"
+            ),
         )

@@ -1,0 +1,85 @@
+# Targeted continuation config for LoRA + SGLD detector fine-tuning.
+# This is a second-stage run on a multipleQAs-focused ambiguity slice:
+# entailment (supported), neutral (mismatch), contradiction (fabricated).
+#
+# Prepare data with:
+# PYTHONPATH=. venv312/bin/python scripts/prepare_targeted_hallucination_dataset.py \
+#   --input-dir data/training/nli_dataset_ambigqa_mini \
+#   --output-dir data/training/nli_dataset_ambigqa_mini_targeted_multipleqa \
+#   --seed 7
+#
+# Train with:
+# PYTHONPATH=. venv312/bin/python scripts/train_hallucination_model.py \
+#   --config sgld_lora_warmstart_ambigqa_mini_targeted_multipleqa_contraguard \
+#   --data-dir data/training/nli_dataset_ambigqa_mini_targeted_multipleqa \
+#   --output-dir models/checkpoints/sgld_lora_warmstart_ambigqa_mini_targeted_multipleqa_contraguard \
+#   --resume-from models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_contraguard/best_model
+
+training:
+  model:
+    base_model: microsoft/deberta-v3-small
+    num_labels: 3
+    cache_dir: ./models/training
+    lora:
+      enabled: true
+      r: 8
+      lora_alpha: 16
+      lora_dropout: 0.05
+      bias: none
+      task_type: SEQ_CLS
+      target_modules: ["query_proj", "key_proj", "value_proj"]
+      modules_to_save: ["classifier", "pooler"]
+
+  hyperparameters:
+    learning_rate: 5.0e-6
+    weight_decay: 0.01
+    warmup_steps: 0
+    max_epochs: 2
+    batch_size: 16
+    gradient_accumulation_steps: 1
+    max_grad_norm: 1.0
+    mixed_precision: fp16
+    optimizer: sgld
+    noise_scale: 5.0e-5
+    scheduler: linear
+    loss:
+      type: weighted_ce
+      class_weights: [1.0, 1.0, 1.1]
+      label_smoothing: 0.01
+
+  data:
+    max_seq_length: 128
+    train_split: 0.85
+    val_split: 0.10
+    test_split: 0.05
+    balance_classes: true
+    balance_strategy: undersample
+    train_sampling_strategy: balanced
+    train_sampling_power: 1.0
+
+  checkpointing:
+    save_dir: ./models/checkpoints/sgld_lora_warmstart_ambigqa_mini_targeted_multipleqa_contraguard
+    save_strategy: best
+    save_every_n_epochs: 1
+    save_total_limit: 2
+    metric_for_best: f1_macro
+    mode: max
+
+  early_stopping:
+    enabled: true
+    patience: 1
+    metric: f1_macro
+    mode: max
+    min_delta: 0.0001
+
+  datasets:
+    ambigqa:
+      path: data/ambiguity_datasets/02_ambigqa
+      weight: 1.0
+      multiplier: 3
+
+  output:
+    training_data_dir: ./data/training/nli_dataset_ambigqa_mini_targeted_multipleqa
+    checkpoint_dir: ./models/checkpoints/sgld_lora_warmstart_ambigqa_mini_targeted_multipleqa_contraguard
+    final_model_dir: ./models/hallucination_detector_sgld_lora_warmstart_ambigqa_mini_targeted_multipleqa_contraguard
+    logs_dir: ./logs/training

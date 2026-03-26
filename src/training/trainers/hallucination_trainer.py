@@ -69,6 +69,16 @@ class HallucinationTrainer(BaseTrainer):
         self.loss_label_smoothing = loss_config.get('label_smoothing', 0.0)
         self.loss_neutral_boost_weight = loss_config.get('neutral_boost_weight', 0.0)
         self.loss_neutral_margin = loss_config.get('neutral_margin', 0.0)
+        self.loss_contradiction_boost_weight = loss_config.get('contradiction_boost_weight', 0.0)
+        self.loss_contradiction_margin = loss_config.get('contradiction_margin', 0.0)
+        self.loss_contradiction_multiqa_boost_weight = loss_config.get(
+            'contradiction_multiqa_boost_weight',
+            0.0
+        )
+        self.loss_contradiction_multiqa_margin = loss_config.get(
+            'contradiction_multiqa_margin',
+            0.0
+        )
         self._loss_weights_tensor = None
 
         # SWAG (LoRA posterior approx)
@@ -115,6 +125,18 @@ class HallucinationTrainer(BaseTrainer):
                 "Neutral margin regularization enabled: weight=%s margin=%s",
                 self.loss_neutral_boost_weight,
                 self.loss_neutral_margin
+            )
+        if self.loss_contradiction_boost_weight > 0.0:
+            logger.info(
+                "Contradiction-vs-neutral regularization enabled: weight=%s margin=%s",
+                self.loss_contradiction_boost_weight,
+                self.loss_contradiction_margin
+            )
+        if self.loss_contradiction_multiqa_boost_weight > 0.0:
+            logger.info(
+                "Contradiction multipleQAs regularization enabled: weight=%s margin=%s",
+                self.loss_contradiction_multiqa_boost_weight,
+                self.loss_contradiction_multiqa_margin
             )
         if self.swag_enabled:
             logger.info(
@@ -206,7 +228,12 @@ class HallucinationTrainer(BaseTrainer):
                 device=self.device
             )
 
-    def _compute_loss(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+    def _compute_loss(
+        self,
+        logits: torch.Tensor,
+        labels: torch.Tensor,
+        batch: Optional[Dict[str, torch.Tensor]] = None
+    ) -> torch.Tensor:
         base_loss: torch.Tensor
         if self.loss_type in ("ce", "cross_entropy"):
             base_loss = F.cross_entropy(
@@ -215,7 +242,7 @@ class HallucinationTrainer(BaseTrainer):
                 weight=self._loss_weights_tensor,
                 label_smoothing=self.loss_label_smoothing
             )
-            return self._apply_neutral_regularization(logits, labels, base_loss)
+            return self._apply_neutral_regularization(logits, labels, base_loss, batch=batch)
 
         if self.loss_type == "weighted_ce":
             base_loss = F.cross_entropy(
@@ -224,7 +251,7 @@ class HallucinationTrainer(BaseTrainer):
                 weight=self._loss_weights_tensor,
                 label_smoothing=self.loss_label_smoothing
             )
-            return self._apply_neutral_regularization(logits, labels, base_loss)
+            return self._apply_neutral_regularization(logits, labels, base_loss, batch=batch)
 
         if self.loss_type == "focal":
             ce = F.cross_entropy(
@@ -236,7 +263,7 @@ class HallucinationTrainer(BaseTrainer):
             )
             pt = torch.exp(-ce)
             base_loss = (((1 - pt) ** self.loss_focal_gamma) * ce).mean()
-            return self._apply_neutral_regularization(logits, labels, base_loss)
+            return self._apply_neutral_regularization(logits, labels, base_loss, batch=batch)
 
         raise ValueError(f"Unknown loss type: {self.loss_type}")
 
@@ -244,7 +271,8 @@ class HallucinationTrainer(BaseTrainer):
         self,
         logits: torch.Tensor,
         labels: torch.Tensor,
-        base_loss: torch.Tensor
+        base_loss: torch.Tensor,
+        batch: Optional[Dict[str, torch.Tensor]] = None
     ) -> torch.Tensor:
         """
         Encourage neutral examples to keep a margin over non-neutral logits.
@@ -252,25 +280,55 @@ class HallucinationTrainer(BaseTrainer):
         This directly targets the observed "neutral collapse" failure mode while
         preserving the base CE/focal objective.
         """
-        if self.loss_neutral_boost_weight <= 0.0:
-            return base_loss
+        total_loss = base_loss
 
         # Label mapping is fixed across the project: 0=entailment, 1=neutral, 2=contradiction.
-        neutral_mask = labels == 1
-        if not torch.any(neutral_mask):
-            return base_loss
+        if self.loss_neutral_boost_weight > 0.0:
+            neutral_mask = labels == 1
+            if torch.any(neutral_mask):
+                neutral_logits = logits[neutral_mask, 1]
+                non_neutral_logits = torch.stack(
+                    (logits[neutral_mask, 0], logits[neutral_mask, 2]),
+                    dim=1
+                )
+                strongest_non_neutral = non_neutral_logits.max(dim=1).values
 
-        neutral_logits = logits[neutral_mask, 1]
-        non_neutral_logits = torch.stack(
-            (logits[neutral_mask, 0], logits[neutral_mask, 2]),
-            dim=1
-        )
-        strongest_non_neutral = non_neutral_logits.max(dim=1).values
+                neutral_margin_loss = F.relu(
+                    strongest_non_neutral - neutral_logits + self.loss_neutral_margin
+                ).mean()
+                total_loss = total_loss + (self.loss_neutral_boost_weight * neutral_margin_loss)
 
-        neutral_margin_loss = F.relu(
-            strongest_non_neutral - neutral_logits + self.loss_neutral_margin
-        ).mean()
-        return base_loss + (self.loss_neutral_boost_weight * neutral_margin_loss)
+        if self.loss_contradiction_boost_weight > 0.0:
+            contradiction_mask = labels == 2
+            if torch.any(contradiction_mask):
+                contradiction_logits = logits[contradiction_mask, 2]
+                neutral_logits = logits[contradiction_mask, 1]
+                contradiction_margin_loss = F.relu(
+                    neutral_logits - contradiction_logits + self.loss_contradiction_margin
+                ).mean()
+                total_loss = total_loss + (
+                    self.loss_contradiction_boost_weight * contradiction_margin_loss
+                )
+
+        if self.loss_contradiction_multiqa_boost_weight > 0.0 and batch is not None:
+            multipleqas = batch.get('is_multipleqas')
+            if multipleqas is not None:
+                multipleqas = multipleqas.to(labels.device) > 0.5
+                contradiction_multiqa_mask = (labels == 2) & multipleqas
+                if torch.any(contradiction_multiqa_mask):
+                    contradiction_logits = logits[contradiction_multiqa_mask, 2]
+                    neutral_logits = logits[contradiction_multiqa_mask, 1]
+                    contradiction_multiqa_margin_loss = F.relu(
+                        neutral_logits
+                        - contradiction_logits
+                        + self.loss_contradiction_multiqa_margin
+                    ).mean()
+                    total_loss = total_loss + (
+                        self.loss_contradiction_multiqa_boost_weight
+                        * contradiction_multiqa_margin_loss
+                    )
+
+        return total_loss
 
     def train(
         self,
@@ -506,13 +564,13 @@ class HallucinationTrainer(BaseTrainer):
                         input_ids=input_ids,
                         attention_mask=attention_mask
                     )
-                    loss = self._compute_loss(outputs.logits, labels) / self.gradient_accumulation_steps
+                    loss = self._compute_loss(outputs.logits, labels, batch=batch) / self.gradient_accumulation_steps
             else:
                 outputs = self.model(
                     input_ids=input_ids,
                     attention_mask=attention_mask
                 )
-                loss = self._compute_loss(outputs.logits, labels) / self.gradient_accumulation_steps
+                loss = self._compute_loss(outputs.logits, labels, batch=batch) / self.gradient_accumulation_steps
 
             # Backward pass
             if self.scaler:
@@ -611,7 +669,7 @@ class HallucinationTrainer(BaseTrainer):
                     attention_mask=attention_mask
                 )
 
-                loss = self._compute_loss(outputs.logits, labels)
+                loss = self._compute_loss(outputs.logits, labels, batch=batch)
                 total_loss += loss.item()
                 num_batches += 1
 

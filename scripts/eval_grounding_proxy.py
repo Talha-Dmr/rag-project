@@ -105,6 +105,25 @@ def update_stats(store: Dict[str, List[float]], stats: Dict[str, float]) -> None
         "conflict_mass_mean",
         "label_entropy",
         "label_disagreement",
+        "hard_contradiction_rate",
+        "hallucination_prob_mean",
+        "hallucination_prob_topk",
+        "contradiction_margin_mean",
+        "confidence_mean",
+        "top2_margin_mean",
+        "entailment_rate",
+        "neutral_rate",
+        "contradiction_label_rate",
+        "contradiction_neutral_gap_mean",
+        "contradiction_support_mean",
+        "contradiction_support_topk",
+        "contradiction_soft_mean",
+        "contradiction_soft_topk",
+        "contradiction_weighted_rate",
+        "entailment_neutral_gap_mean",
+        "selected_contradiction_rate_metric",
+        "selected_contradiction_prob_metric",
+        "selected_uncertainty_metric",
         "risk_score",
         "policy_cost_answer",
         "policy_cost_retrieve_more",
@@ -113,6 +132,22 @@ def update_stats(store: Dict[str, List[float]], stats: Dict[str, float]) -> None
         "risk_retrieval_gap",
         "risk_ambiguity",
         "risk_uncertainty_scaled",
+        "risk_component_contradiction_rate",
+        "risk_component_contradiction_prob",
+        "risk_component_uncertainty",
+        "risk_component_source_inconsistency",
+        "risk_component_retrieval_weakness",
+        "risk_component_low_confidence",
+        "risk_component_retrieval_gap",
+        "risk_component_ambiguity",
+        "risk_detector_component",
+        "risk_retrieval_component",
+        "risk_source_component",
+        "gate_trigger_contradiction_rate",
+        "gate_trigger_contradiction_prob",
+        "gate_trigger_uncertainty",
+        "gate_trigger_retrieval_low",
+        "gate_trigger_source_consistency",
     ):
         val = stats.get(key)
         if isinstance(val, (int, float)):
@@ -599,6 +634,11 @@ def main() -> None:
             query_text=query,
             return_context=False,
             detect_hallucinations=True,
+            hallucination_aggregation=(
+                config.get("hallucination_aggregation")
+                or (config.get("hallucination_detector", {}) or {}).get("aggregation")
+                or None
+            ),
             gating=gating_override if gating_override else None,
         )
         answer = (result.get("answer") or "").strip()

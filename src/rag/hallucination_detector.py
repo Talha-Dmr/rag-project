@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import logging
 import os
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -709,15 +710,64 @@ class HallucinationDetector:
         num_contradictions = sum(
             1 for r in individual_results if r['is_hallucination']
         )
-        hallucination_score = num_contradictions / len(contexts)
+        hard_contradiction_rate = num_contradictions / len(contexts)
+        contradiction_probs = [
+            float((r.get("scores") or {}).get("contradiction", 0.0))
+            for r in individual_results
+        ]
+        entailment_probs = [
+            float((r.get("scores") or {}).get("entailment", 0.0))
+            for r in individual_results
+        ]
+        neutral_probs = [
+            float((r.get("scores") or {}).get("neutral", 0.0))
+            for r in individual_results
+        ]
 
-        # Aggregate decision
-        if aggregation == 'any':
+        if contradiction_probs:
+            hallucination_prob_mean = float(sum(contradiction_probs) / len(contradiction_probs))
+            top_k = max(1, math.ceil(len(contradiction_probs) / 2))
+            top_probs = sorted(contradiction_probs, reverse=True)[:top_k]
+            hallucination_prob_topk = float(sum(top_probs) / len(top_probs))
+            contradiction_margin_mean = float(sum(
+                max(0.0, cp - max(ep, np_))
+                for cp, ep, np_ in zip(contradiction_probs, entailment_probs, neutral_probs)
+            ) / len(contradiction_probs))
+            contradiction_neutral_gap_mean = float(sum(
+                cp - np_ for cp, np_ in zip(contradiction_probs, neutral_probs)
+            ) / len(contradiction_probs))
+        else:
+            hallucination_prob_mean = 0.0
+            hallucination_prob_topk = 0.0
+            contradiction_margin_mean = 0.0
+            contradiction_neutral_gap_mean = 0.0
+
+        # Aggregate decision / score
+        agg = (aggregation or "any").strip().lower()
+        if agg == 'any':
+            hallucination_score = hard_contradiction_rate
             is_hallucination = (num_contradictions > 0)
-        elif aggregation == 'majority':
+        elif agg == 'majority':
+            hallucination_score = hard_contradiction_rate
             is_hallucination = (num_contradictions > len(contexts) / 2)
-        elif aggregation == 'all':
+        elif agg == 'all':
+            hallucination_score = hard_contradiction_rate
             is_hallucination = (num_contradictions == len(contexts))
+        elif agg == 'prob_mean':
+            hallucination_score = hallucination_prob_mean
+            is_hallucination = (hallucination_score >= 0.40)
+        elif agg == 'prob_topk':
+            hallucination_score = hallucination_prob_topk
+            is_hallucination = (hallucination_score >= 0.40)
+        elif agg == 'margin_mean':
+            hallucination_score = contradiction_margin_mean
+            is_hallucination = (hallucination_score >= 0.08)
+        elif agg == 'prob_mean_plus_margin':
+            hallucination_score = float(min(
+                1.0,
+                0.75 * hallucination_prob_mean + 0.25 * min(1.0, contradiction_margin_mean * 4.0)
+            ))
+            is_hallucination = (hallucination_score >= 0.40)
         else:
             raise ValueError(f"Unknown aggregation: {aggregation}")
 
@@ -725,6 +775,11 @@ class HallucinationDetector:
             'is_hallucination': is_hallucination,
             'individual_results': individual_results,
             'hallucination_score': hallucination_score,
+            'hard_contradiction_rate': hard_contradiction_rate,
+            'hallucination_prob_mean': hallucination_prob_mean,
+            'hallucination_prob_topk': hallucination_prob_topk,
+            'contradiction_margin_mean': contradiction_margin_mean,
+            'contradiction_neutral_gap_mean': contradiction_neutral_gap_mean,
             'num_contexts': len(contexts),
             'num_contradictions': num_contradictions,
             'aggregation': aggregation

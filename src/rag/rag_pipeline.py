@@ -280,6 +280,18 @@ class RAGPipeline:
             label_entropy = 0.0
             label_disagreement = 0.0
 
+        detector_conflict = self._clamp01(
+            0.50 * conflict_mass_mean
+            + 0.30 * label_disagreement
+            + 0.20 * contradiction_prob_mean
+        )
+        detector_conflict_consensus = self._clamp01(
+            0.45 * float(detection_result.get("hard_contradiction_rate", 0.0) or 0.0)
+            + 0.25 * contradiction_weighted_rate
+            + 0.20 * conflict_mass_mean
+            + 0.10 * label_disagreement
+        )
+
         return {
             "contradiction_rate": detection_result.get("hallucination_score", 0.0),
             "hard_contradiction_rate": detection_result.get("hard_contradiction_rate", 0.0),
@@ -309,6 +321,8 @@ class RAGPipeline:
             "contradiction_soft_mean": contradiction_soft_mean,
             "contradiction_soft_topk": contradiction_soft_topk,
             "contradiction_weighted_rate": contradiction_weighted_rate,
+            "detector_conflict": detector_conflict,
+            "detector_conflict_consensus": detector_conflict_consensus,
             "entailment_neutral_gap_mean": entailment_neutral_gap_mean,
         }
 
@@ -698,7 +712,20 @@ class RAGPipeline:
 
             retrieval_stats = self._compute_retrieval_stats(retrieved_docs)
             source_consistency = None
-            if gating_enabled and gating_config.get("source_consistency_threshold") is not None:
+            source_metric_needed = False
+            if gating_enabled:
+                strategy_name = str(gating_config.get("strategy", "") or "").strip().lower()
+                source_metric_needed = (
+                    gating_config.get("source_consistency_threshold") is not None
+                    or strategy_name == "risk_budgeted"
+                    or str(gating_config.get("contradiction_rate_metric", "")).strip()
+                    in {"source_consistency", "source_inconsistency", "combined_conflict"}
+                    or str(gating_config.get("contradiction_prob_metric", "")).strip()
+                    in {"source_consistency", "source_inconsistency", "combined_conflict"}
+                    or str(gating_config.get("uncertainty_metric", "")).strip()
+                    in {"source_consistency", "source_inconsistency", "combined_conflict"}
+                )
+            if gating_enabled and source_metric_needed:
                 source_consistency = self._compute_source_consistency(
                     retrieved_docs,
                     gating_config.get("source_consistency_top_k")
@@ -769,7 +796,12 @@ class RAGPipeline:
                 gating_stats = {
                     "retrieval_max_score": retrieval_stats.get("max_score", 0.0),
                     "retrieval_mean_score": retrieval_stats.get("mean_score", 0.0),
-                    "source_consistency": source_consistency
+                    "source_consistency": source_consistency,
+                    "source_inconsistency": (
+                        self._clamp01(1.0 - float(source_consistency))
+                        if isinstance(source_consistency, (int, float))
+                        else 0.0
+                    ),
                 }
                 if detection_result:
                     gating_stats.update(
@@ -784,6 +816,22 @@ class RAGPipeline:
                         "contradiction_prob_mean": 0.0,
                         "uncertainty_mean": 0.0
                     })
+
+                gating_stats["combined_conflict"] = self._clamp01(
+                    0.45 * float(
+                        gating_stats.get(
+                            "detector_conflict_consensus",
+                            gating_stats.get("detector_conflict", 0.0),
+                        )
+                        or 0.0
+                    )
+                    + 0.35 * float(gating_stats.get("source_inconsistency", 0.0) or 0.0)
+                    + 0.20 * max(
+                        0.0,
+                        float(gating_stats.get("retrieval_max_score", 0.0) or 0.0)
+                        - float(gating_stats.get("retrieval_mean_score", 0.0) or 0.0)
+                    )
+                )
 
                 decision = self._decide_gating_action(gating_stats, gating_config)
 

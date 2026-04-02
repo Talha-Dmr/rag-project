@@ -11,11 +11,16 @@ import argparse
 import json
 import math
 import random
+import time
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, List
 
 from src.core.config_loader import load_config
+from src.evaluation.epistemic_research import (
+    aggregate_question_type_counts,
+    classify_answer_outcome,
+)
 from src.rag.rag_pipeline import RAGPipeline
 
 
@@ -479,6 +484,16 @@ def main() -> None:
     parser.add_argument("--source-consistency-threshold", type=float, default=None)
     parser.add_argument("--uncertainty-source", default=None)
     parser.add_argument(
+        "--detector-model-path",
+        default=None,
+        help="Optional override for hallucination_detector.model_path.",
+    )
+    parser.add_argument(
+        "--detector-base-model",
+        default=None,
+        help="Optional override for hallucination_detector.base_model.",
+    )
+    parser.add_argument(
         "--llm-temperature",
         type=float,
         default=None,
@@ -536,6 +551,12 @@ def main() -> None:
             "'epi_coupled_v2' adds margins to reduce threshold fragility."
         ),
     )
+    parser.add_argument(
+        "--risky-contradiction-threshold",
+        type=float,
+        default=0.40,
+        help="Per-query contradiction-rate threshold for risky answered/retrieved outcomes.",
+    )
     args = parser.parse_args()
 
     seed_everything(int(args.seed))
@@ -546,6 +567,15 @@ def main() -> None:
         questions = questions[: args.limit]
 
     config = load_config(args.config)
+    if args.detector_model_path is not None or args.detector_base_model is not None:
+        detector_cfg = config.get("hallucination_detector") or {}
+        if not isinstance(detector_cfg, dict):
+            detector_cfg = {}
+        if args.detector_model_path is not None:
+            detector_cfg["model_path"] = args.detector_model_path
+        if args.detector_base_model is not None:
+            detector_cfg["base_model"] = args.detector_base_model
+        config["hallucination_detector"] = detector_cfg
     if args.llm_temperature is not None:
         llm_cfg = config.get("llm") or {}
         if not isinstance(llm_cfg, dict):
@@ -628,12 +658,17 @@ def main() -> None:
     u_ale_values: List[float] = []
     retrieval_spread_values: List[float] = []
     low_confidence_values: List[float] = []
+    runtime_values: List[float] = []
+    detail_rows: List[Dict[str, object]] = []
 
     for item in questions:
         query = item.get("query", "")
         if not query:
             continue
+        question_id = item.get("id")
+        question_type = str(item.get("type") or "unknown")
 
+        started_at = time.perf_counter()
         result = rag.query(
             query_text=query,
             return_context=False,
@@ -645,6 +680,7 @@ def main() -> None:
             ),
             gating=gating_override if gating_override else None,
         )
+        elapsed = time.perf_counter() - started_at
         answer = (result.get("answer") or "").strip()
         gating = result.get("gating") or {}
         stats = gating.get("stats") or {}
@@ -656,10 +692,18 @@ def main() -> None:
 
         action_counts[action] += 1
         total += 1
+        runtime_values.append(elapsed)
 
         is_abstain = bool(abstain_message and answer == abstain_message)
         if is_abstain:
             abstain += 1
+        contradiction_rate = float(stats.get("contradiction_rate", 0.0) or 0.0)
+        outcome_bucket = classify_answer_outcome(
+            action=action,
+            is_abstain=is_abstain,
+            contradiction_rate=contradiction_rate,
+            risky_contradiction_threshold=args.risky_contradiction_threshold,
+        )
 
         update_stats(buckets["all"], stats)
         update_stats(buckets["abstain" if is_abstain else "answered"], stats)
@@ -702,11 +746,15 @@ def main() -> None:
 
         if details_fh is not None:
             row = {
+                "question_id": question_id,
+                "question_type": question_type,
                 "query": query,
                 "action": action,
                 "attempts": attempts,
                 "k_used": k_used,
                 "is_abstain": bool(is_abstain),
+                "outcome_bucket": outcome_bucket,
+                "runtime_seconds": elapsed,
                 "stats": stats,
                 "u_epi": u_epi,
                 "u_epi_raw": shadow_metrics["u_epi_raw"],
@@ -725,17 +773,35 @@ def main() -> None:
             if args.dump_include_answer:
                 preview = answer.replace("\n", " ").strip()
                 row["answer_preview"] = preview[:400]
+            detail_rows.append(row)
             details_fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+        else:
+            detail_rows.append(
+                {
+                    "question_id": question_id,
+                    "question_type": question_type,
+                    "action": action,
+                    "is_abstain": bool(is_abstain),
+                    "outcome_bucket": outcome_bucket,
+                    "runtime_seconds": elapsed,
+                }
+            )
 
     summary = {
         "total": total,
         "abstain": abstain,
         "abstain_rate": (abstain / total) if total else 0.0,
+        "retrieve_more_rate": (action_counts.get("retrieve_more", 0) / total) if total else 0.0,
         "detector_failures": detector_failures,
         "actions": dict(action_counts),
         "stats_all": summarize(buckets["all"]),
         "stats_answered": summarize(buckets["answered"]),
         "stats_abstain": summarize(buckets["abstain"]),
+        "runtime_total_seconds": sum(runtime_values),
+        "runtime_mean_seconds": mean(runtime_values),
+        "risky_contradiction_threshold": float(args.risky_contradiction_threshold),
+        "outcome_counts": dict(Counter(str(row["outcome_bucket"]) for row in detail_rows)),
+        "question_type_outcomes": aggregate_question_type_counts(detail_rows),
         "u_epi_mean": mean(u_epi_values),
         "u_epi_raw_mean": mean(u_epi_raw_values),
         "u_epi_stochastic_mean": mean(u_epi_stochastic_values),

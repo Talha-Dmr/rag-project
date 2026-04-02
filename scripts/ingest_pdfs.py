@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Dict, Tuple
 
-import fitz  # PyMuPDF
+from pypdf import PdfReader
 
 
 # =========================
@@ -114,12 +114,12 @@ def clean_text(text: str) -> str:
 
 
 def extract_text_from_pdf(pdf_path: Path) -> Tuple[str, List[Dict]]:
-    doc = fitz.open(pdf_path)
     full_text_parts = []
     page_records = []
+    reader = PdfReader(str(pdf_path))
 
-    for page_index, page in enumerate(doc):
-        page_text = page.get_text("text")
+    for page_index, page in enumerate(reader.pages):
+        page_text = page.extract_text() or ""
         cleaned_page_text = clean_text(page_text)
 
         page_records.append(

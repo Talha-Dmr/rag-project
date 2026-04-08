@@ -1,0 +1,50 @@
+{"id": "fq01", "type": "sanity", "query": "What is the core objective of BCBS 239 for risk data aggregation and risk reporting?"}
+{"id": "fq02", "type": "sanity", "query": "Under the EBA SREP framework, what should supervisory review assess in a bank's risk governance?"}
+{"id": "fq03", "type": "sanity", "query": "Why do BCBS 239 and related implementation guidance emphasize data lineage in risk reporting?"}
+{"id": "fq04", "type": "sanity", "query": "In prudential supervision, what role do stress tests play in assessing bank resilience?"}
+{"id": "fq05", "type": "sanity", "query": "How do PRA and ECB materials frame model risk management and independent validation for internal models?"}
+{"id": "fq06", "type": "sanity", "query": "What is the primary objective of risk aggregation timeliness under stress in BCBS guidance?"}
+{"id": "fq07", "type": "sanity", "query": "Which risk does BCBS mainly address through board and senior management responsibility for data quality?"}
+{"id": "fq08", "type": "sanity", "query": "How does BCBS define success criteria for manual workarounds in risk reporting controls?"}
+{"id": "fq09", "type": "sanity", "query": "What implementation constraint is emphasized by BCBS for documentation and governance for internal model changes?"}
+{"id": "fq10", "type": "sanity", "query": "Why does BCBS treat climate-risk integration into governance and risk management as a governance priority?"}
+{"id": "fq11", "type": "conflict", "query": "How do BCBS and ECB guidance differ on the expected timeliness of risk data aggregation during stress conditions?"}
+{"id": "fq12", "type": "conflict", "query": "How do BCBS 239 and EBA internal governance guidance assign board and senior management responsibility for data quality?"}
+{"id": "fq13", "type": "conflict", "query": "Do BCBS 239 and the ECB RDARR guide frame implementation urgency and remediation timing in the same way?"}
+{"id": "fq14", "type": "conflict", "query": "How do BCBS and EBA or PRA guidance frame proportionality for smaller or less complex banks under risk-data expectations?"}
+{"id": "fq15", "type": "conflict", "query": "How do BCBS and ECB or PRA materials treat the acceptable use of manual workarounds in risk reporting controls?"}
+{"id": "fq16", "type": "conflict", "query": "How do ECB and PRA materials differ on the expected frequency and depth of independent validation for internal models?"}
+{"id": "fq17", "type": "conflict", "query": "How do BCBS climate principles and PRA climate supervision differ on the expected pace of climate-risk integration into governance and risk management?"}
+{"id": "fq18", "type": "conflict", "query": "How do BCBS third-party risk principles and EBA outsourcing guidance treat controls for outsourced risk-reporting systems?"}
+{"id": "fq19", "type": "conflict", "query": "How do the ECB RDARR guide and EBA SREP materials frame remediation follow-up when persistent data-quality deficiencies are identified?"}
+{"id": "fq20", "type": "conflict", "query": "How do BCBS-style and local supervisory materials frame materiality and escalation for risk-reporting errors?"}
+{"id": "fq21", "type": "conflict", "query": "How do ECB and PRA materials differ on documentation and governance expectations for internal model changes?"}
+{"id": "fq22", "type": "conflict", "query": "How do BCBS 239-style and local supervisory materials frame auditability and traceability requirements for risk data systems?"}
+{"id": "fq23", "type": "conflict", "query": "How do BCBS intraday liquidity monitoring tools and PRA liquidity supervision differ in what firms are expected to monitor during the day?"}
+{"id": "fq24", "type": "conflict", "query": "How do BCBS 239 implementation guidance, the ECB RDARR guide, and EBA internal governance guidelines frame group-wide governance arrangements across subsidiaries and consolidated banking groups?"}
+{"id": "fq25", "type": "conflict", "query": "How do supervisory materials connect persistent governance or control weaknesses to escalation in supervisory review?"}
+{"id": "fq26", "type": "conflict", "query": "Do BCBS and EBA differ on risk aggregation timeliness under stress when evidence certainty is low?"}
+{"id": "fq27", "type": "conflict", "query": "Are decision thresholds for board and senior management responsibility for data quality aligned between BCBS and EBA in recent guidance?"}
+{"id": "fq28", "type": "conflict", "query": "When sources conflict on manual workarounds in risk reporting controls, which of BCBS and EBA is more conservative?"}
+{"id": "fq29", "type": "conflict", "query": "How do BCBS and EBA justify disagreement on documentation and governance for internal model changes under uncertainty?"}
+{"id": "fq30", "type": "conflict", "query": "Do BCBS and EBA recommend different operational actions for climate-risk integration into governance and risk management in edge cases?"}
+{"id": "fq31", "type": "conflict", "query": "Do BCBS and EBA differ on outsourcing controls for risk-reporting systems when evidence certainty is low?"}
+{"id": "fq32", "type": "conflict", "query": "Are decision thresholds for materiality and escalation for reporting errors aligned between BCBS and EBA in recent guidance?"}
+{"id": "fq33", "type": "conflict", "query": "When sources conflict on auditability and traceability for risk data systems, which of BCBS and EBA is more conservative?"}
+{"id": "fq34", "type": "conflict", "query": "How do BCBS and EBA justify disagreement on intraday liquidity monitoring during the day under uncertainty?"}
+{"id": "fq35", "type": "conflict", "query": "Do BCBS and EBA recommend different operational actions for group-wide governance across subsidiaries and consolidated groups in edge cases?"}
+{"id": "fq36", "type": "conflict", "query": "Do BCBS and ECB differ on risk aggregation timeliness under stress when evidence certainty is low?"}
+{"id": "fq37", "type": "conflict", "query": "Are decision thresholds for board and senior management responsibility for data quality aligned between BCBS and ECB in recent guidance?"}
+{"id": "fq38", "type": "conflict", "query": "When sources conflict on manual workarounds in risk reporting controls, which of BCBS and ECB is more conservative?"}
+{"id": "fq39", "type": "conflict", "query": "How do BCBS and ECB justify disagreement on documentation and governance for internal model changes under uncertainty?"}
+{"id": "fq40", "type": "conflict", "query": "Do BCBS and ECB recommend different operational actions for climate-risk integration into governance and risk management in edge cases?"}
+{"id": "fq41", "type": "conflict", "query": "Do BCBS and ECB differ on outsourcing controls for risk-reporting systems when evidence certainty is low?"}
+{"id": "fq42", "type": "conflict", "query": "Are decision thresholds for materiality and escalation for reporting errors aligned between BCBS and ECB in recent guidance?"}
+{"id": "fq43", "type": "conflict", "query": "When sources conflict on auditability and traceability for risk data systems, which of BCBS and ECB is more conservative?"}
+{"id": "fq44", "type": "conflict", "query": "How do BCBS and ECB justify disagreement on intraday liquidity monitoring during the day under uncertainty?"}
+{"id": "fq45", "type": "conflict", "query": "Do BCBS and ECB recommend different operational actions for group-wide governance across subsidiaries and consolidated groups in edge cases?"}
+{"id": "fq46", "type": "conflict", "query": "Do BCBS and PRA differ on risk aggregation timeliness under stress when evidence certainty is low?"}
+{"id": "fq47", "type": "conflict", "query": "Are decision thresholds for board and senior management responsibility for data quality aligned between BCBS and PRA in recent guidance?"}
+{"id": "fq48", "type": "conflict", "query": "When sources conflict on manual workarounds in risk reporting controls, which of BCBS and PRA is more conservative?"}
+{"id": "fq49", "type": "conflict", "query": "How do BCBS and PRA justify disagreement on documentation and governance for internal model changes under uncertainty?"}
+{"id": "fq50", "type": "conflict", "query": "Do BCBS and PRA recommend different operational actions for climate-risk integration into governance and risk management in edge cases?"}

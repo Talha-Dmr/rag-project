@@ -1,0 +1,252 @@
+documents:
+  - document_id: bcbs239
+    source_org: BCBS
+    family: bcbs
+    jurisdiction: global
+    document_type: principle
+    year: 2013
+    priority: 1
+    format: html
+    title: Principles for effective risk data aggregation and risk reporting
+    source_url: https://www.bis.org/publ/bcbs239.htm
+    download_url: https://www.bis.org/publ/bcbs239.htm
+    raw_relpath: bcbs/bcbs239.html
+    themes: [fq01, fq03, fq06, fq07, fq08, fq09]
+
+  - document_id: bcbs239_impl_note
+    source_org: BCBS
+    family: bcbs
+    jurisdiction: global
+    document_type: implementation_note
+    year: 2018
+    priority: 1
+    format: html
+    title: Implementation of the Principles for effective risk data aggregation and risk reporting
+    source_url: https://www.bis.org/publ/bcbs_nl36.htm
+    download_url: https://www.bis.org/publ/bcbs_nl36.htm
+    raw_relpath: bcbs/bcbs239_impl_note.html
+    themes: [fq03, fq06, fq07, fq08, fq09]
+
+  - document_id: bcbs248_intraday_liquidity
+    source_org: BCBS
+    family: bcbs
+    jurisdiction: global
+    document_type: monitoring_tool
+    year: 2013
+    priority: 1
+    format: html
+    title: Monitoring tools for intraday liquidity management
+    source_url: https://www.bis.org/publ/bcbs248.htm
+    download_url: https://www.bis.org/publ/bcbs248.htm
+    raw_relpath: bcbs/bcbs248_intraday_liquidity.html
+    themes: [fq18]
+
+  - document_id: bcbs_climate_principles
+    source_org: BCBS
+    family: bcbs
+    jurisdiction: global
+    document_type: principle
+    year: 2022
+    priority: 1
+    format: html
+    title: Principles for the effective management and supervision of climate-related financial risks
+    source_url: https://www.bis.org/bcbs/publ/d532.htm
+    download_url: https://www.bis.org/bcbs/publ/d532.htm
+    raw_relpath: bcbs/bcbs_climate_principles.html
+    themes: [fq12]
+
+  - document_id: bcbs_third_party_risk
+    source_org: BCBS
+    family: bcbs
+    jurisdiction: global
+    document_type: principle
+    year: 2025
+    priority: 1
+    format: html
+    title: Principles for the sound management of third-party risk
+    source_url: https://www.bis.org/bcbs/publ/d605.htm
+    download_url: https://www.bis.org/bcbs/publ/d605.htm
+    raw_relpath: bcbs/bcbs_third_party_risk.html
+    themes: [fq13]
+
+  - document_id: eba_srep_hub
+    source_org: EBA
+    family: eba
+    jurisdiction: eu
+    document_type: guideline
+    year: 2022
+    priority: 1
+    format: pdf
+    title: Guidelines on common procedures and methodologies for SREP and supervisory stress testing
+    source_url: https://www.eba.europa.eu/regulation-and-policy/supervisory-review-and-evaluation-process-srep-and-pillar-2
+    download_url: https://www.eba.europa.eu/sites/default/files/document_library/Publications/Guidelines/2022/EBA-GL-2022-03%20Revised%20SREP%20Guidelines/1028500/Final%20Report%20on%20Guidelines%20on%20common%20procedures%20and%20methodologies%20for%20SREP%20and%20supervisory%20stress%20testing.pdf
+    raw_relpath: eba/eba_srep_hub.pdf
+    themes: [fq02, fq04, fq14, fq20]
+
+  - document_id: eba_ict_risk_srep
+    source_org: EBA
+    family: eba
+    jurisdiction: eu
+    document_type: guideline_page
+    year: 2026
+    priority: 2
+    format: html
+    title: Guidelines on ICT Risk Assessment under the SREP
+    source_url: https://eba.europa.eu/activities/single-rulebook/regulatory-activities/supervisory-review-and-evaluation-process-srep-and-pillar-2/guidelines-ict-risk-assessment-under-srep
+    download_url: https://eba.europa.eu/activities/single-rulebook/regulatory-activities/supervisory-review-and-evaluation-process-srep-and-pillar-2/guidelines-ict-risk-assessment-under-srep
+    raw_relpath: eba/eba_ict_risk_srep.html
+    themes: [fq02, fq13]
+
+  - document_id: eba_outsourcing
+    source_org: EBA
+    family: eba
+    jurisdiction: eu
+    document_type: guideline_page
+    year: 2019
+    priority: 1
+    format: html
+    title: Guidelines on outsourcing arrangements
+    source_url: https://www.eba.europa.eu/publications-and-media/press-releases/eba-publishes-revised-guidelines-outsourcing-arrangements
+    download_url: https://www.eba.europa.eu/publications-and-media/press-releases/eba-publishes-revised-guidelines-outsourcing-arrangements
+    raw_relpath: eba/eba_outsourcing.html
+    themes: [fq13]
+
+  - document_id: eba_esg_risks
+    source_org: EBA
+    family: eba
+    jurisdiction: eu
+    document_type: guideline_page
+    year: 2026
+    priority: 2
+    format: html
+    title: Guidelines on the management of ESG risks
+    source_url: https://www.eba.europa.eu/activities/single-rulebook/regulatory-activities/sustainable-finance/guidelines-management-esg-risks
+    download_url: https://www.eba.europa.eu/activities/single-rulebook/regulatory-activities/sustainable-finance/guidelines-management-esg-risks
+    raw_relpath: eba/eba_esg_risks.html
+    themes: [fq12]
+
+  - document_id: eba_internal_governance
+    source_org: EBA
+    family: eba
+    jurisdiction: eu
+    document_type: guideline
+    year: 2021
+    priority: 2
+    format: pdf
+    title: Guidelines on internal governance under CRD
+    source_url: https://www.eba.europa.eu/regulation-and-policy/internal-governance
+    download_url: https://www.eba.europa.eu/sites/default/files/document_library/Publications/Guidelines/2021/1016721/Final%20report%20on%20Guidelines%20on%20internal%20governance%20under%20CRD.pdf
+    raw_relpath: eba/eba_internal_governance.pdf
+    themes: [fq02, fq07, fq19]
+
+  - document_id: eba_model_validation
+    source_org: EBA
+    family: eba
+    jurisdiction: eu
+    document_type: hub_page
+    year: 2026
+    priority: 2
+    format: html
+    title: Model validation hub
+    source_url: https://www.eba.europa.eu/regulation-and-policy/model-validation
+    download_url: https://www.eba.europa.eu/regulation-and-policy/model-validation
+    raw_relpath: eba/eba_model_validation.html
+    themes: [fq05, fq11]
+
+  - document_id: pra_ss24_15_liquidity
+    source_org: PRA
+    family: pra_boe
+    jurisdiction: uk
+    document_type: supervisory_statement
+    year: 2015
+    priority: 1
+    format: html
+    title: SS24/15 – The PRA’s approach to supervising liquidity and funding risks
+    source_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2015/the-pras-approach-to-supervising-liquidity-and-funding-risks-ss
+    download_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2015/the-pras-approach-to-supervising-liquidity-and-funding-risks-ss
+    raw_relpath: pra_boe/pra_ss24_15_liquidity.html
+    themes: [fq18]
+
+  - document_id: pra_cp6_22_model_risk
+    source_org: PRA
+    family: pra_boe
+    jurisdiction: uk
+    document_type: consultation_paper
+    year: 2022
+    priority: 1
+    format: html
+    title: CP6/22 – Model risk management principles for banks
+    source_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2022/june/model-risk-management-principles-for-banks
+    download_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2022/june/model-risk-management-principles-for-banks
+    raw_relpath: pra_boe/pra_cp6_22_model_risk.html
+    themes: [fq05, fq11]
+
+  - document_id: pra_ss5_25_climate
+    source_org: PRA
+    family: pra_boe
+    jurisdiction: uk
+    document_type: supervisory_statement
+    year: 2025
+    priority: 2
+    format: html
+    title: SS5/25 – Enhancing banks’ and insurers’ approaches to managing climate-related risks
+    source_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2025/december/enhancing-banks-and-insurers-approaches-to-managing-climate-related-risks-ss
+    download_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2025/december/enhancing-banks-and-insurers-approaches-to-managing-climate-related-risks-ss
+    raw_relpath: pra_boe/pra_ss5_25_climate.html
+    themes: [fq12]
+
+  - document_id: ecb_rdarr_guide
+    source_org: ECB
+    family: ecb
+    jurisdiction: eu
+    document_type: guide
+    year: 2024
+    priority: 1
+    format: pdf
+    title: Guide on effective risk data aggregation and risk reporting
+    source_url: https://www.bankingsupervision.europa.eu/ecb/pub/pdf/ssm.supervisory_guides240503_riskreporting.en.pdf
+    download_url: https://www.bankingsupervision.europa.eu/ecb/pub/pdf/ssm.supervisory_guides240503_riskreporting.en.pdf
+    raw_relpath: ecb/ecb_rdarr_guide.pdf
+    themes: [fq06, fq07, fq08, fq09]
+
+  - document_id: ecb_climate_guide_family
+    source_org: ECB
+    family: ecb
+    jurisdiction: eu
+    document_type: faq_page
+    year: 2026
+    priority: 2
+    format: html
+    title: Guide on climate-related and environmental risks
+    source_url: https://www.bankingsupervision.europa.eu/framework/legal-framework/public-consultations/html/climate-related_risks_faq.en.html
+    download_url: https://www.bankingsupervision.europa.eu/framework/legal-framework/public-consultations/html/climate-related_risks_faq.en.html
+    raw_relpath: ecb/ecb_climate_guide_family.html
+    themes: [fq12]
+
+  - document_id: ecb_internal_models_guide
+    source_org: ECB
+    family: ecb
+    jurisdiction: eu
+    document_type: guide_page
+    year: 2025
+    priority: 2
+    format: html
+    title: ECB guide to internal models
+    source_url: https://www.bankingsupervision.europa.eu/press/other-publications/publications/html/ssm.faq_guide_internal_models_2025~baf433d505.de.html
+    download_url: https://www.bankingsupervision.europa.eu/press/other-publications/publications/html/ssm.faq_guide_internal_models_2025~baf433d505.de.html
+    raw_relpath: ecb/ecb_internal_models_guide.html
+    themes: [fq05, fq11]
+
+  - document_id: ecb_2025_stress_test
+    source_org: ECB
+    family: ecb
+    jurisdiction: eu
+    document_type: press_release
+    year: 2025
+    priority: 2
+    format: html
+    title: ECB 2025 stress test programme
+    source_url: https://www.bankingsupervision.europa.eu/press/pr/date/2025/html/ssm.pr250120~6e75fde026.en.html
+    download_url: https://www.bankingsupervision.europa.eu/press/pr/date/2025/html/ssm.pr250120~6e75fde026.en.html
+    raw_relpath: ecb/ecb_2025_stress_test.html
+    themes: [fq04]

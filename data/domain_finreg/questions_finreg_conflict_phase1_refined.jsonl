@@ -1,0 +1,20 @@
+{"id":"fq01","type":"sanity","query":"What is the core objective of BCBS 239 for risk data aggregation and risk reporting?"}
+{"id":"fq02","type":"sanity","query":"Under the EBA SREP framework, what should supervisory review assess in a bank's risk governance?"}
+{"id":"fq03","type":"sanity","query":"Why do BCBS 239 and related implementation guidance emphasize data lineage in risk reporting?"}
+{"id":"fq04","type":"sanity","query":"In prudential supervision, what role do stress tests play in assessing bank resilience?"}
+{"id":"fq05","type":"sanity","query":"How do PRA and ECB materials frame model risk management and independent validation for internal models?"}
+{"id":"fq06","type":"conflict","query":"How do BCBS and ECB guidance differ on the expected timeliness of risk data aggregation during stress conditions?"}
+{"id":"fq07","type":"conflict","query":"How do BCBS 239 and EBA internal governance guidance assign board and senior management responsibility for data quality?"}
+{"id":"fq08","type":"conflict","query":"Do BCBS 239 and the ECB RDARR guide frame implementation urgency and remediation timing in the same way?"}
+{"id":"fq09","type":"conflict","query":"How do BCBS and EBA or PRA guidance frame proportionality for smaller or less complex banks under risk-data expectations?"}
+{"id":"fq10","type":"conflict","query":"How do BCBS and ECB or PRA materials treat the acceptable use of manual workarounds in risk reporting controls?"}
+{"id":"fq11","type":"conflict","query":"How do ECB and PRA materials differ on the expected frequency and depth of independent validation for internal models?"}
+{"id":"fq12","type":"conflict","query":"How do BCBS climate principles and PRA climate supervision differ on the expected pace of climate-risk integration into governance and risk management?"}
+{"id":"fq13","type":"conflict","query":"How do BCBS third-party risk principles and EBA outsourcing guidance treat controls for outsourced risk-reporting systems?"}
+{"id":"fq14","type":"conflict","query":"How do supervisory materials frame remediation expectations when data-quality deficiencies persist?"}
+{"id":"fq15","type":"conflict","query":"How do BCBS-style and local supervisory materials frame materiality and escalation for risk-reporting errors?"}
+{"id":"fq16","type":"conflict","query":"How do ECB and PRA materials differ on documentation and governance expectations for internal model changes?"}
+{"id":"fq17","type":"conflict","query":"How do BCBS 239-style and local supervisory materials frame auditability and traceability requirements for risk data systems?"}
+{"id":"fq18","type":"conflict","query":"How do BCBS intraday liquidity monitoring tools and PRA liquidity supervision differ in what firms are expected to monitor during the day?"}
+{"id":"fq19","type":"conflict","query":"How do BCBS, ECB, and EBA materials frame data-governance responsibilities for cross-border banking groups?"}
+{"id":"fq20","type":"conflict","query":"How do supervisory materials connect persistent governance or control weaknesses to escalation in supervisory review?"}

@@ -207,6 +207,7 @@ class HuggingFaceLLM(BaseLLM):
 
         answer = self.generate(prompt, max_tokens=max_tokens, temperature=temperature)
         answer = self._strip_role_leaks(answer)
+        answer = self._strip_unrelated_tail(answer)
 
         # Post-process to drop prompt-injection or extra roles
         for marker in [
@@ -219,10 +220,14 @@ class HuggingFaceLLM(BaseLLM):
             "\nUser:",
             "\nSystem:",
             "\nDeveloper:",
+            "\nYou're an AI language model",
+            "\nYou are Claude",
             "Human:",
             "Assistant:",
             "QUESTION:",
-            "CONTEXT:"
+            "CONTEXT:",
+            "You're an AI language model",
+            "You are Claude",
         ]:
             if marker in answer:
                 answer = answer.split(marker, 1)[0].strip()
@@ -242,7 +247,10 @@ class HuggingFaceLLM(BaseLLM):
             r"\bRole:\s",
             r"\bInstruction:\s",
             r"\bPrompt:\s",
-            r"\bHuman Resources Manager:\s"
+            r"\bHuman Resources Manager:\s",
+            r"You're an AI language model",
+            r"You are Claude",
+            r"\bClaude\.",
         ]
 
         earliest = None
@@ -257,3 +265,43 @@ class HuggingFaceLLM(BaseLLM):
             return answer[:earliest].strip()
 
         return answer.strip()
+
+    def _strip_unrelated_tail(self, answer: str) -> str:
+        if not answer:
+            return answer
+
+        cleaned = re.sub(
+            r"^\s*Based on the (?:given|provided) context,\s*I will (?:generate|provide) a response:\s*",
+            "",
+            answer,
+            flags=re.IGNORECASE,
+        )
+
+        tail_patterns = [
+            r"\bQuestion:\s",
+            r"\bANSWER:\s",
+            r"\bHuman Resources:\s",
+            r"\bHuman resources department\b",
+            r"\bHuman resources policies\b",
+            r"\bHuman resources department:\s",
+            r"\bHuman Resources Department:\s",
+            r"\bPremier [A-Z][a-z]+ [A-Z][a-z]+\b",
+            r"\bWhat actions might\b",
+            r"\bTo which company would you apply\b",
+            r"\bPlease send your resume\b",
+            r"\bJob Title:\s",
+            r"\bdefy gravity\b",
+        ]
+
+        earliest = None
+        for pattern in tail_patterns:
+            match = re.search(pattern, cleaned, flags=re.IGNORECASE)
+            if match:
+                pos = match.start()
+                if pos > 0 and (earliest is None or pos < earliest):
+                    earliest = pos
+
+        if earliest is not None:
+            return cleaned[:earliest].strip()
+
+        return cleaned.strip()

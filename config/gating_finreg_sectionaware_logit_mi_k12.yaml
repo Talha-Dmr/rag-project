@@ -1,4 +1,4 @@
-# Financial regulation/compliance domain: section-aware finreg default.
+# Financial regulation/compliance domain: section-aware chunking A/B run.
 
 embeddings:
   type: huggingface

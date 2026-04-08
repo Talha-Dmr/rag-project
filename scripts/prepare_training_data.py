@@ -26,6 +26,7 @@ from src.training.data.converters.asqa_converter import ASQAConverter
 from src.training.data.converters.wic_converter import WiCConverter
 from src.training.data.converters.clamber_converter import CLAMBERConverter
 from src.training.data.converters.condambigqa_converter import CondAmbigQAConverter
+from src.training.data.converters.fever_converter import FeverConverter
 from src.training.utils.data_utils import (
     split_dataset,
     balance_classes,
@@ -98,6 +99,15 @@ def load_converters(config: Dict[str, Any]) -> Dict[str, Any]:
         converters['condambigqa'] = CondAmbigQAConverter(
             dataset_path=cfg['path'],
             multiplier=cfg.get('multiplier', 3),
+            seed=42
+        )
+
+    # FEVER-style local pair-NLI data
+    if 'fever' in datasets_config:
+        cfg = datasets_config['fever']
+        converters['fever'] = FeverConverter(
+            dataset_path=cfg['path'],
+            multiplier=cfg.get('multiplier', 1),
             seed=42
         )
 

@@ -5,6 +5,7 @@ Main RAG Pipeline orchestrator.
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from collections import OrderedDict
+import re
 import numpy as np
 from src.dataset.data_manager import DataManager
 from src.chunking.base_chunker import ChunkerFactory
@@ -18,6 +19,31 @@ from src.core.base_classes import BaseReranker
 from src.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+MODEL_ABSTAIN_PHRASES = (
+    "i don't know based on the provided context",
+    "i do not know based on the provided context",
+    "the provided context does not contain enough information",
+    "the context does not contain enough information",
+)
+
+SOURCE_FAMILY_PATTERNS = {
+    "bcbs": re.compile(r"\b(?:bcbs|basel committee|bis)\b", re.IGNORECASE),
+    "eba": re.compile(r"\b(?:eba|european banking authority)\b", re.IGNORECASE),
+    "ecb": re.compile(
+        r"\b(?:ecb|european central bank|single supervisory mechanism|ssm)\b",
+        re.IGNORECASE,
+    ),
+    "pra": re.compile(
+        r"\b(?:pra|prudential regulation authority|bank of england|boe)\b",
+        re.IGNORECASE,
+    ),
+}
+
+SOURCE_BALANCE_STOPWORDS = {
+    "and", "are", "body", "data", "do", "for", "frame", "how", "its",
+    "materials", "quality", "responsibility", "senior", "the", "their", "when",
+}
 
 
 class RAGPipeline:
@@ -638,6 +664,25 @@ class RAGPipeline:
 
         return strategy
 
+    def _normalize_generated_answer(self, answer: str) -> str:
+        if not answer:
+            return ""
+
+        cleaned = answer.strip()
+        lower = cleaned.lower()
+
+        for phrase in MODEL_ABSTAIN_PHRASES:
+            idx = lower.find(phrase)
+            if idx != -1:
+                end = idx + len(phrase)
+                return cleaned[:end].strip().rstrip(".") + "."
+
+        return cleaned
+
+    def _model_requested_abstain(self, answer: str) -> bool:
+        lower = (answer or "").strip().lower()
+        return any(phrase in lower for phrase in MODEL_ABSTAIN_PHRASES)
+
     def query(
         self,
         query_text: str,
@@ -695,7 +740,12 @@ class RAGPipeline:
             if self.reranker:
                 logger.info("Applying reranker...")
                 rerank_top_k = self.reranker_top_k or current_k
-                retrieved_docs = self.reranker.rerank(query_text, retrieved_docs, top_k=rerank_top_k)
+                reranked_docs = self.reranker.rerank(query_text, retrieved_docs, top_k=current_k)
+                retrieved_docs = self._balance_source_families(
+                    query_text,
+                    reranked_docs,
+                    rerank_top_k,
+                )
                 logger.info(f"Reranked documents → top {len(retrieved_docs)} kept")
 
             if not retrieved_docs:
@@ -735,6 +785,8 @@ class RAGPipeline:
             logger.info("Generating answer...")
             context_texts = [doc['content'] for doc in retrieved_docs]
             answer = self.llm.generate_with_context(query_text, context_texts)
+            answer = self._normalize_generated_answer(answer)
+            model_requested_abstain = self._model_requested_abstain(answer)
 
             result = {
                 'answer': answer,
@@ -742,7 +794,10 @@ class RAGPipeline:
             }
 
             # Hallucination detection
-            if detect_hallucinations and self.hallucination_detector:
+            if model_requested_abstain:
+                result['hallucination_detected'] = False
+                detection_result = None
+            elif detect_hallucinations and self.hallucination_detector:
                 logger.info("Checking for hallucinations...")
 
                 try:
@@ -817,6 +872,10 @@ class RAGPipeline:
                         "uncertainty_mean": 0.0
                     })
 
+                if model_requested_abstain:
+                    gating_action = "abstain"
+                    result['answer'] = abstain_message
+
                 gating_stats["combined_conflict"] = self._clamp01(
                     0.45 * float(
                         gating_stats.get(
@@ -833,7 +892,9 @@ class RAGPipeline:
                     )
                 )
 
-                decision = self._decide_gating_action(gating_stats, gating_config)
+                decision = "abstain" if model_requested_abstain else self._decide_gating_action(
+                    gating_stats, gating_config
+                )
 
                 if decision == "retrieve_more" and gating_attempts < max_retries:
                     gating_attempts += 1
@@ -971,6 +1032,109 @@ class RAGPipeline:
             lines.append(f"[{idx}] {label}{suffix}")
 
         return "\n".join(lines)
+
+    def _extract_named_source_families(self, query_text: str) -> List[str]:
+        named_families: List[str] = []
+        for family, pattern in SOURCE_FAMILY_PATTERNS.items():
+            if pattern.search(query_text):
+                named_families.append(family)
+        return named_families
+
+    def _canonicalize_source_family(self, raw_value: Any) -> Optional[str]:
+        if raw_value is None:
+            return None
+
+        normalized = str(raw_value).strip().lower()
+        if not normalized:
+            return None
+
+        for family, pattern in SOURCE_FAMILY_PATTERNS.items():
+            if pattern.search(normalized):
+                return family
+
+        return None
+
+    def _doc_source_family(self, doc: Dict[str, Any]) -> Optional[str]:
+        metadata = doc.get("metadata") or {}
+        for key in ("family", "source_org", "title", "source", "url", "path"):
+            family = self._canonicalize_source_family(metadata.get(key))
+            if family:
+                return family
+        return None
+
+    def _source_balance_tokens(self, text: str) -> set[str]:
+        return {
+            token
+            for token in re.findall(r"[a-z0-9]+", (text or "").lower())
+            if len(token) > 2 and token not in SOURCE_BALANCE_STOPWORDS
+        }
+
+    def _family_doc_match_score(self, query_text: str, doc: Dict[str, Any]) -> tuple[float, float]:
+        metadata = doc.get("metadata") or {}
+        query_tokens = self._source_balance_tokens(query_text)
+        title_parts = [
+            metadata.get("title"),
+            metadata.get("section_heading"),
+            metadata.get("doc_id"),
+        ]
+        title_tokens = self._source_balance_tokens(
+            " ".join(part for part in title_parts if isinstance(part, str) and part.strip())
+        )
+        overlap = 0.0
+        if query_tokens and title_tokens:
+            overlap = float(len(query_tokens & title_tokens) / len(query_tokens))
+        return overlap, float(doc.get("score", 0.0) or 0.0)
+
+    def _balance_source_families(
+        self,
+        query_text: str,
+        retrieved_docs: List[Dict[str, Any]],
+        target_k: int,
+    ) -> List[Dict[str, Any]]:
+        min_named_families = int(self.source_config.get("balance_min_named_families", 2))
+        if not bool(self.source_config.get("balance_named_families", False)):
+            return retrieved_docs[:target_k]
+
+        named_families = self._extract_named_source_families(query_text)
+        if len(named_families) < min_named_families:
+            return retrieved_docs[:target_k]
+
+        family_candidates: Dict[str, List[Dict[str, Any]]] = {family: [] for family in named_families}
+        for doc in retrieved_docs:
+            family = self._doc_source_family(doc)
+            if family in family_candidates:
+                family_candidates[family].append(doc)
+
+        if sum(1 for docs in family_candidates.values() if docs) < min_named_families:
+            return retrieved_docs[:target_k]
+
+        balanced_docs: List[Dict[str, Any]] = []
+        used_doc_ids = set()
+
+        for family in named_families:
+            docs = family_candidates.get(family) or []
+            if not docs:
+                continue
+            doc = max(docs, key=lambda candidate: self._family_doc_match_score(query_text, candidate))
+            balanced_docs.append(doc)
+            used_doc_ids.add(id(doc))
+
+        for doc in retrieved_docs:
+            if len(balanced_docs) >= target_k:
+                break
+            if id(doc) in used_doc_ids:
+                continue
+            balanced_docs.append(doc)
+            used_doc_ids.add(id(doc))
+
+        if len(balanced_docs) != len(retrieved_docs[:target_k]):
+            logger.info(
+                "Applied source-family balancing for %s → families=%s",
+                query_text[:80],
+                ",".join(named_families),
+            )
+
+        return balanced_docs[:target_k]
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> 'RAGPipeline':

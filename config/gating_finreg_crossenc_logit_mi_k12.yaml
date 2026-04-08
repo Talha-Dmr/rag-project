@@ -1,4 +1,4 @@
-# Financial regulation/compliance domain: section-aware finreg default.
+# Financial regulation/compliance domain: cross-encoder reranker A/B run.
 
 embeddings:
   type: huggingface
@@ -17,21 +17,27 @@ llm:
   max_tokens: 256
 
 chunking:
-  strategy: section_aware
+  strategy: semantic
   config:
-    max_chunk_size: 1200
-    min_chunk_size: 200
-    chunk_overlap: 120
-    max_heading_length: 120
-    allow_titlecase_headings: true
+    similarity_threshold: 0.7
+    min_chunk_size: 100
+    max_chunk_size: 1000
+    embedder:
+      type: huggingface
+      model_name: sentence-transformers/all-mpnet-base-v2
+      device: cuda
+      cache_folder: ./models/embeddings
+      batch_size: 32
 
 retrieval:
-  k: 20
+  k: 12
   score_threshold: 0.0
 
 reranker:
-  type: ebcar
+  type: cross_encoder
+  model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
   top_k: 5
+  device: cuda
 
 hallucination_detector:
   model_path: electra_deberta/final_fever_deberta_v3_base_model

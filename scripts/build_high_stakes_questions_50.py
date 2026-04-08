@@ -146,6 +146,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build 50Q high-stakes domain question sets")
     parser.add_argument("--total", type=int, default=50, help="Total questions per domain")
     parser.add_argument("--sanity", type=int, default=10, help="Sanity question count per domain")
+    parser.add_argument(
+        "--domain",
+        choices=["health", "finreg", "disaster", "all"],
+        default="all",
+        help="Optionally build only one domain.",
+    )
+    parser.add_argument(
+        "--finreg-refined-v2",
+        action="store_true",
+        help="Build the finreg 50Q set from the phase-1 refined v2 seed and phase-1-aligned topics.",
+    )
     args = parser.parse_args()
 
     specs = [
@@ -172,10 +183,33 @@ def main() -> None:
         DomainSpec(
             name="finreg",
             id_prefix="fq",
-            seed_path=Path("data/domain_finreg/questions_finreg_conflict.jsonl"),
-            out_path=Path("data/domain_finreg/questions_finreg_conflict_50.jsonl"),
-            sources=["BCBS", "EBA", "ECB", "Federal Reserve", "PRA"],
+            seed_path=Path(
+                "data/domain_finreg/questions_finreg_conflict_phase1_refined_v2.jsonl"
+                if args.finreg_refined_v2
+                else "data/domain_finreg/questions_finreg_conflict.jsonl"
+            ),
+            out_path=Path(
+                "data/domain_finreg/questions_finreg_conflict_phase1_refined_v2_50.jsonl"
+                if args.finreg_refined_v2
+                else "data/domain_finreg/questions_finreg_conflict_50.jsonl"
+            ),
+            sources=["BCBS", "EBA", "ECB", "PRA"]
+            if args.finreg_refined_v2
+            else ["BCBS", "EBA", "ECB", "Federal Reserve", "PRA"],
             topics=[
+                "risk aggregation timeliness under stress",
+                "board and senior management responsibility for data quality",
+                "manual workarounds in risk reporting controls",
+                "documentation and governance for internal model changes",
+                "climate-risk integration into governance and risk management",
+                "outsourcing controls for risk-reporting systems",
+                "materiality and escalation for reporting errors",
+                "auditability and traceability for risk data systems",
+                "intraday liquidity monitoring during the day",
+                "group-wide governance across subsidiaries and consolidated groups",
+            ]
+            if args.finreg_refined_v2
+            else [
                 "risk aggregation timeliness",
                 "board accountability for data quality",
                 "manual adjustments in regulatory reporting",
@@ -211,7 +245,11 @@ def main() -> None:
         ),
     ]
 
-    for spec in specs:
+    selected_specs = specs
+    if args.domain != "all":
+        selected_specs = [spec for spec in specs if spec.name == args.domain]
+
+    for spec in selected_specs:
         rows = build_domain(spec, total=args.total, sanity_target=args.sanity)
         _write_jsonl(spec.out_path, rows)
         print(f"{spec.name}: wrote {len(rows)} -> {spec.out_path}")
@@ -219,4 +257,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

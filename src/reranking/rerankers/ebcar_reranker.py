@@ -1,4 +1,5 @@
 import math
+import re
 from typing import Any, Dict, List, Optional, Sequence
 from collections import OrderedDict
 
@@ -22,11 +23,17 @@ class EBCARReranker(BaseReranker):
     """
 
     DEFAULT_WEIGHTS = {
-        'semantic': 0.6,
+        'semantic': 0.54,
         'retriever': 0.2,
         'position': 0.1,
         'evidence': 0.07,
         'length': 0.03,
+        'title_overlap': 0.06,
+    }
+
+    TITLE_STOPWORDS = {
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'do', 'for', 'from', 'how',
+        'in', 'is', 'of', 'on', 'or', 'the', 'to', 'under', 'when', 'with',
     }
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -86,6 +93,7 @@ class EBCARReranker(BaseReranker):
                 metadata['original_score'] = float(doc['score'])
 
             features = self._compute_features(
+                query_text=query,
                 doc=doc,
                 query_vector=query_vector,
                 doc_vector=doc_vec,
@@ -174,6 +182,7 @@ class EBCARReranker(BaseReranker):
     # ------------------------------------------------------------------
     def _compute_features(
         self,
+        query_text: str,
         doc: Dict[str, Any],
         query_vector: np.ndarray,
         doc_vector: np.ndarray,
@@ -188,6 +197,7 @@ class EBCARReranker(BaseReranker):
             'position': self._position_signal(doc, doc_index),
             'evidence': self._evidence_signal(metadata),
             'length': self._length_signal(doc.get('content', '')),
+            'title_overlap': self._title_overlap_signal(query_text, metadata),
         }
         return features
 
@@ -244,6 +254,36 @@ class EBCARReranker(BaseReranker):
         if tokens == 0:
             return 0.0
         return 1.0 - math.exp(-tokens / self.length_normalizer)
+
+    @classmethod
+    def _title_overlap_signal(cls, query_text: str, metadata: Dict[str, Any]) -> float:
+        query_tokens = cls._keyword_tokens(query_text)
+        if not query_tokens:
+            return 0.0
+
+        title_parts = [
+            metadata.get('title'),
+            metadata.get('section_heading'),
+            metadata.get('doc_id'),
+        ]
+        title_text = " ".join(part for part in title_parts if isinstance(part, str) and part.strip())
+        title_tokens = cls._keyword_tokens(title_text)
+        if not title_tokens:
+            return 0.0
+
+        overlap = query_tokens & title_tokens
+        if not overlap:
+            return 0.0
+        return float(len(overlap) / len(query_tokens))
+
+    @classmethod
+    def _keyword_tokens(cls, text: str) -> set[str]:
+        tokens = {
+            token
+            for token in re.findall(r"[a-z0-9]+", (text or "").lower())
+            if len(token) > 2 and token not in cls.TITLE_STOPWORDS
+        }
+        return tokens
 
     def _combine_features(self, features: Dict[str, float]) -> float:
         score = 0.0

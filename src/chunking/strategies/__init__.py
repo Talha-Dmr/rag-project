@@ -4,8 +4,10 @@ Chunking strategies for text splitting.
 
 from src.chunking.strategies.fixed_size import FixedSizeChunker
 from src.chunking.strategies.semantic import SemanticChunker
+from src.chunking.strategies.section_aware import SectionAwareChunker
 
 __all__ = [
     'FixedSizeChunker',
     'SemanticChunker',
+    'SectionAwareChunker',
 ]

@@ -36,6 +36,22 @@ class HallucinationDetector:
         2: 'contradiction'
     }
 
+    LABEL_ALIASES = {
+        "entailment": "entailment",
+        "supports": "entailment",
+        "supports": "entailment",
+        "support": "entailment",
+        "neutral": "neutral",
+        "not enough info": "neutral",
+        "not_enough_info": "neutral",
+        "nei": "neutral",
+        "unknown": "neutral",
+        "contradiction": "contradiction",
+        "refutes": "contradiction",
+        "refute": "contradiction",
+        "refuted": "contradiction",
+    }
+
     def __init__(
         self,
         model_path: str,
@@ -77,6 +93,12 @@ class HallucinationDetector:
             self.representation_sampling_config.get("enabled", False)
         )
         self._classifier_module = None
+        self.label_to_index = {
+            "entailment": self.LABEL_ENTAILMENT,
+            "neutral": self.LABEL_NEUTRAL,
+            "contradiction": self.LABEL_CONTRADICTION,
+        }
+        self.index_to_label = dict(self.LABEL_NAMES)
         self.local_files_only = (
             os.getenv("HF_HUB_OFFLINE", "").strip().lower() in {"1", "true", "yes", "on"}
         )
@@ -90,6 +112,7 @@ class HallucinationDetector:
         # Load model and tokenizer
         logger.info(f"Loading hallucination detector from: {model_path}")
         self._load_model()
+        self._configure_label_mapping()
         if self.representation_sampling_enabled:
             try:
                 self._classifier_module = self._resolve_classifier_module()
@@ -212,6 +235,50 @@ class HallucinationDetector:
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise
+
+    def _normalize_label_name(self, name: str) -> Optional[str]:
+        norm = str(name or "").strip().lower().replace("-", " ").replace("_", " ")
+        norm = " ".join(norm.split())
+        return self.LABEL_ALIASES.get(norm)
+
+    def _configure_label_mapping(self) -> None:
+        """Infer model-specific label order and map it into the canonical 3-way NLI order."""
+        try:
+            cfg = getattr(self.model, "config", None)
+            id2label = getattr(cfg, "id2label", None) or {}
+        except Exception:
+            id2label = {}
+
+        canonical_to_index: Dict[str, int] = {}
+        for raw_idx, raw_name in dict(id2label).items():
+            try:
+                idx = int(raw_idx)
+            except Exception:
+                continue
+            canonical = self._normalize_label_name(str(raw_name))
+            if canonical is not None:
+                canonical_to_index[canonical] = idx
+
+        if {"entailment", "neutral", "contradiction"} <= set(canonical_to_index.keys()):
+            self.label_to_index = canonical_to_index
+            self.index_to_label = {
+                canonical_to_index["entailment"]: "entailment",
+                canonical_to_index["neutral"]: "neutral",
+                canonical_to_index["contradiction"]: "contradiction",
+            }
+            logger.info(
+                "Resolved detector label mapping: entailment=%s neutral=%s contradiction=%s",
+                self.label_to_index["entailment"],
+                self.label_to_index["neutral"],
+                self.label_to_index["contradiction"],
+            )
+        else:
+            logger.info(
+                "Using default detector label mapping: entailment=%s neutral=%s contradiction=%s",
+                self.label_to_index["entailment"],
+                self.label_to_index["neutral"],
+                self.label_to_index["contradiction"],
+            )
 
     def _setup_swag(self) -> None:
         swag_path = self.swag_config.get("path")
@@ -503,11 +570,11 @@ class HallucinationDetector:
 
         # Get prediction
         predicted_class = torch.argmax(probs).item()
-        label = self.LABEL_NAMES[predicted_class]
+        label = self.index_to_label.get(predicted_class, self.LABEL_NAMES.get(predicted_class, str(predicted_class)))
         confidence = probs[predicted_class].item()
 
         # Check if hallucination (contradiction)
-        is_hallucination = (predicted_class == self.LABEL_CONTRADICTION)
+        is_hallucination = (predicted_class == self.label_to_index["contradiction"])
 
         result = {
             'is_hallucination': is_hallucination,
@@ -517,25 +584,25 @@ class HallucinationDetector:
 
         if return_scores:
             result['scores'] = {
-                'entailment': probs[self.LABEL_ENTAILMENT].item(),
-                'neutral': probs[self.LABEL_NEUTRAL].item(),
-                'contradiction': probs[self.LABEL_CONTRADICTION].item()
+                'entailment': probs[self.label_to_index["entailment"]].item(),
+                'neutral': probs[self.label_to_index["neutral"]].item(),
+                'contradiction': probs[self.label_to_index["contradiction"]].item()
             }
             # Normalized entropy as uncertainty in [0,1]
             probs_safe = torch.clamp(probs, min=1e-12)
             entropy = -(probs_safe * torch.log(probs_safe)).sum().item()
-            norm_entropy = entropy / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+            norm_entropy = entropy / float(torch.log(torch.tensor(3)).item())
             result['uncertainty_entropy'] = float(norm_entropy)
             if var_row is not None:
                 result['uncertainty_variance'] = float(var_row.mean().item())
                 result['contradiction_variance'] = float(
-                    var_row[self.LABEL_CONTRADICTION].item()
+                    var_row[self.label_to_index["contradiction"]].item()
                 )
             if logit_metrics is not None:
                 mi_val = float(logit_metrics["mi"][0].item())
                 var_val = float(logit_metrics["variance"][0].item())
                 ent_val = float(logit_metrics["entropy"][0].item())
-                norm_ent = ent_val / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                norm_ent = ent_val / float(torch.log(torch.tensor(3)).item())
                 result['uncertainty_logit_mi'] = mi_val
                 result['uncertainty_logit_variance'] = var_val
                 result['uncertainty_logit_entropy'] = norm_ent
@@ -543,7 +610,7 @@ class HallucinationDetector:
                 mi_val = float(rep_metrics["mi"][0].item())
                 var_val = float(rep_metrics["variance"][0].item())
                 ent_val = float(rep_metrics["entropy"][0].item())
-                norm_ent = ent_val / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                norm_ent = ent_val / float(torch.log(torch.tensor(3)).item())
                 result['uncertainty_rep_mi'] = mi_val
                 result['uncertainty_rep_variance'] = var_val
                 result['uncertainty_rep_entropy'] = norm_ent
@@ -620,10 +687,10 @@ class HallucinationDetector:
             # Process results
             for j in range(len(batch_premises)):
                 predicted_class = torch.argmax(probs[j]).item()
-                label = self.LABEL_NAMES[predicted_class]
+                label = self.index_to_label.get(predicted_class, self.LABEL_NAMES.get(predicted_class, str(predicted_class)))
                 confidence = probs[j][predicted_class].item()
 
-                is_hallucination = (predicted_class == self.LABEL_CONTRADICTION)
+                is_hallucination = (predicted_class == self.label_to_index["contradiction"])
 
                 result = {
                     'is_hallucination': is_hallucination,
@@ -633,25 +700,25 @@ class HallucinationDetector:
 
                 if return_scores:
                     result['scores'] = {
-                        'entailment': probs[j][self.LABEL_ENTAILMENT].item(),
-                        'neutral': probs[j][self.LABEL_NEUTRAL].item(),
-                        'contradiction': probs[j][self.LABEL_CONTRADICTION].item()
+                        'entailment': probs[j][self.label_to_index["entailment"]].item(),
+                        'neutral': probs[j][self.label_to_index["neutral"]].item(),
+                        'contradiction': probs[j][self.label_to_index["contradiction"]].item()
                     }
                     probs_safe = torch.clamp(probs[j], min=1e-12)
                     entropy = -(probs_safe * torch.log(probs_safe)).sum().item()
-                    norm_entropy = entropy / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                    norm_entropy = entropy / float(torch.log(torch.tensor(3)).item())
                     result['uncertainty_entropy'] = float(norm_entropy)
                     if var is not None:
                         var_row = var[j]
                         result['uncertainty_variance'] = float(var_row.mean().item())
                         result['contradiction_variance'] = float(
-                            var_row[self.LABEL_CONTRADICTION].item()
+                            var_row[self.label_to_index["contradiction"]].item()
                         )
                     if logit_metrics is not None:
                         mi_val = float(logit_metrics["mi"][j].item())
                         var_val = float(logit_metrics["variance"][j].item())
                         ent_val = float(logit_metrics["entropy"][j].item())
-                        norm_ent = ent_val / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                        norm_ent = ent_val / float(torch.log(torch.tensor(3)).item())
                         result['uncertainty_logit_mi'] = mi_val
                         result['uncertainty_logit_variance'] = var_val
                         result['uncertainty_logit_entropy'] = norm_ent
@@ -659,7 +726,7 @@ class HallucinationDetector:
                         mi_val = float(rep_metrics["mi"][j].item())
                         var_val = float(rep_metrics["variance"][j].item())
                         ent_val = float(rep_metrics["entropy"][j].item())
-                        norm_ent = ent_val / float(torch.log(torch.tensor(len(self.LABEL_NAMES))).item())
+                        norm_ent = ent_val / float(torch.log(torch.tensor(3)).item())
                         result['uncertainty_rep_mi'] = mi_val
                         result['uncertainty_rep_variance'] = var_val
                         result['uncertainty_rep_entropy'] = norm_ent

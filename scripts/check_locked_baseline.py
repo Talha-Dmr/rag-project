@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Sanity check for the locked high-stakes baseline.
+Sanity check for the locked FinReg baseline.
 
 This is intentionally lightweight: it does not run any models. It only checks that
-the canonical high-stakes configs still match the intended locked defaults.
+the canonical config still matches the intended locked defaults.
 """
 
 from __future__ import annotations
@@ -49,51 +49,37 @@ def main() -> None:
     args = p.parse_args()
 
     root = Path(args.root).resolve()
-    configs = {
-        "health": root / "config/gating_health_ebcar_logit_mi_sc009.yaml",
-        "disaster": root / "config/gating_disaster_ebcar_logit_mi_sc009.yaml",
-        "finreg": root / "config/gating_finreg_ebcar_logit_mi_sc009.yaml",
-    }
+    path = root / "config/gating_finreg_ebcar_logit_mi_sc009.yaml"
 
-    # Canonical locked expectations.
+    if not path.exists():
+        raise SystemExit(f"Missing config: {path}")
+
+    cfg = load_yaml(path)
+
     expected = {
+        "chunking.strategy": "section_aware",
+        "retrieval.k": 20,
         "reranker.type": "ebcar",
         "gating.enabled": True,
         "gating.strategy": "retrieve_more",
         "gating.uncertainty_source": "logit_mi",
-        "hallucination_detector.base_model": "microsoft/deberta-v3-small",
-    }
-    expected_domain = {
-        "health": {"gating.contradiction_rate_threshold": 0.40},
-        "finreg": {"gating.contradiction_rate_threshold": 0.40},
-        "disaster": {"gating.contradiction_rate_threshold": 1.01},
+        "hallucination_detector.base_model": "microsoft/deberta-v3-base",
+        "gating.contradiction_rate_threshold": 1.01,
     }
 
     failures: List[str] = []
-    for domain, path in configs.items():
-        if not path.exists():
-            failures.append(f"[{domain}] missing: {path}")
-            continue
-        cfg = load_yaml(path)
 
-        # Shared expectations.
-        for k, v in expected.items():
-            ok, msg = check_eq(cfg, k, v)
-            if not ok:
-                failures.append(f"[{domain}] {msg}")
+    for k, v in expected.items():
+        ok, msg = check_eq(cfg, k, v)
+        if not ok:
+            failures.append(msg)
 
-        # Detector path must point to the balanced checkpoint family.
-        model_path = str(get(cfg, "hallucination_detector.model_path", default="") or "")
-        if "balanced" not in model_path:
-            failures.append(
-                f"[{domain}] hallucination_detector.model_path should reference balanced checkpoint, actual={model_path!r}"
-            )
-
-        # Domain-specific expectations.
-        for k, v in expected_domain[domain].items():
-            ok, msg = check_eq(cfg, k, v)
-            if not ok:
-                failures.append(f"[{domain}] {msg}")
+    # Detector path must point to the FEVER DeBERTa-v3-base export.
+    model_path = str(get(cfg, "hallucination_detector.model_path", default="") or "")
+    if "final_fever_deberta_v3_base_model" not in model_path:
+        failures.append(
+            f"hallucination_detector.model_path should reference the FEVER DeBERTa-v3-base export, actual={model_path!r}"
+        )
 
     if failures:
         print("LOCKED BASELINE CHECK: FAIL")
@@ -102,10 +88,8 @@ def main() -> None:
         raise SystemExit(1)
 
     print("LOCKED BASELINE CHECK: OK")
-    for domain, path in configs.items():
-        print(f"- {domain}: {path.relative_to(root)}")
+    print(f"- finreg: {path.relative_to(root)}")
 
 
 if __name__ == "__main__":
     main()
-

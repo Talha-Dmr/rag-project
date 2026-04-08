@@ -16,7 +16,7 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Sequence, Tuple
 
 from pypdf import PdfReader
 
@@ -287,6 +287,155 @@ def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
     return chunks
 
 
+def normalize_chunk_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def is_heading_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("[PAGE "):
+        return False
+    if len(stripped) > 120:
+        return False
+    if re.match(r"^\d+(\.\d+)*\s+[A-Z]", stripped):
+        return True
+    if stripped.isupper() and any(char.isalpha() for char in stripped):
+        return True
+    return False
+
+
+def structure_aware_segments(full_text: str, prefer_headings: bool) -> List[str]:
+    segments: List[str] = []
+    current_lines: List[str] = []
+
+    for raw_line in full_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            if current_lines:
+                segments.append("\n".join(current_lines).strip())
+                current_lines = []
+            continue
+
+        if line.startswith("[PAGE "):
+            if current_lines:
+                segments.append("\n".join(current_lines).strip())
+                current_lines = []
+            continue
+
+        if prefer_headings and is_heading_line(line) and current_lines:
+            segments.append("\n".join(current_lines).strip())
+            current_lines = [line]
+            continue
+
+        current_lines.append(line)
+
+    if current_lines:
+        segments.append("\n".join(current_lines).strip())
+
+    return [segment for segment in segments if segment]
+
+
+def pack_segments(segments: Sequence[str], chunk_size: int, overlap: int) -> List[str]:
+    if not segments:
+        return []
+
+    chunks: List[str] = []
+    current: List[str] = []
+    current_len = 0
+
+    for segment in segments:
+        segment_len = len(segment)
+        separator_len = 2 if current else 0
+        would_exceed = current and current_len + separator_len + segment_len > chunk_size
+        if would_exceed:
+            chunks.append("\n\n".join(current).strip())
+
+            if overlap > 0:
+                overlap_segments: List[str] = []
+                overlap_len = 0
+                for existing in reversed(current):
+                    extra = len(existing) + (2 if overlap_segments else 0)
+                    if overlap_segments and overlap_len + extra > overlap:
+                        break
+                    overlap_segments.insert(0, existing)
+                    overlap_len += extra
+                current = overlap_segments[:]
+                current_len = sum(len(item) for item in current) + max(0, len(current) - 1) * 2
+            else:
+                current = []
+                current_len = 0
+
+        separator_len = 2 if current else 0
+        current.append(segment)
+        current_len += separator_len + segment_len
+
+    if current:
+        chunks.append("\n\n".join(current).strip())
+
+    return [chunk for chunk in chunks if chunk]
+
+
+def build_chunk_records_for_document(
+    doc_stem: str,
+    full_text: str,
+    document_metadata: Dict[str, object],
+    chunk_strategy: str,
+    chunk_size: int,
+    overlap: int,
+) -> List[Dict[str, object]]:
+    strategy = chunk_strategy.lower().strip()
+    if strategy == "structure_aware":
+        chunks = pack_segments(
+            structure_aware_segments(full_text, prefer_headings=False),
+            chunk_size=chunk_size,
+            overlap=overlap,
+        )
+    elif strategy == "structure_aware_small":
+        adjusted_chunk_size = max(400, chunk_size // 2)
+        adjusted_overlap = min(overlap, adjusted_chunk_size // 4)
+        chunks = pack_segments(
+            structure_aware_segments(full_text, prefer_headings=False),
+            chunk_size=adjusted_chunk_size,
+            overlap=adjusted_overlap,
+        )
+    elif strategy == "structure_aware_small_heading":
+        adjusted_chunk_size = max(400, chunk_size // 2)
+        adjusted_overlap = min(overlap, adjusted_chunk_size // 4)
+        chunks = pack_segments(
+            structure_aware_segments(full_text, prefer_headings=True),
+            chunk_size=adjusted_chunk_size,
+            overlap=adjusted_overlap,
+        )
+    else:
+        chunks = chunk_text(full_text, chunk_size=chunk_size, overlap=overlap)
+
+    base_id = slugify(doc_stem)
+    chunk_records: List[Dict[str, object]] = []
+    for idx, chunk_value in enumerate(chunks, start=1):
+        page_start, page_end = page_lookup_for_chunk(chunk_value, full_text)
+        chunk_records.append(
+            {
+                "chunk_id": f"{base_id}_{idx:04d}",
+                "chunk_index": idx,
+                "text": chunk_value,
+                "text_sha1": sha1_text(chunk_value),
+                "source_file": document_metadata["source_file"],
+                "source_collection": document_metadata["source_collection"],
+                "layer": document_metadata["layer"],
+                "title": document_metadata["title"],
+                "regulator": document_metadata["regulator"],
+                "doc_type": document_metadata["doc_type"],
+                "jurisdiction": document_metadata["jurisdiction"],
+                "language": document_metadata["language"],
+                "year": document_metadata["year"],
+                "page_start": page_start,
+                "page_end": page_end,
+                "chunking_strategy": strategy,
+            }
+        )
+    return chunk_records
+
+
 def page_lookup_for_chunk(chunk_text_value: str, full_text: str) -> Tuple[int, int]:
     start_idx = full_text.find(chunk_text_value)
     if start_idx == -1:
@@ -349,33 +498,14 @@ def build_chunk_records(
     chunk_size: int,
     overlap: int,
 ) -> List[Dict[str, object]]:
-    base_id = slugify(pdf_path.stem)
-    chunks = chunk_text(full_text, chunk_size=chunk_size, overlap=overlap)
-    chunk_records: List[Dict[str, object]] = []
-
-    for idx, chunk_value in enumerate(chunks, start=1):
-        page_start, page_end = page_lookup_for_chunk(chunk_value, full_text)
-        chunk_records.append(
-            {
-                "chunk_id": f"{base_id}_{idx:04d}",
-                "chunk_index": idx,
-                "text": chunk_value,
-                "text_sha1": sha1_text(chunk_value),
-                "source_file": document_metadata["source_file"],
-                "source_collection": document_metadata["source_collection"],
-                "layer": document_metadata["layer"],
-                "title": document_metadata["title"],
-                "regulator": document_metadata["regulator"],
-                "doc_type": document_metadata["doc_type"],
-                "jurisdiction": document_metadata["jurisdiction"],
-                "language": document_metadata["language"],
-                "year": document_metadata["year"],
-                "page_start": page_start,
-                "page_end": page_end,
-            }
-        )
-
-    return chunk_records
+    return build_chunk_records_for_document(
+        doc_stem=pdf_path.stem,
+        full_text=full_text,
+        document_metadata=document_metadata,
+        chunk_strategy="fixed",
+        chunk_size=chunk_size,
+        overlap=overlap,
+    )
 
 
 def build_output_paths(pdf_path: Path, raw_root: Path, processed_root: Path) -> Dict[str, Path]:

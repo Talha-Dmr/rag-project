@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -55,6 +56,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--top-k-max", type=int, default=10, help="Maximum top-k to retrieve.")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_ROOT, help="Base output directory.")
     parser.add_argument("--run-id", default="", help="Optional stable run id suffix.")
+    parser.add_argument(
+        "--baseline-processed-root",
+        type=Path,
+        default=None,
+        help="Baseline processed corpus root used to resolve benchmark gold chunk texts.",
+    )
     parser.add_argument("--candidate-pool", type=int, default=50, help="Candidate pool for hybrid/adaptive methods.")
     parser.add_argument(
         "--dense-collection-name",
@@ -78,6 +85,17 @@ def parse_args() -> argparse.Namespace:
         "--device",
         default="",
         help="Optional embedder device override, e.g. cpu or cuda.",
+    )
+    parser.add_argument(
+        "--chunk-match-mode",
+        choices=("exact_id", "text_substring"),
+        default="exact_id",
+        help="How chunk-level hits should be scored.",
+    )
+    parser.add_argument(
+        "--fixed-run-dir",
+        action="store_true",
+        help="Write outputs directly under --output-dir instead of creating a timestamped child folder.",
     )
     return parser.parse_args()
 
@@ -138,6 +156,26 @@ def load_processed_chunks(root: Path) -> List[ChunkRecord]:
                     )
                 )
     return chunk_records
+
+
+def normalize_match_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().lower()
+
+
+def load_chunk_text_index(root: Path) -> Dict[str, str]:
+    index: Dict[str, str] = {}
+    for path in iter_processed_chunk_paths(root):
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                payload = json.loads(line)
+                chunk_id = str(payload.get("chunk_id", "")).strip()
+                text = normalize_match_text(str(payload.get("text", "")))
+                if chunk_id and text:
+                    index[chunk_id] = text
+    return index
 
 
 def build_dense_stack(
@@ -287,6 +325,45 @@ def bool_hit(items: Sequence[str], gold_values: Sequence[str], k: int) -> int:
     return int(any(item in gold for item in items[:k]))
 
 
+def texts_match(candidate_text: str, gold_text: str) -> bool:
+    if not candidate_text or not gold_text:
+        return False
+    return candidate_text in gold_text or gold_text in candidate_text
+
+
+def chunk_hit_value(
+    top_chunk_ids: Sequence[str],
+    top_chunk_texts: Sequence[str],
+    gold_chunk_ids: Sequence[str],
+    gold_chunk_texts: Sequence[str],
+    k: int,
+    match_mode: str,
+) -> int:
+    if match_mode == "exact_id":
+        return bool_hit(top_chunk_ids, gold_chunk_ids, k)
+
+    limited_texts = top_chunk_texts[:k]
+    return int(
+        any(texts_match(candidate_text, gold_text) for candidate_text in limited_texts for gold_text in gold_chunk_texts)
+    )
+
+
+def chunk_reciprocal_rank(
+    top_chunk_ids: Sequence[str],
+    top_chunk_texts: Sequence[str],
+    gold_chunk_ids: Sequence[str],
+    gold_chunk_texts: Sequence[str],
+    match_mode: str,
+) -> float:
+    if match_mode == "exact_id":
+        return reciprocal_rank(top_chunk_ids, gold_chunk_ids)
+
+    for rank, candidate_text in enumerate(top_chunk_texts, start=1):
+        if any(texts_match(candidate_text, gold_text) for gold_text in gold_chunk_texts):
+            return 1.0 / rank
+    return 0.0
+
+
 def format_for_csv(value: Any) -> str:
     if isinstance(value, (list, dict)):
         return json.dumps(value, ensure_ascii=False)
@@ -407,9 +484,12 @@ def benchmark_row_from_results(
     item: Dict[str, Any],
     retrieval_method: str,
     retrieved_results: List[Dict[str, Any]],
+    chunk_match_mode: str,
+    gold_chunk_texts: Sequence[str],
 ) -> Dict[str, Any]:
     top_doc_ids = [normalize_doc_id(str(result.get("metadata", {}).get("doc_id", ""))) for result in retrieved_results]
     top_chunk_ids = [str(result.get("metadata", {}).get("chunk_id", "")) for result in retrieved_results]
+    top_chunk_texts = [normalize_match_text(str(result.get("content", ""))) for result in retrieved_results]
     top_scores = [float(result.get("score", 0.0) or 0.0) for result in retrieved_results]
 
     row: Dict[str, Any] = {
@@ -428,10 +508,23 @@ def benchmark_row_from_results(
 
     for k in TOP_K_VALUES:
         row[f"doc_hit_at_{k}"] = bool_hit(top_doc_ids, [row["benchmark_doc_id"]], k)
-        row[f"chunk_hit_at_{k}"] = bool_hit(top_chunk_ids, item["gold_chunks"], k)
+        row[f"chunk_hit_at_{k}"] = chunk_hit_value(
+            top_chunk_ids=top_chunk_ids,
+            top_chunk_texts=top_chunk_texts,
+            gold_chunk_ids=item["gold_chunks"],
+            gold_chunk_texts=gold_chunk_texts,
+            k=k,
+            match_mode=chunk_match_mode,
+        )
 
     row["doc_rr"] = reciprocal_rank(top_doc_ids, [row["benchmark_doc_id"]])
-    row["chunk_rr"] = reciprocal_rank(top_chunk_ids, item["gold_chunks"])
+    row["chunk_rr"] = chunk_reciprocal_rank(
+        top_chunk_ids=top_chunk_ids,
+        top_chunk_texts=top_chunk_texts,
+        gold_chunk_ids=item["gold_chunks"],
+        gold_chunk_texts=gold_chunk_texts,
+        match_mode=chunk_match_mode,
+    )
     return row
 
 
@@ -519,6 +612,11 @@ def main() -> None:
     if not processed_chunks:
         raise SystemExit(f"No processed chunks found under {args.processed_root}")
 
+    gold_chunk_text_index: Dict[str, str] = {}
+    if args.chunk_match_mode == "text_substring":
+        baseline_root = args.baseline_processed_root or args.processed_root
+        gold_chunk_text_index = load_chunk_text_index(baseline_root)
+
     methods = (
         ["bm25", "dense", "hybrid", "adaptive_or_stochastic"]
         if args.retrieval_method == "all"
@@ -563,7 +661,7 @@ def main() -> None:
     for method in methods:
         per_question_rows: List[Dict[str, Any]] = []
         run_name = build_run_name(method, session_run_id)
-        run_dir = args.output_dir / run_name
+        run_dir = args.output_dir if args.fixed_run_dir else args.output_dir / run_name
 
         for item in benchmark:
             question = str(item["question"])
@@ -584,7 +682,18 @@ def main() -> None:
             else:
                 raise SystemExit(f"Unsupported retrieval method: {method}")
 
-            row = benchmark_row_from_results(item, method, results[:top_k_max])
+            gold_chunk_texts = [
+                gold_chunk_text_index.get(chunk_id, "")
+                for chunk_id in item["gold_chunks"]
+                if gold_chunk_text_index.get(chunk_id, "")
+            ]
+            row = benchmark_row_from_results(
+                item,
+                method,
+                results[:top_k_max],
+                chunk_match_mode=args.chunk_match_mode,
+                gold_chunk_texts=gold_chunk_texts,
+            )
             per_question_rows.append(row)
 
         persist_dir = args.dense_persist_directory

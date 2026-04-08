@@ -8,11 +8,12 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean
 from typing import Dict, Iterable, List, Sequence
@@ -152,7 +153,7 @@ def build_strategy_corpus(args: argparse.Namespace, strategy: str) -> Path:
         )
 
     manifest = {
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "source_root": str(args.baseline_processed_root),
         "processed_root": str(destination_root),
         "chunk_strategy": strategy,
@@ -215,9 +216,9 @@ def run_eval(
     if args.rebuild_indexes:
         command.append("--rebuild-index")
 
-    env = dict(**__import__("os").environ)
+    env = dict(os.environ)
     existing_pythonpath = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = str(PROJECT_ROOT) + (f";{existing_pythonpath}" if existing_pythonpath else "")
+    env["PYTHONPATH"] = str(PROJECT_ROOT) + (f"{os.pathsep}{existing_pythonpath}" if existing_pythonpath else "")
     env.setdefault("HF_HUB_OFFLINE", "1")
     env.setdefault("TRANSFORMERS_OFFLINE", "1")
     subprocess.run(command, cwd=PROJECT_ROOT, check=True, env=env)

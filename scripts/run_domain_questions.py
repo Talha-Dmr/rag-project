@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run a question set for any domain and summarize gating behavior.
+Run the current FinReg question set and summarize gating behavior.
 """
 
 import argparse
@@ -27,12 +27,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run domain question set")
     parser.add_argument(
         "--config",
-        default="gating_energy_ebcar",
+        default="gating_finreg_ebcar_logit_mi_sc009",
         help="Config name (without .yaml)",
     )
     parser.add_argument(
         "--questions",
-        required=True,
+        default="data/domain_finreg/questions_finreg_conflict_phase1_refined_v2.jsonl",
         help="Path to JSONL questions",
     )
     parser.add_argument(

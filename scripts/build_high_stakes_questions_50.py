@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Build 50-question high-stakes sets for health, financial regulation, and disaster risk.
+Build the active 50-question FinReg confirmation set from the current refined v2 seed set.
 
-It keeps existing 20Q seed questions and adds domain-specific questions to reach:
-- 10 sanity
-- 40 conflict
+The repository is now FinReg-first. This script intentionally no longer builds health or
+disaster sets.
 """
 
 from __future__ import annotations
@@ -12,7 +11,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -58,10 +56,10 @@ def _dedup_keep_order(questions: List[str]) -> List[str]:
 def _generate_conflicts(sources: List[str], topics: List[str], needed: int) -> List[str]:
     templates = [
         "Do {s1} and {s2} differ on {topic} when evidence certainty is low?",
-        "Are decision thresholds for {topic} aligned between {s1} and {s2} in recent guidance?",
-        "When sources conflict on {topic}, which of {s1} and {s2} is more conservative?",
-        "How do {s1} and {s2} justify disagreement on {topic} under uncertainty?",
-        "Do {s1} and {s2} recommend different operational actions for {topic} in edge cases?",
+        "Are supervisory expectations for {topic} aligned between {s1} and {s2}?",
+        "When materials diverge on {topic}, which of {s1} and {s2} is more conservative?",
+        "How do {s1} and {s2} frame disagreement on {topic} under uncertainty?",
+        "Do {s1} and {s2} imply different operational actions for {topic} in difficult cases?",
     ]
 
     questions: List[str] = []
@@ -69,8 +67,8 @@ def _generate_conflicts(sources: List[str], topics: List[str], needed: int) -> L
     idx = 0
     for s1, s2 in pairs:
         for topic in topics:
-            t = templates[idx % len(templates)]
-            questions.append(t.format(s1=s1, s2=s2, topic=topic))
+            template = templates[idx % len(templates)]
+            questions.append(template.format(s1=s1, s2=s2, topic=topic))
             idx += 1
             if len(questions) >= needed:
                 return _dedup_keep_order(questions)[:needed]
@@ -80,179 +78,84 @@ def _generate_conflicts(sources: List[str], topics: List[str], needed: int) -> L
 
 def _generate_sanity(source: str, topics: List[str], needed: int) -> List[str]:
     templates = [
-        "What is the primary objective of {topic} in {source} guidance?",
-        "Which risk does {source} mainly address through {topic}?",
-        "How does {source} define success criteria for {topic}?",
+        "What is the primary supervisory objective of {topic} in {source} guidance?",
+        "Which governance concern does {source} mainly address through {topic}?",
+        "How does {source} frame good practice for {topic}?",
         "What implementation constraint is emphasized by {source} for {topic}?",
-        "Why does {source} treat {topic} as a governance priority?",
+        "Why does {source} treat {topic} as a control priority?",
     ]
     questions: List[str] = []
     for i, topic in enumerate(topics):
-        t = templates[i % len(templates)]
-        questions.append(t.format(source=source, topic=topic))
+        template = templates[i % len(templates)]
+        questions.append(template.format(source=source, topic=topic))
         if len(questions) >= needed:
             break
     return _dedup_keep_order(questions)[:needed]
 
 
-@dataclass
-class DomainSpec:
-    name: str
-    id_prefix: str
-    seed_path: Path
-    out_path: Path
-    sources: List[str]
-    topics: List[str]
-    sanity_source: str
-
-
-def build_domain(spec: DomainSpec, total: int = 50, sanity_target: int = 10) -> List[Dict[str, str]]:
-    seed = _read_jsonl(spec.seed_path)
+def build_finreg(total: int = 50, sanity_target: int = 10) -> List[Dict[str, str]]:
+    seed_path = Path("data/domain_finreg/questions_finreg_conflict_phase1_refined_v2.jsonl")
+    seed = _read_jsonl(seed_path)
     seed_sanity = [x for x in seed if x.get("type") == "sanity"]
     seed_conflict = [x for x in seed if x.get("type") == "conflict"]
 
     if len(seed) > total:
-        raise ValueError(f"{spec.seed_path} has more than {total} rows")
+        raise ValueError(f"{seed_path} has more than {total} rows")
 
     add_sanity = max(0, sanity_target - len(seed_sanity))
     conflict_target = total - sanity_target
     add_conflict = max(0, conflict_target - len(seed_conflict))
 
-    extra_sanity = _generate_sanity(spec.sanity_source, spec.topics, add_sanity)
-    extra_conflict = _generate_conflicts(spec.sources, spec.topics, add_conflict)
+    sources = ["BCBS", "EBA", "ECB", "PRA"]
+    topics = [
+        "risk aggregation timeliness under stress",
+        "board and senior management responsibility for data quality",
+        "manual workarounds in risk reporting controls",
+        "documentation and governance for internal model changes",
+        "climate-risk integration into governance and risk management",
+        "outsourcing controls for risk-reporting systems",
+        "materiality and escalation for reporting errors",
+        "auditability and traceability for risk data systems",
+        "intraday liquidity monitoring during the day",
+        "group-wide governance across subsidiaries and consolidated groups",
+    ]
 
-    all_sanity = [x["query"] for x in seed_sanity] + extra_sanity
-    all_conflict = [x["query"] for x in seed_conflict] + extra_conflict
+    extra_sanity = _generate_sanity("BCBS", topics, add_sanity)
+    extra_conflict = _generate_conflicts(sources, topics, add_conflict)
 
-    all_sanity = _dedup_keep_order(all_sanity)[:sanity_target]
-    all_conflict = _dedup_keep_order(all_conflict)[:conflict_target]
+    all_sanity = _dedup_keep_order([x["query"] for x in seed_sanity] + extra_sanity)[:sanity_target]
+    all_conflict = _dedup_keep_order([x["query"] for x in seed_conflict] + extra_conflict)[:conflict_target]
 
     rows: List[Dict[str, str]] = []
     idx = 1
     for q in all_sanity:
-        rows.append({"id": f"{spec.id_prefix}{idx:02d}", "type": "sanity", "query": q})
+        rows.append({"id": f"fq{idx:02d}", "type": "sanity", "query": q})
         idx += 1
     for q in all_conflict:
-        rows.append({"id": f"{spec.id_prefix}{idx:02d}", "type": "conflict", "query": q})
+        rows.append({"id": f"fq{idx:02d}", "type": "conflict", "query": q})
         idx += 1
 
     if len(rows) != total:
-        raise ValueError(f"{spec.name}: expected {total} rows, got {len(rows)}")
+        raise ValueError(f"expected {total} rows, got {len(rows)}")
 
     return rows
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build 50Q high-stakes domain question sets")
-    parser.add_argument("--total", type=int, default=50, help="Total questions per domain")
-    parser.add_argument("--sanity", type=int, default=10, help="Sanity question count per domain")
+    parser = argparse.ArgumentParser(description="Build the active 50Q FinReg question set")
+    parser.add_argument("--total", type=int, default=50, help="Total questions to produce")
+    parser.add_argument("--sanity", type=int, default=10, help="Sanity question count")
     parser.add_argument(
-        "--domain",
-        choices=["health", "finreg", "disaster", "all"],
-        default="all",
-        help="Optionally build only one domain.",
-    )
-    parser.add_argument(
-        "--finreg-refined-v2",
-        action="store_true",
-        help="Build the finreg 50Q set from the phase-1 refined v2 seed and phase-1-aligned topics.",
+        "--out",
+        default="data/domain_finreg/questions_finreg_conflict_phase1_refined_v2_50.jsonl",
+        help="Output JSONL path",
     )
     args = parser.parse_args()
 
-    specs = [
-        DomainSpec(
-            name="health",
-            id_prefix="hq",
-            seed_path=Path("data/domain_health/questions_health_conflict.jsonl"),
-            out_path=Path("data/domain_health/questions_health_conflict_50.jsonl"),
-            sources=["WHO", "CDC", "NICE", "ECDC"],
-            topics=[
-                "booster prioritization",
-                "isolation duration",
-                "mask guidance by setting",
-                "antiviral eligibility for mild cases",
-                "asymptomatic testing cadence",
-                "pediatric vaccination interval",
-                "return-to-work criteria for clinicians",
-                "travel screening and quarantine",
-                "conditional recommendation criteria",
-                "evidence certainty thresholds",
-            ],
-            sanity_source="WHO",
-        ),
-        DomainSpec(
-            name="finreg",
-            id_prefix="fq",
-            seed_path=Path(
-                "data/domain_finreg/questions_finreg_conflict_phase1_refined_v2.jsonl"
-                if args.finreg_refined_v2
-                else "data/domain_finreg/questions_finreg_conflict.jsonl"
-            ),
-            out_path=Path(
-                "data/domain_finreg/questions_finreg_conflict_phase1_refined_v2_50.jsonl"
-                if args.finreg_refined_v2
-                else "data/domain_finreg/questions_finreg_conflict_50.jsonl"
-            ),
-            sources=["BCBS", "EBA", "ECB", "PRA"]
-            if args.finreg_refined_v2
-            else ["BCBS", "EBA", "ECB", "Federal Reserve", "PRA"],
-            topics=[
-                "risk aggregation timeliness under stress",
-                "board and senior management responsibility for data quality",
-                "manual workarounds in risk reporting controls",
-                "documentation and governance for internal model changes",
-                "climate-risk integration into governance and risk management",
-                "outsourcing controls for risk-reporting systems",
-                "materiality and escalation for reporting errors",
-                "auditability and traceability for risk data systems",
-                "intraday liquidity monitoring during the day",
-                "group-wide governance across subsidiaries and consolidated groups",
-            ]
-            if args.finreg_refined_v2
-            else [
-                "risk aggregation timeliness",
-                "board accountability for data quality",
-                "manual adjustments in regulatory reporting",
-                "model validation frequency",
-                "climate risk in ICAAP",
-                "outsourcing controls for risk systems",
-                "materiality thresholds for reporting errors",
-                "audit trail retention",
-                "intraday liquidity monitoring",
-                "AI model explainability requirements",
-            ],
-            sanity_source="BCBS",
-        ),
-        DomainSpec(
-            name="disaster",
-            id_prefix="dq",
-            seed_path=Path("data/domain_disaster/questions_disaster_conflict.jsonl"),
-            out_path=Path("data/domain_disaster/questions_disaster_conflict_50.jsonl"),
-            sources=["NOAA", "IPCC", "UNDRR", "WMO", "FEMA"],
-            topics=[
-                "drought outlook interpretation",
-                "flood return-period assumptions",
-                "heat attribution confidence",
-                "compound-hazard evacuation triggers",
-                "early warning false-alarm tradeoff",
-                "adaptation option ranking",
-                "wildfire readiness thresholds",
-                "coastal risk scenario selection",
-                "disaster financing priorities",
-                "vulnerable-population prioritization",
-            ],
-            sanity_source="UNDRR",
-        ),
-    ]
-
-    selected_specs = specs
-    if args.domain != "all":
-        selected_specs = [spec for spec in specs if spec.name == args.domain]
-
-    for spec in selected_specs:
-        rows = build_domain(spec, total=args.total, sanity_target=args.sanity)
-        _write_jsonl(spec.out_path, rows)
-        print(f"{spec.name}: wrote {len(rows)} -> {spec.out_path}")
+    rows = build_finreg(total=args.total, sanity_target=args.sanity)
+    out_path = Path(args.out)
+    _write_jsonl(out_path, rows)
+    print(f"finreg: wrote {len(rows)} -> {out_path}")
 
 
 if __name__ == "__main__":

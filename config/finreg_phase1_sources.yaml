@@ -250,3 +250,185 @@ documents:
     download_url: https://www.bankingsupervision.europa.eu/press/pr/date/2025/html/ssm.pr250120~6e75fde026.en.html
     raw_relpath: ecb/ecb_2025_stress_test.html
     themes: [fq04]
+
+  - document_id: bcbs_corporate_governance
+    source_org: BCBS
+    family: bcbs
+    jurisdiction: global
+    document_type: principle
+    year: 2015
+    priority: 2
+    format: html
+    title: Corporate governance principles for banks
+    source_url: https://www.bis.org/bcbs/publ/d328.htm
+    download_url: https://www.bis.org/bcbs/publ/d328.htm
+    raw_relpath: bcbs/bcbs_corporate_governance.html
+    themes: [fq02, fq07, fq14, fq19]
+
+  - document_id: bcbs_stress_testing_principles
+    source_org: BCBS
+    family: bcbs
+    jurisdiction: global
+    document_type: principle
+    year: 2018
+    priority: 2
+    format: html
+    title: Stress testing principles
+    source_url: https://www.bis.org/bcbs/publ/d450.htm
+    download_url: https://www.bis.org/bcbs/publ/d450.htm
+    raw_relpath: bcbs/bcbs_stress_testing_principles.html
+    themes: [fq04, fq14, fq20]
+
+  - document_id: bcbs_core_principles
+    source_org: BCBS
+    family: bcbs
+    jurisdiction: global
+    document_type: principle
+    year: 2024
+    priority: 3
+    format: html
+    title: Core principles for effective banking supervision
+    source_url: https://www.bis.org/bcbs/publ/d573.htm
+    download_url: https://www.bis.org/bcbs/publ/d573.htm
+    raw_relpath: bcbs/bcbs_core_principles.html
+    themes: [fq14, fq19, fq20]
+
+  - document_id: eba_ict_security_risk_management
+    source_org: EBA
+    family: eba
+    jurisdiction: eu
+    document_type: guideline
+    year: 2019
+    priority: 2
+    format: pdf
+    title: Guidelines on ICT and security risk management
+    source_url: https://www.eba.europa.eu/activities/single-rulebook/regulatory-activities/internal-governance/guidelines-ict-and-security-risk-management
+    download_url: https://www.eba.europa.eu/sites/default/files/document_library/Publications/Guidelines/2020/GLs%20on%20ICT%20and%20security%20risk%20management/872936/Final%20draft%20Guidelines%20on%20ICT%20and%20security%20risk%20management.pdf
+    raw_relpath: eba/eba_ict_security_risk_management.pdf
+    themes: [fq10, fq13, fq17]
+
+  - document_id: eba_joint_suitability
+    source_org: EBA
+    family: eba
+    jurisdiction: eu
+    document_type: guideline_page
+    year: 2026
+    priority: 3
+    format: html
+    title: Consultation on draft Joint ESMA and EBA Guidelines on the assessment of the suitability of members of the management body and key function holders
+    source_url: https://www.eba.europa.eu/publications-and-media/events/consultation-draft-joint-esma-and-eba-guidelines-assessment-suitability-members-management-body-and
+    download_url: https://www.eba.europa.eu/publications-and-media/events/consultation-draft-joint-esma-and-eba-guidelines-assessment-suitability-members-management-body-and
+    raw_relpath: eba/eba_joint_suitability.html
+    themes: [fq02, fq07, fq19]
+
+  - document_id: eba_sound_remuneration
+    source_org: EBA
+    family: eba
+    jurisdiction: eu
+    document_type: guideline_page
+    year: 2021
+    priority: 3
+    format: html
+    title: Guidelines on sound remuneration policies under CRD
+    source_url: https://www.eba.europa.eu/activities/single-rulebook/regulatory-activities/remuneration/guidelines-sound-remuneration-policies-under-crd?version=2021
+    download_url: https://www.eba.europa.eu/activities/single-rulebook/regulatory-activities/remuneration/guidelines-sound-remuneration-policies-under-crd?version=2021
+    raw_relpath: eba/eba_sound_remuneration.html
+    themes: [fq02, fq14, fq19]
+
+  - document_id: ecb_icaap_ilaap_consultation
+    source_org: ECB
+    family: ecb
+    jurisdiction: eu
+    document_type: consultation_page
+    year: 2018
+    priority: 3
+    format: html
+    title: ECB public consultation on the ICAAP and ILAAP guides
+    source_url: https://www.bankingsupervision.europa.eu/framework/legal-framework/public-consultations/html/icaap_ilaap.en.html
+    download_url: https://www.bankingsupervision.europa.eu/framework/legal-framework/public-consultations/html/icaap_ilaap.en.html
+    raw_relpath: ecb/ecb_icaap_ilaap_consultation.html
+    themes: [fq04, fq18, fq20]
+
+  - document_id: ecb_governance_risk_culture_consultation
+    source_org: ECB
+    family: ecb
+    jurisdiction: eu
+    document_type: consultation_page
+    year: 2020
+    priority: 3
+    format: html
+    title: ECB public consultation on governance and risk culture
+    source_url: https://www.bankingsupervision.europa.eu/framework/legal-framework/public-consultations/html/governance_and_risk_culture.en.html
+    download_url: https://www.bankingsupervision.europa.eu/framework/legal-framework/public-consultations/html/governance_and_risk_culture.en.html
+    raw_relpath: ecb/ecb_governance_risk_culture_consultation.html
+    themes: [fq02, fq07, fq14, fq19]
+
+  - document_id: pra_ss5_21_branch_subsidiary
+    source_org: PRA
+    family: pra_boe
+    jurisdiction: uk
+    document_type: supervisory_statement
+    year: 2021
+    priority: 2
+    format: pdf
+    title: SS5/21 – The PRA’s approach to branch and subsidiary supervision
+    source_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+    download_url: https://www.bankofengland.co.uk/-/media/boe/files/prudential-regulation/supervisory-statement/2021/ss521-july-2021.pdf
+    raw_relpath: pra_boe/pra_ss5_21_branch_subsidiary.pdf
+    themes: [fq19]
+
+  - document_id: pra_ss4_16_third_country_branches
+    source_org: PRA
+    family: pra_boe
+    jurisdiction: uk
+    document_type: supervisory_statement
+    year: 2016
+    priority: 3
+    format: pdf
+    title: SS4/16 – Internal governance of third-country branches
+    source_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2016/internal-governance-of-third-country-branches-ss
+    download_url: https://www.bankofengland.co.uk/-/media/boe/files/prudential-regulation/supervisory-statement/2016/ss416.pdf
+    raw_relpath: pra_boe/pra_ss4_16_third_country_branches.pdf
+    themes: [fq19]
+
+  - document_id: pra_ss1_21_operational_resilience
+    source_org: PRA
+    family: pra_boe
+    jurisdiction: uk
+    document_type: supervisory_statement
+    year: 2021
+    priority: 2
+    format: html
+    title: "SS1/21 – Operational resilience: impact tolerances for important business services"
+    source_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2021/march/operational-resilience-impact-tolerances-for-important-business-services-ss
+    download_url: https://www.bankofengland.co.uk/prudential-regulation/publication/2021/march/operational-resilience-impact-tolerances-for-important-business-services-ss
+    raw_relpath: pra_boe/pra_ss1_21_operational_resilience.html
+    themes: [fq10, fq13, fq17]
+
+  - document_id: pra_ss2_21_outsourcing_third_party
+    source_org: PRA
+    family: pra_boe
+    jurisdiction: uk
+    document_type: supervisory_statement
+    year: 2021
+    priority: 2
+    format: pdf
+    title: SS2/21 – Outsourcing and third party risk management
+    source_url: https://www.bankofengland.co.uk/prudential-regulation/regulatory-digest/2021/march
+    download_url: https://www.bankofengland.co.uk/-/media/boe/files/prudential-regulation/supervisory-statement/2024/ss221-november-2024-update.pdf
+    raw_relpath: pra_boe/pra_ss2_21_outsourcing_third_party.pdf
+    themes: [fq10, fq13, fq17]
+
+  - document_id: fed_sr11_7_model_risk
+    source_org: Federal Reserve
+    family: fed_occ
+    jurisdiction: us
+    document_type: supervisory_letter
+    year: 2011
+    priority: 4
+    format: html
+    title: SR 11-7 – Guidance on Model Risk Management
+    source_url: https://www.federalreserve.gov/bankinforeg/srletters/sr1107.htm
+    download_url: https://www.federalreserve.gov/bankinforeg/srletters/sr1107.htm
+    raw_relpath: fed_occ/fed_sr11_7_model_risk.html
+    themes: [fq05, fq11, fq16]

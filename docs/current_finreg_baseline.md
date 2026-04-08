@@ -1,7 +1,7 @@
 # Current FinReg Baseline
 
-This document summarizes the **current working FinReg baseline** after the move from the
-synthetic bootstrap corpus to the real phase-1 corpus.
+This document summarizes the **current working FinReg baseline** after corpus finalization on
+the real phase-1.5 prudential / supervisory corpus.
 
 Use this as the primary reference for the active FinReg stack.
 
@@ -12,7 +12,7 @@ Use this as the primary reference for the active FinReg stack.
 ## Active Stack
 
 - domain: prudential / supervisory finreg
-- corpus: real phase-1 regulatory corpus
+- corpus: real phase-1.5 prudential / supervisory regulatory corpus
 - chunking: `section_aware`
 - retrieval first-pass `k`: `20`
 - reranker: `ebcar`
@@ -35,11 +35,12 @@ Raw source families:
 - `PRA/BoE`
 - `ECB`
 
-Current phase-1 corpus characteristics:
+Current corpus characteristics:
 
-- `18` official source documents
+- `31` official source documents
+- source families: `BCBS`, `EBA`, `ECB`, `PRA/BoE`, selected `Fed`
 - section-aware index rebuilt from real source material
-- current `rag_finreg` collection size during the section-aware runs: about `1380` chunks
+- current `rag_finreg` collection size: about `2221` chunks
 
 ## Current Question Sets
 
@@ -62,37 +63,37 @@ Interpretation:
 
 Files:
 
-- `evaluation_results/auto_eval/finreg_phase1_refined_v2_default_seed7.json`
-- `evaluation_results/auto_eval/finreg_phase1_refined_v2_default_seed11.json`
-- `evaluation_results/auto_eval/finreg_phase1_refined_v2_default_seed19.json`
+- `evaluation_results/auto_eval/finreg_phase15_refined_v2_default_seed7.json`
+- `evaluation_results/auto_eval/finreg_phase15_refined_v2_default_seed11.json`
+- `evaluation_results/auto_eval/finreg_phase15_refined_v2_default_seed19.json`
 
 Observed:
 
-- `seed7`: `abstain_rate = 0.25`
+- `seed7`: `abstain_rate = 0.35`
 - `seed11`: `abstain_rate = 0.30`
 - `seed19`: `abstain_rate = 0.25`
-- mean abstain rate: `0.2667`
+- mean abstain rate: `0.30`
 
 ### 50Q refined v2
 
 Files:
 
-- `evaluation_results/auto_eval/finreg_phase1_refined_v2_50_default_seed7.json`
-- `evaluation_results/auto_eval/finreg_phase1_refined_v2_50_default_seed11.json`
-- `evaluation_results/auto_eval/finreg_phase1_refined_v2_50_default_seed19.json`
+- `evaluation_results/auto_eval/finreg_phase15_refined_v2_50_default_seed7.json`
+- `evaluation_results/auto_eval/finreg_phase15_refined_v2_50_default_seed11.json`
+- `evaluation_results/auto_eval/finreg_phase15_refined_v2_50_default_seed19.json`
 
 Observed:
 
-- `seed7`: `abstain_rate = 0.30`
-- `seed11`: `abstain_rate = 0.28`
+- `seed7`: `abstain_rate = 0.28`
+- `seed11`: `abstain_rate = 0.22`
 - `seed19`: `abstain_rate = 0.28`
-- mean abstain rate: `0.2867`
+- mean abstain rate: `0.26`
 
 Action mix on the 50Q set is stable:
 
-- `none`: about `23-24`
-- `retrieve_more`: about `11-13`
-- `abstain`: about `14-15`
+- `none`: about `19-31`
+- `retrieve_more`: about `8-17`
+- `abstain`: about `11-14`
 
 ## What This Means
 
@@ -107,8 +108,9 @@ This should be treated as a **defensible working baseline**, not a final optimiz
 
 ## Immediate Next Step
 
-The next improvement should focus on:
+The corpus is now in a practical stopping range for this project. The next work should focus on:
 
-1. question tagging for the refined v2 sets
-2. targeted retrieval/reranking improvements for the remaining hard comparison questions
-3. only then, further corpus expansion if the hard cases still reflect evidence coverage gaps
+1. question-set maturity and taxonomy
+2. retrieval / reranking maturity
+3. generator baseline clarity
+4. only then detector / gate ablations

@@ -1,177 +1,86 @@
-# Modular RAG Project
+# RAG Project
 
-A highly modular Retrieval-Augmented Generation (RAG) system built with LangChain and HuggingFace local models.
+This repository is currently centered on a **prudential / supervisory FinReg RAG baseline**.
 
-## Features
+The active stack is not a generic multi-domain demo anymore. The canonical working path is:
 
-- **Modular Dataset Loading**: Support for PDF, Text, JSON, and more
-- **Flexible Chunking Strategies**: Semantic, fixed-size, and recursive chunking
-- **Vector Store Abstraction**: Easily swap between ChromaDB, FAISS, and others
-- **HuggingFace Integration**: Local LLM and embedding models
-- **Advanced Reranking**: Cross-encoder and BM25 reranking strategies
-- **Configuration-Driven**: Change components via YAML configs without code changes
+- real FinReg corpus from official BCBS / EBA / ECB / PRA-BoE / selected Fed sources
+- `section_aware` chunking
+- dense retrieval + `ebcar` reranking
+- local `Qwen/Qwen2.5-1.5B-Instruct`
+- FEVER-based hallucination detector
+- stochastic gating with `retrieve_more`
 
-## Results (Current Snapshot)
+## Canonical Baseline
 
-### Locked Defaults (High-Stakes Track)
+- config: [config/gating_finreg_ebcar_logit_mi_sc009.yaml](/home/talha/projects/rag-project/config/gating_finreg_ebcar_logit_mi_sc009.yaml)
+- baseline summary: [docs/current_finreg_baseline.md](/home/talha/projects/rag-project/docs/current_finreg_baseline.md)
+- source manifest: [config/finreg_phase1_sources.yaml](/home/talha/projects/rag-project/config/finreg_phase1_sources.yaml)
 
-This section defines the **current locked default stack** for high-stakes usage in this iteration.
+Current corpus status:
 
-- Canonical baseline doc: `docs/baseline_locked.md`
-- Domains (3-domain mix):
-  - Primary: Health `config/gating_health_ebcar_logit_mi_sc009.yaml`
-  - Primary: Disaster/climate `config/gating_disaster_ebcar_logit_mi_sc009.yaml`
-  - Stress-test: Financial regulation `config/gating_finreg_ebcar_logit_mi_sc009.yaml`
-- Default epistemic signal: `logit_mi`
-- Default detector variant: `balanced` (SGLD NLI detector checkpoint referenced by the configs)
-- Evidence (50Q, seeds `7/11/19`):
-  - Stability: `docs/stability_report_50_default.md`
-  - Detector ablation (balanced vs focal): `docs/detector_ablation_report_50.md`
-- Not default:
-  - `*_focaldet.yaml` and `*_neutralguarddet.yaml` configs are **experimental** and must not be used as defaults.
-  - Energy/Macro results below are **legacy ablation track** (not part of the current high-stakes baseline).
+- `31` official source documents
+- about `2221` indexed chunks in `rag_finreg`
 
-Decision (frozen for this iteration):
-- Keep **balanced detector + logit-MI** as the active default path.
-- Keep FinReg as **stress-test** (not primary KPI gate in this iteration).
-- Stop additional threshold sweeps for this cycle unless a regression is observed.
+Primary question sets:
 
-### Legacy / Explorations (Not Defaults)
-
-Current defaults (epistemic track, legacy 50Q rep-vs-logit ablation):
-  - Energy (logit-MI): `config/gating_energy_ebcar_logit_mi_sc009.yaml` → abstain 35/50 (0.70)
-  - Macro (logit-MI): `config/gating_macro_ebcar_logit_mi_sc009.yaml` → abstain 22/50 (0.44)
-- Representation-space track (experimental):
-  - Energy (rep-MI): `config/gating_energy_ebcar_rep_mi_sc004.yaml` → abstain 45/50 (0.90)
-  - Macro (rep-MI): `config/gating_macro_ebcar_rep_mi_sc004.yaml` → abstain 44/50 (0.88)
-- Decision:
-  - Keep `logit-MI` as default epistemic signal.
-  - Keep `rep-MI` as experimental (currently too conservative on coverage).
-- Coverage-first alternative:
-  - Energy: `config/gating_energy_ebcar_consistency_only_sc050.yaml` → abstain 14/50 (0.28)
-  - Macro: `config/gating_macro_ebcar_consistency_only_sc050.yaml` → abstain 9/50 (0.18)
-- Safety variant (MC Dropout + consistency, 50Q):
-  - Energy: abstain 31/50 (0.62)
-  - Macro: abstain 36/50 (0.72)
-- Historical threshold sweep (older calibration run):
-  - threshold=0.70 → abstain 46/50 (0.92)
-  - threshold=0.85 → abstain 22/50 (0.44)
-  - threshold=0.90 → abstain 21/50 (0.42)
-- Gating ablation (Energy 20Q, Macro 50Q; conflict-heavy pilot):
-
-| Domain | Setting | abstain | abstain_rate | actions |
-| --- | --- | --- | --- | --- |
-| Energy | nogate | 0/20 | 0.00 | none=20 |
-| Energy | retrieve_more | 11/20 | 0.55 | retrieve_more=11, none=9 |
-| Energy | abstain | 15/20 | 0.75 | abstain=15, none=5 |
-| Macro | nogate | 0/50 | 0.00 | none=50 |
-| Macro | retrieve_more | 11/50 | 0.22 | retrieve_more=11, none=39 |
-| Macro | abstain | 35/50 | 0.70 | abstain=35, none=15 |
-- Note: Energy set is 20Q (conflict-heavy) so this is a pilot ablation; Macro 50Q is the more stable signal.
-- Signal comparison (detector on):
-  - Energy (50Q): MC Dropout + consistency `31/50` vs consistency-only `14/50`
-  - Macro (50Q): MC Dropout + consistency `36/50` vs consistency-only `9/50`
-- Source-consistency only (detector on, no MC Dropout):
-  - Energy (50Q): abstain `14/50` (0.28)
-  - Macro (50Q): abstain `9/50` (0.18)
-- Details and ablations: see `docs/future_work_langevin.md`
-
-## Project Structure
-
-```
-rag-project/
-├── src/
-│   ├── core/           # Base classes and utilities
-│   ├── dataset/        # Data loading module
-│   ├── chunking/       # Text chunking strategies
-│   ├── embeddings/     # Embedding models
-│   ├── vector_stores/  # Vector database implementations
-│   ├── rag/            # RAG pipeline
-│   └── reranking/      # Reranking strategies
-├── config/             # Configuration files
-├── docs/               # Documentation
-├── examples/           # Example scripts
-└── tests/              # Test suite
-```
-
-## Installation
-
-### Using Poetry (Recommended)
-
-```bash
-# Install Poetry if you haven't already
-curl -sSL https://install.python-poetry.org | python3 -
-
-# Install dependencies
-poetry install
-
-# Activate virtual environment
-poetry shell
-```
-
-### Optional GPU Support
-
-```bash
-poetry install --extras gpu
-```
+- [data/domain_finreg/questions_finreg_conflict_phase1_refined_v2.jsonl](/home/talha/projects/rag-project/data/domain_finreg/questions_finreg_conflict_phase1_refined_v2.jsonl)
+- [data/domain_finreg/questions_finreg_conflict_phase1_refined_v2_50.jsonl](/home/talha/projects/rag-project/data/domain_finreg/questions_finreg_conflict_phase1_refined_v2_50.jsonl)
 
 ## Quick Start
 
-```python
-from src.core.config_loader import ConfigLoader
-from src.rag.rag_pipeline import RAGPipeline
-
-# Load configuration
-config = ConfigLoader().load('base_config')
-
-# Initialize RAG pipeline
-rag = RAGPipeline.from_config(config)
-
-# Index documents
-rag.index_documents(source="/path/to/documents")
-
-# Query
-response = rag.query("What is RAG?", return_sources=True, include_sources_in_answer=True)
-print(response)
-```
-
-## Configuration
-
-Edit `config/base_config.yaml` to customize:
-
-- Data loaders (PDF, Text, JSON)
-- Chunking strategies (Semantic, Fixed-size, Recursive)
-- Vector stores (ChromaDB, FAISS)
-- Embedding models
-- LLM models
-- Reranking methods
-
-## Documentation
-
-- [Dataset Implementation](docs/01_dataset_implementation.md)
-- [Chunking Implementation](docs/02_chunking_implementation.md)
-- [RAG Implementation](docs/03_rag_implementation.md)
-- [Reranking Implementation](docs/04_reranking_implementation.md)
-
-## Development
+Fetch the official source documents:
 
 ```bash
-# Run tests
-poetry run pytest
-
-# Format code
-poetry run black src/
-
-# Type checking
-poetry run mypy src/
+PYTHONPATH=. venv312/bin/python scripts/fetch_finreg_phase1_sources.py
 ```
 
-## Requirements
+Build the processed corpus:
 
-- Python 3.10+
-- 8GB+ RAM (16GB recommended for larger models)
-- Optional: CUDA-compatible GPU for faster inference
+```bash
+PYTHONPATH=. venv312/bin/python scripts/build_finreg_phase1_corpus.py
+```
 
-## License
+Rebuild the FinReg index:
 
-MIT License
+```bash
+PYTHONPATH=. venv312/bin/python scripts/index_domain_corpus.py \
+  --config gating_finreg_ebcar_logit_mi_sc009 \
+  --corpus data/processed/finreg/finreg_phase1_corpus.jsonl \
+  --reset-collection
+```
+
+Run the current 20-question baseline:
+
+```bash
+PYTHONPATH=. venv312/bin/python scripts/eval_grounding_proxy.py \
+  --config gating_finreg_ebcar_logit_mi_sc009 \
+  --questions data/domain_finreg/questions_finreg_conflict_phase1_refined_v2.jsonl \
+  --limit 20 \
+  --seed 7 \
+  --output evaluation_results/auto_eval/finreg_readme_seed7.json
+```
+
+Run the 3-seed confirmation loop:
+
+```bash
+PYTHONPATH=. venv312/bin/python scripts/eval_grounding_proxy_multi_seed.py \
+  --config gating_finreg_ebcar_logit_mi_sc009 \
+  --questions data/domain_finreg/questions_finreg_conflict_phase1_refined_v2_50.jsonl \
+  --limit 50 \
+  --seeds 7 11 19 \
+  --output-dir evaluation_results/auto_eval
+```
+
+## Working Rules
+
+- Treat the FinReg baseline as the default research path unless a task explicitly says otherwise.
+- Treat legacy question sets, bootstrap corpus notes, and early stability reports as historical only.
+- Prefer the local `Qwen` path. OpenRouter is not part of the active baseline.
+
+## Main References
+
+- baseline summary: [docs/current_finreg_baseline.md](/home/talha/projects/rag-project/docs/current_finreg_baseline.md)
+- locked pointer: [docs/baseline_locked.md](/home/talha/projects/rag-project/docs/baseline_locked.md)
+- corpus runbook: [docs/finreg_phase1_corpus_runbook.md](/home/talha/projects/rag-project/docs/finreg_phase1_corpus_runbook.md)
+- question-set methodology: [docs/finreg_question_set_methodology.md](/home/talha/projects/rag-project/docs/finreg_question_set_methodology.md)

@@ -36,6 +36,22 @@ class HallucinationDetector:
         2: 'contradiction'
     }
 
+    CANONICAL_LABEL_ALIASES = {
+        "entailment": "entailment",
+        "supports": "entailment",
+        "supported": "entailment",
+        "support": "entailment",
+        "neutral": "neutral",
+        "not_enough_info": "neutral",
+        "not enough info": "neutral",
+        "nei": "neutral",
+        "unknown": "neutral",
+        "contradiction": "contradiction",
+        "refutes": "contradiction",
+        "refute": "contradiction",
+        "conflict": "contradiction",
+    }
+
     def __init__(
         self,
         model_path: str,
@@ -90,6 +106,7 @@ class HallucinationDetector:
         # Load model and tokenizer
         logger.info(f"Loading hallucination detector from: {model_path}")
         self._load_model()
+        self._configure_label_mapping()
         if self.representation_sampling_enabled:
             try:
                 self._classifier_module = self._resolve_classifier_module()
@@ -195,10 +212,24 @@ class HallucinationDetector:
 
         # Case 2: HF export
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                str(tokenizer_dir),
-                local_files_only=self.local_files_only
-            )
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    str(tokenizer_dir),
+                    local_files_only=self.local_files_only
+                )
+            except Exception as tokenizer_error:
+                if not self.base_model:
+                    raise
+                logger.warning(
+                    "Local tokenizer load failed from %s (%s). Falling back to base_model tokenizer: %s",
+                    tokenizer_dir,
+                    tokenizer_error,
+                    self.base_model,
+                )
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    self.base_model,
+                    local_files_only=self.local_files_only
+                )
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 str(model_dir),
                 local_files_only=self.local_files_only
@@ -212,6 +243,71 @@ class HallucinationDetector:
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise
+
+    @classmethod
+    def _canonicalize_label_name(cls, value: object) -> str:
+        text = str(value or "").strip().lower().replace("-", " ").replace("_", " ")
+        text = " ".join(text.split())
+        return cls.CANONICAL_LABEL_ALIASES.get(text, "")
+
+    def _configure_label_mapping(self) -> None:
+        """
+        Infer model label ids from config.id2label when possible.
+
+        This keeps the detector compatible with both:
+        - entailment / neutral / contradiction exports
+        - FEVER-style SUPPORTS / REFUTES / NOT ENOUGH INFO exports
+        """
+        default_names = {
+            0: "entailment",
+            1: "neutral",
+            2: "contradiction",
+        }
+        self.LABEL_NAMES = dict(default_names)
+        self.LABEL_ENTAILMENT = 0
+        self.LABEL_NEUTRAL = 1
+        self.LABEL_CONTRADICTION = 2
+
+        config = getattr(self.model, "config", None)
+        id2label = getattr(config, "id2label", None)
+        if not isinstance(id2label, dict):
+            return
+
+        canonical_to_id: Dict[str, int] = {}
+        pretty_names: Dict[int, str] = {}
+        for raw_id, raw_name in id2label.items():
+            try:
+                label_id = int(raw_id)
+            except Exception:
+                continue
+            canonical = self._canonicalize_label_name(raw_name)
+            if not canonical:
+                continue
+            canonical_to_id[canonical] = label_id
+            pretty_names[label_id] = canonical
+
+        required = {"entailment", "neutral", "contradiction"}
+        if not required.issubset(set(canonical_to_id.keys())):
+            logger.warning(
+                "Could not fully infer detector labels from id2label=%s; using default label ids.",
+                id2label,
+            )
+            return
+
+        self.LABEL_ENTAILMENT = int(canonical_to_id["entailment"])
+        self.LABEL_NEUTRAL = int(canonical_to_id["neutral"])
+        self.LABEL_CONTRADICTION = int(canonical_to_id["contradiction"])
+        self.LABEL_NAMES = {
+            idx: pretty_names.get(idx, default_names.get(idx, str(idx)))
+            for idx in range(max(pretty_names.keys()) + 1)
+        }
+        logger.info(
+            "Configured detector label mapping: entailment=%s neutral=%s contradiction=%s from id2label=%s",
+            self.LABEL_ENTAILMENT,
+            self.LABEL_NEUTRAL,
+            self.LABEL_CONTRADICTION,
+            id2label,
+        )
 
     def _setup_swag(self) -> None:
         swag_path = self.swag_config.get("path")

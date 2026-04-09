@@ -1,0 +1,57 @@
+# Financial regulation/compliance domain: logit-space MI gating.
+# Local detector variant for chunking pair eval grounding reruns.
+
+embeddings:
+  type: huggingface
+  model_name: C:/Users/ASUS/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/c9745ed1d9f207416be6d2e6f8de32d1f16199bf
+  device: cuda
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg
+    collection_name: rag_finreg
+
+llm:
+  model_name: Qwen/Qwen2.5-1.5B-Instruct
+  device: cuda
+  max_tokens: 256
+
+retrieval:
+  k: 5
+  score_threshold: 0.0
+
+reranker:
+  type: ebcar
+  top_k: 5
+
+hallucination_detector:
+  # Existing local HF export; loader now remaps FEVER-style labels safely.
+  model_path: src/electra_daberta/final_fever_deberta_v3_base_model
+  base_model: C:/Users/ASUS/.cache/huggingface/hub/models--microsoft--deberta-v3-base/snapshots/8ccc9b6f36199bec6961081d44eb72fb3f7353f3
+  mc_dropout_samples: 1
+  logit_sampling:
+    enabled: true
+    steps: 40
+    step_size: 0.03
+    noise_std: 0.1
+    energy: hybrid
+    prior_strength: 1.0
+    entropy_weight: 0.5
+
+sources:
+  consistency_top_k: 5
+
+gating:
+  enabled: true
+  strategy: retrieve_more
+  max_retries: 2
+  k_multiplier: 2.0
+  max_k: 20
+  contradiction_rate_threshold: 0.40
+  contradiction_prob_threshold: 0.5
+  uncertainty_source: logit_mi
+  uncertainty_threshold: 0.02
+  source_consistency_threshold: 0.35
+  source_consistency_top_k: 5
+  abstain_message: "I don't have enough reliable information to answer that."

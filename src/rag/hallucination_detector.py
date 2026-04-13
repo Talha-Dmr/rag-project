@@ -13,6 +13,7 @@ from pathlib import Path
 import logging
 import os
 import math
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -165,17 +166,22 @@ class HallucinationDetector:
         if model_pt.exists():
             base_model = self.base_model
             lora_config = self.lora_config
+            checkpoint_state = None
+            checkpoint_weights = torch.load(model_pt, map_location=self.device, weights_only=False)
 
             # Try to infer base model from training_state if available
             state_path = self.model_path / "training_state.pt"
             if state_path.exists():
                 try:
-                    state = torch.load(state_path, map_location="cpu")
-                    cfg = state.get("config", {})
+                    checkpoint_state = torch.load(state_path, map_location="cpu", weights_only=False)
+                    cfg = checkpoint_state.get("config", {})
                     base_model = base_model or cfg.get("model", {}).get("base_model")
                     lora_config = lora_config or cfg.get("model", {}).get("lora")
                 except Exception:
                     pass
+
+            if not lora_config:
+                lora_config = self._infer_lora_config_from_checkpoint(checkpoint_weights)
 
             if not base_model:
                 raise ValueError(
@@ -197,8 +203,7 @@ class HallucinationDetector:
                 lora_config=lora_config,
                 local_files_only=self.local_files_only
             )
-            state = torch.load(model_pt, map_location=self.device)
-            missing, unexpected = self.model.load_state_dict(state, strict=False)
+            missing, unexpected = self.model.load_state_dict(checkpoint_weights, strict=False)
             if missing or unexpected:
                 logger.warning(
                     "Checkpoint load (strict=False). Missing keys: %s | Unexpected keys: %s",
@@ -243,6 +248,50 @@ class HallucinationDetector:
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise
+
+    def _infer_lora_config_from_checkpoint(
+        self,
+        state_dict: Dict[str, torch.Tensor]
+    ) -> Optional[Dict[str, Any]]:
+        """Infer a minimal LoRA config from a training checkpoint state_dict."""
+        lora_a_keys = [key for key in state_dict.keys() if ".lora_A." in key]
+        if not lora_a_keys:
+            return None
+
+        target_modules = set()
+        modules_to_save = set()
+        inferred_r: Optional[int] = None
+
+        for key in lora_a_keys:
+            match = re.search(r"\.([^.]+)\.lora_A\.[^.]+\.weight$", key)
+            if match:
+                target_modules.add(match.group(1))
+            tensor = state_dict.get(key)
+            if tensor is not None and getattr(tensor, "shape", None):
+                try:
+                    inferred_r = int(tensor.shape[0])
+                except Exception:
+                    pass
+
+        for key in state_dict.keys():
+            match = re.search(r"\.([^.]+)\.modules_to_save\.[^.]+\.", key)
+            if match:
+                modules_to_save.add(match.group(1))
+
+        inferred = {
+            "enabled": True,
+            "r": inferred_r or 8,
+            "lora_alpha": 16,
+            "lora_dropout": 0.0,
+            "bias": "none",
+            "task_type": "SEQ_CLS",
+            "target_modules": sorted(target_modules) or ["query_proj", "key_proj", "value_proj"],
+        }
+        if modules_to_save:
+            inferred["modules_to_save"] = sorted(modules_to_save)
+
+        logger.info("Inferred LoRA config from checkpoint: %s", inferred)
+        return inferred
 
     @classmethod
     def _canonicalize_label_name(cls, value: object) -> str:

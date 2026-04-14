@@ -430,7 +430,10 @@ class HallucinationTrainer(BaseTrainer):
                 epoch=epoch,
                 model=self.model,
                 optimizer=self.optimizer,
-                metrics=val_metrics
+                metrics=val_metrics,
+                extra_state={
+                    'config': self.config
+                }
             )
 
             if self.early_stopping_callback:
@@ -444,6 +447,29 @@ class HallucinationTrainer(BaseTrainer):
         if self.swag_enabled:
             self._save_swag_state(output_dir)
         return history
+
+    def initialize_from_checkpoint(self, checkpoint_path: str) -> None:
+        """
+        Load model weights only from a checkpoint for phase-to-phase warm start.
+
+        This intentionally does not restore optimizer, scheduler, scaler, or
+        epoch counters. Use it when starting a new training phase from prior
+        weights, not when resuming an interrupted run.
+        """
+        checkpoint_path = Path(checkpoint_path)
+        model_path = checkpoint_path / "model.pt"
+        if not model_path.exists():
+            raise FileNotFoundError(f"Checkpoint model file not found: {model_path}")
+
+        state_dict = torch.load(model_path, map_location=self.device, weights_only=False)
+        missing, unexpected = self.model.load_state_dict(state_dict, strict=False)
+        if missing or unexpected:
+            logger.warning(
+                "Weights-only init used strict=False. Missing keys: %s | Unexpected keys: %s",
+                missing,
+                unexpected
+            )
+        logger.info("Initialized model weights from checkpoint: %s", checkpoint_path)
 
     def _get_swag_params(self) -> Dict[str, torch.nn.Parameter]:
         params = {}

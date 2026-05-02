@@ -50,6 +50,7 @@ class HallucinationTrainer(BaseTrainer):
         self.model_name = model_config.get('base_model', 'microsoft/deberta-v3-large-mnli')
         self.num_labels = model_config.get('num_labels', 3)
         self.cache_dir = model_config.get('cache_dir', './models/training')
+        self.tokenizer_name = data_config.get('tokenizer_name', self.model_name)
 
         # Hyperparameters
         self.learning_rate = hyper_config.get('learning_rate', 2e-5)
@@ -159,7 +160,7 @@ class HallucinationTrainer(BaseTrainer):
         # Create dataloaders
         self.train_loader = create_dataloader(
             data_path=train_data_path,
-            tokenizer_name=self.model_name,
+            tokenizer_name=self.tokenizer_name,
             batch_size=self.batch_size,
             max_length=self.max_seq_length,
             shuffle=True,
@@ -170,7 +171,7 @@ class HallucinationTrainer(BaseTrainer):
 
         self.val_loader = create_dataloader(
             data_path=val_data_path,
-            tokenizer_name=self.model_name,
+            tokenizer_name=self.tokenizer_name,
             batch_size=self.batch_size,
             max_length=self.max_seq_length,
             shuffle=False,

@@ -64,7 +64,8 @@ class HallucinationDetector:
         mc_dropout_samples: int = 1,
         swag_config: Optional[Dict[str, Any]] = None,
         logit_sampling_config: Optional[Dict[str, Any]] = None,
-        representation_sampling_config: Optional[Dict[str, Any]] = None
+        representation_sampling_config: Optional[Dict[str, Any]] = None,
+        artifact_verifier_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize hallucination detector.
@@ -92,6 +93,13 @@ class HallucinationDetector:
         self.representation_sampling_config = representation_sampling_config or {}
         self.representation_sampling_enabled = bool(
             self.representation_sampling_config.get("enabled", False)
+        )
+        self.artifact_verifier_config = artifact_verifier_config or {}
+        self.artifact_verifier_enabled = bool(
+            self.artifact_verifier_config.get("enabled", False)
+        )
+        self.artifact_verifier_confidence_threshold = float(
+            self.artifact_verifier_config.get("confidence_threshold", 0.42)
         )
         self._classifier_module = None
         self.local_files_only = (
@@ -125,6 +133,38 @@ class HallucinationDetector:
             logger.info("Logit sampling enabled: %s", self.logit_sampling_config)
         if self.representation_sampling_enabled:
             logger.info("Representation sampling enabled: %s", self.representation_sampling_config)
+        if self.artifact_verifier_enabled:
+            logger.info("Artifact verifier enabled: %s", self.artifact_verifier_config)
+
+    def _artifact_verifier_result(
+        self,
+        premise: str,
+        hypothesis: str,
+        *,
+        query: str = ""
+    ) -> Optional[Dict[str, Any]]:
+        """Return a high-confidence lexical verifier result, or None."""
+        if not self.artifact_verifier_enabled:
+            return None
+
+        try:
+            from src.rag.artifact_verifier import predict_support_status, to_detector_result
+        except Exception as exc:
+            logger.warning("Artifact verifier import failed; falling back to neural detector: %s", exc)
+            return None
+
+        prediction = predict_support_status(
+            query=query,
+            candidate_answer=hypothesis,
+            evidence_span=premise,
+        )
+        result = to_detector_result(prediction)
+        result["artifact_verifier_confidence_threshold"] = (
+            self.artifact_verifier_confidence_threshold
+        )
+        if result["confidence"] < self.artifact_verifier_confidence_threshold:
+            return None
+        return result
 
     def _resolve_classifier_module(self) -> torch.nn.Module:
         """Find classifier head across plain HF and PEFT wrapped models."""
@@ -154,8 +194,59 @@ class HallucinationDetector:
         model_dir = self.model_path / "model"
         tokenizer_dir = self.model_path / "tokenizer"
 
+        # Case 0: exported PEFT adapter bundle. Prefer the adapter directory over
+        # root pytorch_model.bin when both exist; some exports keep a PEFT state
+        # dict at the root that is not directly loadable as a plain HF model.
+        if (model_dir / "adapter_config.json").exists():
+            base_model = self.base_model
+            if not base_model:
+                adapter_config_path = model_dir / "adapter_config.json"
+                try:
+                    import json
+
+                    adapter_config = json.loads(adapter_config_path.read_text(encoding="utf-8"))
+                    base_model = adapter_config.get("base_model_name_or_path")
+                except Exception:
+                    base_model = None
+            if not base_model:
+                raise ValueError(
+                    "base_model is required to load an exported PEFT adapter bundle"
+                )
+
+            try:
+                from peft import PeftModel
+                from src.training.utils.model_utils import load_model_and_tokenizer
+            except Exception as exc:
+                raise ImportError(
+                    "peft and training utilities are required to load PEFT adapter bundles."
+                ) from exc
+
+            self.model, self.tokenizer = load_model_and_tokenizer(
+                model_name=base_model,
+                num_labels=3,
+                cache_dir=None,
+                device=self.device,
+                lora_config=None,
+                local_files_only=self.local_files_only
+            )
+            self.model = PeftModel.from_pretrained(
+                self.model,
+                str(model_dir),
+                local_files_only=self.local_files_only,
+            )
+            self.model.eval()
+            self.model = self.model.to(self.device)
+            logger.info("Loaded model from exported PEFT adapter bundle")
+            return
+
         # Check if paths exist
-        if not model_dir.exists():
+        if (self.model_path / "pytorch_model.bin").exists() or (
+            self.model_path / "model.safetensors"
+        ).exists():
+            # Prefer a full HuggingFace export at the root over a nested LoRA
+            # adapter directory. Some exported bundles keep both.
+            model_dir = self.model_path
+        elif not model_dir.exists():
             # Try loading directly from model_path (HF export)
             model_dir = self.model_path
 
@@ -603,6 +694,12 @@ class HallucinationDetector:
                 - confidence: float (confidence in prediction)
                 - scores: Dict[str, float] (optional, probabilities per label)
         """
+        artifact_result = self._artifact_verifier_result(premise, hypothesis)
+        if artifact_result is not None:
+            if not return_scores:
+                artifact_result.pop("scores", None)
+            return artifact_result
+
         # Tokenize
         inputs = self.tokenizer(
             premise,
@@ -715,6 +812,16 @@ class HallucinationDetector:
         if len(premises) != len(hypotheses):
             raise ValueError("Number of premises must match number of hypotheses")
 
+        artifact_results: List[Optional[Dict[str, Any]]] = []
+        if self.artifact_verifier_enabled:
+            for premise, hypothesis in zip(premises, hypotheses):
+                result = self._artifact_verifier_result(premise, hypothesis)
+                if result is not None and not return_scores:
+                    result.pop("scores", None)
+                artifact_results.append(result)
+            if all(result is not None for result in artifact_results):
+                return [result for result in artifact_results if result is not None]
+
         # Process in batches
         all_results = []
 
@@ -810,6 +917,11 @@ class HallucinationDetector:
                         result['uncertainty_rep_entropy'] = norm_ent
 
                 all_results.append(result)
+
+        if artifact_results:
+            for index, artifact_result in enumerate(artifact_results):
+                if artifact_result is not None:
+                    all_results[index] = artifact_result
 
         return all_results
 

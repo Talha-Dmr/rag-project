@@ -1,0 +1,141 @@
+{
+  "artifact_bundle": {
+    "name": "detector-assets-phase2.2",
+    "distribution": "external Drive artifact, not committed to GitHub",
+    "local_staging_path": "detector-assets-phase2.2",
+    "notes": [
+      "Phase 2.2 model checkpoints were trained locally and are staged outside the PR.",
+      "GitHub should contain only code, configs, small summaries, manifests, and reproduce commands.",
+      "Raw model weights, optimizer states, training data outputs, raw eval predictions, and vector DB files should stay outside GitHub."
+    ]
+  },
+  "base_model_export": {
+    "name": "adamw_lora_targeted_multipleqa_phase2_1_mixed_v2",
+    "artifact_path": "models/checkpoints/adamw_lora_targeted_multipleqa_phase2_1_mixed_v2/base_model_unwrapped",
+    "required_files": [
+      "added_tokens.json",
+      "config.json",
+      "pytorch_model.bin",
+      "special_tokens_map.json",
+      "spm.model",
+      "tokenizer_config.json",
+      "tokenizer.json"
+    ]
+  },
+  "trained_checkpoints": [
+    {
+      "name": "adamw_lora_finregbench_phase2_2_mixed_v2_balanced",
+      "artifact_path": "models/checkpoints/adamw_lora_finregbench_phase2_2_mixed_v2_balanced/best_model",
+      "config_path": "config/adamw_lora_finregbench_phase2_2_mixed_v2_balanced.yaml",
+      "training_data_path": "data/training/nli_dataset_finregbench_phase2_2_mixed_v2",
+      "best_checkpoint": "best_model",
+      "best_metric_name": "f1_macro",
+      "best_metric": 0.2254976064499874,
+      "best_epoch": 2,
+      "required_files": [
+        "model.pt",
+        "optimizer.pt",
+        "training_state.pt"
+      ]
+    },
+    {
+      "name": "adamw_lora_finregbench_phase2_2_mixed_v3_balanced_recall",
+      "artifact_path": "models/checkpoints/adamw_lora_finregbench_phase2_2_mixed_v3_balanced_recall/best_model",
+      "config_path": "config/adamw_lora_finregbench_phase2_2_mixed_v3_balanced_recall.yaml",
+      "training_data_path": "data/training/nli_dataset_finregbench_phase2_2_mixed_v2",
+      "best_checkpoint": "best_model",
+      "best_metric_name": "f1_macro",
+      "best_metric": 0.1909375611665688,
+      "best_epoch": 2,
+      "required_files": [
+        "model.pt",
+        "optimizer.pt",
+        "training_state.pt"
+      ]
+    },
+    {
+      "name": "adamw_lora_finregbench_phase2_2_mixed_warmstart",
+      "artifact_path": "models/checkpoints/adamw_lora_finregbench_phase2_2_mixed_warmstart/best_model",
+      "config_path": "config/adamw_lora_finregbench_phase2_2_mixed_warmstart.yaml",
+      "training_data_path": "data/training/nli_dataset_finregbench_phase2_2_mixed",
+      "best_checkpoint": "best_model",
+      "best_metric_name": "f1_macro",
+      "best_metric": 0.23823191733639493,
+      "best_epoch": 0,
+      "required_files": [
+        "model.pt",
+        "optimizer.pt",
+        "training_state.pt"
+      ]
+    },
+    {
+      "name": "adamw_lora_finregbench_phase2_2_prefill_warmstart",
+      "artifact_path": "models/checkpoints/adamw_lora_finregbench_phase2_2_prefill_warmstart/best_model",
+      "config_path": "config/adamw_lora_finregbench_phase2_2_prefill_localexport.yaml",
+      "training_data_path": "data/training/nli_dataset_finregbench_phase2_2",
+      "best_checkpoint": "best_model",
+      "best_metric_name": "f1_macro",
+      "best_metric": 0.17391304347826086,
+      "best_epoch": 0,
+      "required_files": [
+        "model.pt",
+        "optimizer.pt",
+        "training_state.pt"
+      ]
+    }
+  ],
+  "training_data_outputs": [
+    {
+      "path": "data/training/nli_dataset_finregbench_phase2_2",
+      "files": 4,
+      "size_mb": 0.26
+    },
+    {
+      "path": "data/training/nli_dataset_finregbench_phase2_2_mixed",
+      "files": 4,
+      "size_mb": 1.85
+    },
+    {
+      "path": "data/training/nli_dataset_finregbench_phase2_2_mixed_v2",
+      "files": 4,
+      "size_mb": 3.26
+    }
+  ],
+  "eval_outputs": [
+    {
+      "path": "FinRegBench/data/phase2_runs/smoke_300_export_mixed_v2",
+      "rows": 300,
+      "three_way_accuracy": 0.36,
+      "binary_accuracy": 0.53,
+      "negative_accuracy": 0.325
+    },
+    {
+      "path": "FinRegBench/data/phase2_runs/contradiction_stress_export_mixed_v2",
+      "rows": 520,
+      "three_way_accuracy": 1.0,
+      "binary_accuracy": 1.0,
+      "negative_accuracy": 1.0
+    },
+    {
+      "path": "FinRegBench/data/phase2_runs/smoke_300_hybrid_artifact_v1",
+      "rows": 300,
+      "three_way_accuracy": 0.9866666666666667,
+      "binary_accuracy": 0.9966666666666667,
+      "negative_accuracy": 0.98
+    },
+    {
+      "path": "FinRegBench/data/phase2_runs/contradiction_stress_hybrid_artifact_v1",
+      "rows": 520,
+      "three_way_accuracy": 0.9923076923076923,
+      "binary_accuracy": 0.9942307692307693,
+      "negative_accuracy": 0.9923076923076923
+    },
+    {
+      "path": "FinRegBench/data/phase2_runs/review_180_detector_class_artifact_v1",
+      "rows": 180,
+      "three_way_accuracy": 0.9944444444444445,
+      "binary_accuracy": 1.0,
+      "negative_accuracy": 0.9928571428571429
+    }
+  ]
+}

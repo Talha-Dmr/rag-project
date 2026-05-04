@@ -5,6 +5,7 @@ Model utilities for loading and initializing models.
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from typing import Optional, Tuple, Dict, Any
+from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,9 +33,15 @@ def load_model_and_tokenizer(
     """
     logger.info(f"Loading model: {model_name}")
 
+    tokenizer_name = model_name
+    model_path = Path(model_name)
+    if model_path.exists() and (model_path / "tokenizer").is_dir():
+        tokenizer_name = str(model_path / "tokenizer")
+        logger.info("Using tokenizer subdirectory: %s", tokenizer_name)
+
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
-        model_name,
+        tokenizer_name,
         cache_dir=cache_dir,
         local_files_only=local_files_only
     )

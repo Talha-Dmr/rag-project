@@ -54,6 +54,7 @@ models/
 data/*
 *.csv
 *.json
+!artifact_manifest_phase2_2.json
 *.pdf
 *.txt
 !data/domain_health/
@@ -94,8 +95,18 @@ tmp/
 temp/
 
 # Local artifacts
+detector-assets-phase2.2/
 checkpoints_step6000.tar.gz
 Gemini_Generated_Image_*.png
 electra_deberta/
 evaluation_results/
 output/
+
+# FinRegBench generated run artifacts
+FinRegBench/
+FinRegBench/data/phase2_runs/
+FinRegBench/data/*_detector_inputs.jsonl
+FinRegBench/data/*_detector_predictions*.jsonl
+FinRegBench/data/finreg_3000_draft.jsonl
+FinRegBench/data/finreg_3000_artifact_easy.jsonl
+FinRegBench/data/finreg_3000_hard_candidate.jsonl

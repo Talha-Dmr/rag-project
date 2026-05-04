@@ -117,6 +117,10 @@ def train_model(args: argparse.Namespace) -> None:
     logger.info("Building model...")
     trainer.build_model()
 
+    if args.init_from:
+        logger.info("Initializing model weights from checkpoint: %s", args.init_from)
+        trainer.initialize_from_checkpoint(args.init_from)
+
     # Print training info
     logger.info("\n" + "="*80)
     logger.info("TRAINING CONFIGURATION")
@@ -248,6 +252,12 @@ def main():
         '--resume-from',
         type=str,
         help='Resume training from checkpoint'
+    )
+
+    parser.add_argument(
+        '--init-from',
+        type=str,
+        help='Initialize model weights from checkpoint without restoring optimizer or epoch state'
     )
 
     parser.add_argument(

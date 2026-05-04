@@ -41,22 +41,33 @@ class AmbigQAConverter(BaseConverter):
         Returns:
             List of raw AmbigQA examples
         """
-        # AmbigQA has train_light.json, dev_light.json (light versions)
-        data_files = ['train_light.json', 'dev_light.json']
         all_examples = []
+        split_candidates = {
+            "train": ["train_light.json", "train.json"],
+            "dev": ["dev_light.json", "dev.json"],
+        }
 
-        for file_name in data_files:
-            file_path = self.dataset_path / file_name
+        for split_name, candidates in split_candidates.items():
+            file_path = None
+            for candidate in candidates:
+                candidate_path = self.dataset_path / candidate
+                if candidate_path.exists():
+                    file_path = candidate_path
+                    break
 
-            if not file_path.exists():
-                logger.warning(f"File not found: {file_path}, skipping")
+            if file_path is None:
+                logger.warning(
+                    "No AmbigQA file found for split '%s'. Tried: %s",
+                    split_name,
+                    ", ".join(str(self.dataset_path / candidate) for candidate in candidates),
+                )
                 continue
 
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
             all_examples.extend(data)
-            logger.info(f"Loaded {len(data)} examples from {file_name}")
+            logger.info(f"Loaded {len(data)} examples from {file_path.name}")
 
         return all_examples
 

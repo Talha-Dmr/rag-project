@@ -696,7 +696,7 @@ class RAGPipeline:
                 logger.info("Applying reranker...")
                 rerank_top_k = self.reranker_top_k or current_k
                 retrieved_docs = self.reranker.rerank(query_text, retrieved_docs, top_k=rerank_top_k)
-                logger.info(f"Reranked documents → top {len(retrieved_docs)} kept")
+                logger.info(f"Reranked documents -> top {len(retrieved_docs)} kept")
 
             if not retrieved_docs:
                 logger.warning("No documents retrieved")
@@ -1071,7 +1071,8 @@ class RAGPipeline:
                         mc_dropout_samples=detector_config.get('mc_dropout_samples', 1),
                         swag_config=detector_config.get('swag'),
                         logit_sampling_config=detector_config.get('logit_sampling'),
-                        representation_sampling_config=detector_config.get('representation_sampling')
+                        representation_sampling_config=detector_config.get('representation_sampling'),
+                        artifact_verifier_config=detector_config.get('artifact_verifier')
                     )
                 logger.info("Hallucination detector loaded successfully")
 

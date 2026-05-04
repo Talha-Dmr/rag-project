@@ -13,6 +13,7 @@ from pathlib import Path
 import logging
 import os
 import math
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,22 @@ class HallucinationDetector:
         2: 'contradiction'
     }
 
+    CANONICAL_LABEL_ALIASES = {
+        "entailment": "entailment",
+        "supports": "entailment",
+        "supported": "entailment",
+        "support": "entailment",
+        "neutral": "neutral",
+        "not_enough_info": "neutral",
+        "not enough info": "neutral",
+        "nei": "neutral",
+        "unknown": "neutral",
+        "contradiction": "contradiction",
+        "refutes": "contradiction",
+        "refute": "contradiction",
+        "conflict": "contradiction",
+    }
+
     def __init__(
         self,
         model_path: str,
@@ -47,7 +64,8 @@ class HallucinationDetector:
         mc_dropout_samples: int = 1,
         swag_config: Optional[Dict[str, Any]] = None,
         logit_sampling_config: Optional[Dict[str, Any]] = None,
-        representation_sampling_config: Optional[Dict[str, Any]] = None
+        representation_sampling_config: Optional[Dict[str, Any]] = None,
+        artifact_verifier_config: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize hallucination detector.
@@ -76,6 +94,13 @@ class HallucinationDetector:
         self.representation_sampling_enabled = bool(
             self.representation_sampling_config.get("enabled", False)
         )
+        self.artifact_verifier_config = artifact_verifier_config or {}
+        self.artifact_verifier_enabled = bool(
+            self.artifact_verifier_config.get("enabled", False)
+        )
+        self.artifact_verifier_confidence_threshold = float(
+            self.artifact_verifier_config.get("confidence_threshold", 0.42)
+        )
         self._classifier_module = None
         self.local_files_only = (
             os.getenv("HF_HUB_OFFLINE", "").strip().lower() in {"1", "true", "yes", "on"}
@@ -90,6 +115,7 @@ class HallucinationDetector:
         # Load model and tokenizer
         logger.info(f"Loading hallucination detector from: {model_path}")
         self._load_model()
+        self._configure_label_mapping()
         if self.representation_sampling_enabled:
             try:
                 self._classifier_module = self._resolve_classifier_module()
@@ -107,6 +133,38 @@ class HallucinationDetector:
             logger.info("Logit sampling enabled: %s", self.logit_sampling_config)
         if self.representation_sampling_enabled:
             logger.info("Representation sampling enabled: %s", self.representation_sampling_config)
+        if self.artifact_verifier_enabled:
+            logger.info("Artifact verifier enabled: %s", self.artifact_verifier_config)
+
+    def _artifact_verifier_result(
+        self,
+        premise: str,
+        hypothesis: str,
+        *,
+        query: str = ""
+    ) -> Optional[Dict[str, Any]]:
+        """Return a high-confidence lexical verifier result, or None."""
+        if not self.artifact_verifier_enabled:
+            return None
+
+        try:
+            from src.rag.artifact_verifier import predict_support_status, to_detector_result
+        except Exception as exc:
+            logger.warning("Artifact verifier import failed; falling back to neural detector: %s", exc)
+            return None
+
+        prediction = predict_support_status(
+            query=query,
+            candidate_answer=hypothesis,
+            evidence_span=premise,
+        )
+        result = to_detector_result(prediction)
+        result["artifact_verifier_confidence_threshold"] = (
+            self.artifact_verifier_confidence_threshold
+        )
+        if result["confidence"] < self.artifact_verifier_confidence_threshold:
+            return None
+        return result
 
     def _resolve_classifier_module(self) -> torch.nn.Module:
         """Find classifier head across plain HF and PEFT wrapped models."""
@@ -136,8 +194,59 @@ class HallucinationDetector:
         model_dir = self.model_path / "model"
         tokenizer_dir = self.model_path / "tokenizer"
 
+        # Case 0: exported PEFT adapter bundle. Prefer the adapter directory over
+        # root pytorch_model.bin when both exist; some exports keep a PEFT state
+        # dict at the root that is not directly loadable as a plain HF model.
+        if (model_dir / "adapter_config.json").exists():
+            base_model = self.base_model
+            if not base_model:
+                adapter_config_path = model_dir / "adapter_config.json"
+                try:
+                    import json
+
+                    adapter_config = json.loads(adapter_config_path.read_text(encoding="utf-8"))
+                    base_model = adapter_config.get("base_model_name_or_path")
+                except Exception:
+                    base_model = None
+            if not base_model:
+                raise ValueError(
+                    "base_model is required to load an exported PEFT adapter bundle"
+                )
+
+            try:
+                from peft import PeftModel
+                from src.training.utils.model_utils import load_model_and_tokenizer
+            except Exception as exc:
+                raise ImportError(
+                    "peft and training utilities are required to load PEFT adapter bundles."
+                ) from exc
+
+            self.model, self.tokenizer = load_model_and_tokenizer(
+                model_name=base_model,
+                num_labels=3,
+                cache_dir=None,
+                device=self.device,
+                lora_config=None,
+                local_files_only=self.local_files_only
+            )
+            self.model = PeftModel.from_pretrained(
+                self.model,
+                str(model_dir),
+                local_files_only=self.local_files_only,
+            )
+            self.model.eval()
+            self.model = self.model.to(self.device)
+            logger.info("Loaded model from exported PEFT adapter bundle")
+            return
+
         # Check if paths exist
-        if not model_dir.exists():
+        if (self.model_path / "pytorch_model.bin").exists() or (
+            self.model_path / "model.safetensors"
+        ).exists():
+            # Prefer a full HuggingFace export at the root over a nested LoRA
+            # adapter directory. Some exported bundles keep both.
+            model_dir = self.model_path
+        elif not model_dir.exists():
             # Try loading directly from model_path (HF export)
             model_dir = self.model_path
 
@@ -148,17 +257,22 @@ class HallucinationDetector:
         if model_pt.exists():
             base_model = self.base_model
             lora_config = self.lora_config
+            checkpoint_state = None
+            checkpoint_weights = torch.load(model_pt, map_location=self.device, weights_only=False)
 
             # Try to infer base model from training_state if available
             state_path = self.model_path / "training_state.pt"
             if state_path.exists():
                 try:
-                    state = torch.load(state_path, map_location="cpu")
-                    cfg = state.get("config", {})
+                    checkpoint_state = torch.load(state_path, map_location="cpu", weights_only=False)
+                    cfg = checkpoint_state.get("config", {})
                     base_model = base_model or cfg.get("model", {}).get("base_model")
                     lora_config = lora_config or cfg.get("model", {}).get("lora")
                 except Exception:
                     pass
+
+            if not lora_config:
+                lora_config = self._infer_lora_config_from_checkpoint(checkpoint_weights)
 
             if not base_model:
                 raise ValueError(
@@ -180,8 +294,7 @@ class HallucinationDetector:
                 lora_config=lora_config,
                 local_files_only=self.local_files_only
             )
-            state = torch.load(model_pt, map_location=self.device)
-            missing, unexpected = self.model.load_state_dict(state, strict=False)
+            missing, unexpected = self.model.load_state_dict(checkpoint_weights, strict=False)
             if missing or unexpected:
                 logger.warning(
                     "Checkpoint load (strict=False). Missing keys: %s | Unexpected keys: %s",
@@ -195,10 +308,24 @@ class HallucinationDetector:
 
         # Case 2: HF export
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                str(tokenizer_dir),
-                local_files_only=self.local_files_only
-            )
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    str(tokenizer_dir),
+                    local_files_only=self.local_files_only
+                )
+            except Exception as tokenizer_error:
+                if not self.base_model:
+                    raise
+                logger.warning(
+                    "Local tokenizer load failed from %s (%s). Falling back to base_model tokenizer: %s",
+                    tokenizer_dir,
+                    tokenizer_error,
+                    self.base_model,
+                )
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    self.base_model,
+                    local_files_only=self.local_files_only
+                )
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 str(model_dir),
                 local_files_only=self.local_files_only
@@ -212,6 +339,115 @@ class HallucinationDetector:
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise
+
+    def _infer_lora_config_from_checkpoint(
+        self,
+        state_dict: Dict[str, torch.Tensor]
+    ) -> Optional[Dict[str, Any]]:
+        """Infer a minimal LoRA config from a training checkpoint state_dict."""
+        lora_a_keys = [key for key in state_dict.keys() if ".lora_A." in key]
+        if not lora_a_keys:
+            return None
+
+        target_modules = set()
+        modules_to_save = set()
+        inferred_r: Optional[int] = None
+
+        for key in lora_a_keys:
+            match = re.search(r"\.([^.]+)\.lora_A\.[^.]+\.weight$", key)
+            if match:
+                target_modules.add(match.group(1))
+            tensor = state_dict.get(key)
+            if tensor is not None and getattr(tensor, "shape", None):
+                try:
+                    inferred_r = int(tensor.shape[0])
+                except Exception:
+                    pass
+
+        for key in state_dict.keys():
+            match = re.search(r"\.([^.]+)\.modules_to_save\.[^.]+\.", key)
+            if match:
+                modules_to_save.add(match.group(1))
+
+        inferred = {
+            "enabled": True,
+            "r": inferred_r or 8,
+            "lora_alpha": 16,
+            "lora_dropout": 0.0,
+            "bias": "none",
+            "task_type": "SEQ_CLS",
+            "target_modules": sorted(target_modules) or ["query_proj", "key_proj", "value_proj"],
+        }
+        if modules_to_save:
+            inferred["modules_to_save"] = sorted(modules_to_save)
+
+        logger.info("Inferred LoRA config from checkpoint: %s", inferred)
+        return inferred
+
+    @classmethod
+    def _canonicalize_label_name(cls, value: object) -> str:
+        text = str(value or "").strip().lower().replace("-", " ").replace("_", " ")
+        text = " ".join(text.split())
+        return cls.CANONICAL_LABEL_ALIASES.get(text, "")
+
+    def _configure_label_mapping(self) -> None:
+        """
+        Infer model label ids from config.id2label when possible.
+
+        This keeps the detector compatible with both:
+        - entailment / neutral / contradiction exports
+        - FEVER-style SUPPORTS / REFUTES / NOT ENOUGH INFO exports
+        """
+        default_names = {
+            0: "entailment",
+            1: "neutral",
+            2: "contradiction",
+        }
+        self.LABEL_NAMES = dict(default_names)
+        self.LABEL_ENTAILMENT = 0
+        self.LABEL_NEUTRAL = 1
+        self.LABEL_CONTRADICTION = 2
+
+        config = getattr(self.model, "config", None)
+        id2label = getattr(config, "id2label", None)
+        if not isinstance(id2label, dict):
+            return
+
+        canonical_to_id: Dict[str, int] = {}
+        pretty_names: Dict[int, str] = {}
+        for raw_id, raw_name in id2label.items():
+            try:
+                label_id = int(raw_id)
+            except Exception:
+                continue
+            canonical = self._canonicalize_label_name(raw_name)
+            if not canonical:
+                continue
+            canonical_to_id[canonical] = label_id
+            pretty_names[label_id] = canonical
+
+        required = {"entailment", "neutral", "contradiction"}
+        if not required.issubset(set(canonical_to_id.keys())):
+            logger.warning(
+                "Could not fully infer detector labels from id2label=%s; using default label ids.",
+                id2label,
+            )
+            return
+
+        self.LABEL_ENTAILMENT = int(canonical_to_id["entailment"])
+        self.LABEL_NEUTRAL = int(canonical_to_id["neutral"])
+        self.LABEL_CONTRADICTION = int(canonical_to_id["contradiction"])
+        self.LABEL_NAMES = {
+            idx: pretty_names.get(idx, default_names.get(idx, str(idx)))
+            for idx in range(max(pretty_names.keys()) + 1)
+        }
+        logger.info(
+            "Configured detector label mapping: entailment=%s neutral=%s contradiction=%s from id2label=%s",
+            self.LABEL_ENTAILMENT,
+            self.LABEL_NEUTRAL,
+            self.LABEL_CONTRADICTION,
+            id2label,
+        )
 
     def _setup_swag(self) -> None:
         swag_path = self.swag_config.get("path")
@@ -458,6 +694,12 @@ class HallucinationDetector:
                 - confidence: float (confidence in prediction)
                 - scores: Dict[str, float] (optional, probabilities per label)
         """
+        artifact_result = self._artifact_verifier_result(premise, hypothesis)
+        if artifact_result is not None:
+            if not return_scores:
+                artifact_result.pop("scores", None)
+            return artifact_result
+
         # Tokenize
         inputs = self.tokenizer(
             premise,
@@ -570,6 +812,16 @@ class HallucinationDetector:
         if len(premises) != len(hypotheses):
             raise ValueError("Number of premises must match number of hypotheses")
 
+        artifact_results: List[Optional[Dict[str, Any]]] = []
+        if self.artifact_verifier_enabled:
+            for premise, hypothesis in zip(premises, hypotheses):
+                result = self._artifact_verifier_result(premise, hypothesis)
+                if result is not None and not return_scores:
+                    result.pop("scores", None)
+                artifact_results.append(result)
+            if all(result is not None for result in artifact_results):
+                return [result for result in artifact_results if result is not None]
+
         # Process in batches
         all_results = []
 
@@ -665,6 +917,11 @@ class HallucinationDetector:
                         result['uncertainty_rep_entropy'] = norm_ent
 
                 all_results.append(result)
+
+        if artifact_results:
+            for index, artifact_result in enumerate(artifact_results):
+                if artifact_result is not None:
+                    all_results[index] = artifact_result
 
         return all_results
 

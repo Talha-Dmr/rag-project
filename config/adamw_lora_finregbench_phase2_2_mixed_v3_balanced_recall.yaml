@@ -1,0 +1,69 @@
+# Phase 2.2 mixed v3 continuation.
+# Softer contradiction tuning than v2; restores supported recall while keeping
+# balanced sampling over the imbalanced FinRegBench background pool.
+
+training:
+  model:
+    base_model: ./models/checkpoints/adamw_lora_targeted_multipleqa_phase2_1_mixed_v2/base_model_unwrapped
+    num_labels: 3
+    cache_dir: ./models/training
+    lora:
+      enabled: true
+      r: 8
+      lora_alpha: 16
+      lora_dropout: 0.05
+      bias: none
+      task_type: SEQ_CLS
+      target_modules: ["query_proj", "key_proj", "value_proj"]
+      modules_to_save: ["classifier", "pooler", "classifier", "score"]
+
+  hyperparameters:
+    learning_rate: 5.0e-6
+    weight_decay: 0.01
+    warmup_steps: 50
+    max_epochs: 3
+    batch_size: 8
+    gradient_accumulation_steps: 1
+    max_grad_norm: 1.0
+    mixed_precision: fp16
+    optimizer: adamw
+    scheduler: linear
+    loss:
+      type: weighted_ce
+      class_weights: [1.5, 1.0, 1.2]
+      label_smoothing: 0.0
+      contradiction_boost_weight: 0.02
+      contradiction_margin: 0.03
+
+  data:
+    tokenizer_name: ./models/checkpoints/adamw_lora_targeted_multipleqa_phase2_1_mixed_v2/base_model_unwrapped
+    max_seq_length: 128
+    train_split: 0.88
+    val_split: 0.08
+    test_split: 0.04
+    balance_classes: false
+    train_sampling_strategy: balanced
+    train_sampling_power: 1.0
+
+  checkpointing:
+    save_dir: ./models/checkpoints/adamw_lora_finregbench_phase2_2_mixed_v3_balanced_recall
+    save_strategy: best
+    save_every_n_epochs: 1
+    save_total_limit: 2
+    metric_for_best: f1_macro
+    mode: max
+
+  early_stopping:
+    enabled: false
+    patience: 2
+    metric: f1_macro
+    mode: max
+    min_delta: 0.0001
+
+  datasets: {}
+
+  output:
+    training_data_dir: ./data/training/nli_dataset_finregbench_phase2_2_mixed_v2
+    checkpoint_dir: ./models/checkpoints/adamw_lora_finregbench_phase2_2_mixed_v3_balanced_recall
+    final_model_dir: ./models/hallucination_detector_adamw_lora_finregbench_phase2_2_mixed_v3_balanced_recall
+    logs_dir: ./logs/training

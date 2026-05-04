@@ -50,6 +50,7 @@ class HallucinationTrainer(BaseTrainer):
         self.model_name = model_config.get('base_model', 'microsoft/deberta-v3-large-mnli')
         self.num_labels = model_config.get('num_labels', 3)
         self.cache_dir = model_config.get('cache_dir', './models/training')
+        self.tokenizer_name = data_config.get('tokenizer_name', self.model_name)
 
         # Hyperparameters
         self.learning_rate = hyper_config.get('learning_rate', 2e-5)
@@ -159,7 +160,7 @@ class HallucinationTrainer(BaseTrainer):
         # Create dataloaders
         self.train_loader = create_dataloader(
             data_path=train_data_path,
-            tokenizer_name=self.model_name,
+            tokenizer_name=self.tokenizer_name,
             batch_size=self.batch_size,
             max_length=self.max_seq_length,
             shuffle=True,
@@ -170,7 +171,7 @@ class HallucinationTrainer(BaseTrainer):
 
         self.val_loader = create_dataloader(
             data_path=val_data_path,
-            tokenizer_name=self.model_name,
+            tokenizer_name=self.tokenizer_name,
             batch_size=self.batch_size,
             max_length=self.max_seq_length,
             shuffle=False,
@@ -430,7 +431,10 @@ class HallucinationTrainer(BaseTrainer):
                 epoch=epoch,
                 model=self.model,
                 optimizer=self.optimizer,
-                metrics=val_metrics
+                metrics=val_metrics,
+                extra_state={
+                    'config': self.config
+                }
             )
 
             if self.early_stopping_callback:
@@ -444,6 +448,29 @@ class HallucinationTrainer(BaseTrainer):
         if self.swag_enabled:
             self._save_swag_state(output_dir)
         return history
+
+    def initialize_from_checkpoint(self, checkpoint_path: str) -> None:
+        """
+        Load model weights only from a checkpoint for phase-to-phase warm start.
+
+        This intentionally does not restore optimizer, scheduler, scaler, or
+        epoch counters. Use it when starting a new training phase from prior
+        weights, not when resuming an interrupted run.
+        """
+        checkpoint_path = Path(checkpoint_path)
+        model_path = checkpoint_path / "model.pt"
+        if not model_path.exists():
+            raise FileNotFoundError(f"Checkpoint model file not found: {model_path}")
+
+        state_dict = torch.load(model_path, map_location=self.device, weights_only=False)
+        missing, unexpected = self.model.load_state_dict(state_dict, strict=False)
+        if missing or unexpected:
+            logger.warning(
+                "Weights-only init used strict=False. Missing keys: %s | Unexpected keys: %s",
+                missing,
+                unexpected
+            )
+        logger.info("Initialized model weights from checkpoint: %s", checkpoint_path)
 
     def _get_swag_params(self) -> Dict[str, torch.nn.Parameter]:
         params = {}

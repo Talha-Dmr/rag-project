@@ -54,6 +54,7 @@ models/
 data/*
 *.csv
 *.json
+!artifact_manifest_phase2_2.json
 *.pdf
 *.txt
 !data/domain_health/
@@ -94,6 +95,7 @@ tmp/
 temp/
 
 # Local artifacts
+detector-assets-phase2.2/
 checkpoints_step6000.tar.gz
 Gemini_Generated_Image_*.png
 electra_deberta/

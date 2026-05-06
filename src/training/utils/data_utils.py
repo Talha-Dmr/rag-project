@@ -117,6 +117,9 @@ def balance_classes(
     label_counts = Counter(ex[label_key] for ex in data)
     logger.info(f"Original label distribution: {dict(label_counts)}")
 
+    if not data or not label_counts:
+        raise ValueError("Cannot balance classes: dataset is empty")
+
     if strategy == 'undersample':
         # Undersample to minority class size
         min_count = min(label_counts.values())

@@ -226,7 +226,11 @@ def main() -> None:
     parser.add_argument(
         "--artifact-verifier",
         action="store_true",
-        help="Enable the detector's lexical artifact verifier before neural decisions.",
+        help=(
+            "Enable the lexical artifact verifier before neural decisions for "
+            "FinRegBench hybrid evals. This is an explicit experiment flag, not "
+            "the default production detector path."
+        ),
     )
     parser.add_argument("--artifact-verifier-threshold", type=float, default=0.42)
     parser.add_argument(

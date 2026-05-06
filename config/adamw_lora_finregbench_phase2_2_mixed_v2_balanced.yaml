@@ -1,5 +1,7 @@
 # Phase 2.2 mixed v2 FinRegBench continuation.
 # Uses all non-eval-pack background rows plus 2x targeted error seed.
+# Requires the external detector-assets-phase2.2 Drive bundle for the local
+# Phase 2.1 base model export and generated training data.
 
 training:
   model:

@@ -8,6 +8,21 @@ The Phase 2.2 checkpoints listed below were trained locally. The PR contains
 the code, configs, summary metadata, and reproduce commands needed to connect
 the external artifacts back to the implementation.
 
+Important interpretation boundary:
+
+- The neural Phase 2.2 checkpoints are real trained checkpoints, but their
+  best validation `f1_macro` values remain low (`0.17` to `0.24`). They should
+  not be described as a strong detector-quality improvement.
+- The `0.98+` FinRegBench scores below come from the lexical artifact verifier
+  or artifact-hybrid path, not from the neural checkpoint alone.
+- The artifact verifier is useful for FinRegBench regression and benchmark
+  artifact analysis, but it should stay opt-in and must not become the default
+  production hallucination detector without validation on the real finreg RAG
+  corpus and ambiguous-query scenarios.
+- These configs require the external Drive artifact bundle. A fresh clone will
+  not run the Phase 2.2 checkpoint configs until that bundle is restored into
+  the repository layout.
+
 ## External Artifact Layout
 
 ```text

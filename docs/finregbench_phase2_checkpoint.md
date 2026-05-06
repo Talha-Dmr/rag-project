@@ -545,14 +545,17 @@ Run directories:
 
 Updated recommendation:
 
-Use hybrid verification as the FinRegBench-facing detector path. Continue using
-neural training experiments as fallback-improvement work, but do not promote a
-neural-only Phase 2.2 checkpoint as the main detector until it passes both
-supported recall and hard-contradiction recall.
+Use hybrid verification only as an opt-in FinRegBench eval path and artifact
+analysis tool. Continue using neural training experiments as
+fallback-improvement work, but do not promote either the artifact verifier or a
+neural-only Phase 2.2 checkpoint as the main production detector until they pass
+real finreg corpus RAG validation, including ambiguous-query scenarios,
+supported recall, and hard-contradiction recall.
 
-## Phase 2.4 Pipeline Integration
+## Phase 2.4 Opt-in Pipeline Integration
 
-The artifact verifier is now available inside the production detector class:
+The artifact verifier is now available inside the detector class behind an
+explicit config/CLI opt-in:
 
 - `src/rag/artifact_verifier.py`
 - `src/rag/hallucination_detector.py`
@@ -567,15 +570,15 @@ hallucination_detector:
     confidence_threshold: 0.42
 ```
 
-Finreg config variant:
+FinRegBench experiment config variant:
 
 - `config/gating_finreg_ebcar_logit_mi_sc009_artifacthybriddet.yaml`
 
-The production class path was re-evaluated with
+The detector-class opt-in path was re-evaluated with
 `scripts/run_finregbench_detector_model.py --artifact-verifier`, not only the
 standalone hybrid runner.
 
-Current production-class results:
+Current detector-class opt-in results:
 
 ```json
 {

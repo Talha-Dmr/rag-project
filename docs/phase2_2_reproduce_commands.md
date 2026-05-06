@@ -3,6 +3,15 @@
 Run these commands from the repository root after restoring the external
 `detector-assets-phase2.2` bundle into the repository layout.
 
+These commands are not fresh-clone runnable by themselves. The training configs
+and eval configs reference local model checkpoints, training data exports, and
+FinRegBench run inputs that live in the external Drive artifact bundle described
+in `docs/phase2_2_artifact_manifest.md`.
+
+Interpret the results carefully: the neural-only Phase 2.2 checkpoints topped
+out around `f1_macro=0.24`, while the `0.98+` FinRegBench scores come from the
+opt-in lexical artifact verifier / hybrid eval path.
+
 The local runs used the Phase 2.1 unwrapped export as the base model:
 
 ```text
@@ -61,7 +70,8 @@ python scripts/run_finregbench_detector_model.py `
   --model-path models/hallucination_detector_adamw_lora_targeted_multipleqa_phase2_1_mixed_v2
 ```
 
-Production-class artifact verifier evals:
+Detector-class artifact verifier evals (explicit FinRegBench hybrid experiment,
+not the default production detector path):
 
 ```powershell
 python scripts/run_finregbench_detector_model.py `

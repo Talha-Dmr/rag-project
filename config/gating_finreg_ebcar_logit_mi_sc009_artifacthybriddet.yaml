@@ -1,6 +1,9 @@
-# Financial regulation/compliance domain: EBCAR gating with artifact-hybrid detector.
-# Keeps the locked finreg retrieval/gating shape, but enables the lexical
-# artifact verifier before the neural detector for high-confidence cases.
+# FinRegBench-only EBCAR gating experiment with artifact-hybrid detector.
+# This is not the production/default finreg detector config. It exists to
+# reproduce the Phase 2.2 FinRegBench hybrid eval where the lexical artifact
+# verifier is explicitly enabled before the neural detector for high-confidence
+# generated benchmark artifacts.
+# Requires the external Drive bundle described in docs/phase2_2_artifact_manifest.md.
 
 embeddings:
   type: huggingface

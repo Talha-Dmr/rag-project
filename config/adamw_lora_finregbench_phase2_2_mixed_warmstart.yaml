@@ -1,5 +1,7 @@
 # Phase 2.2 mixed FinRegBench continuation.
 # Uses a balanced background pool plus targeted error-mined prefill seed.
+# Requires the external detector-assets-phase2.2 Drive bundle for the local
+# Phase 2.1 base model export and generated training data.
 
 training:
   model:

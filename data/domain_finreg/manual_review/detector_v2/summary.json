@@ -1,0 +1,34 @@
+{
+  "count": 90,
+  "labels": {
+    "contradiction": 30,
+    "entailment": 30,
+    "neutral": 30
+  },
+  "source_orgs": {
+    "ECB": 19,
+    "EBA": 22,
+    "PRA-BoE": 20,
+    "BCBS": 23,
+    "Federal Reserve": 6
+  },
+  "themes": {
+    "model_risk": 10,
+    "ict": 4,
+    "branch_governance": 6,
+    "rdarr": 5,
+    "liquidity": 11,
+    "general": 7,
+    "governance": 20,
+    "outsourcing": 9,
+    "climate": 2,
+    "stress_testing": 11,
+    "srep": 5
+  },
+  "pair_types": {
+    "minimal_contradiction": 30,
+    "extractive_entailment": 30,
+    "cross_source_neutral": 30
+  },
+  "note": "Manual-review set. Fill review_label, keep, and notes before training."
+}

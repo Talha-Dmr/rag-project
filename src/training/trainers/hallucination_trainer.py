@@ -815,7 +815,11 @@ class HallucinationTrainer(BaseTrainer):
 
         logger.info(f"Saved checkpoint to {checkpoint_path}")
 
-    def load_checkpoint(self, checkpoint_path: str) -> Dict[str, Any]:
+    def load_checkpoint(
+        self,
+        checkpoint_path: str,
+        load_optimizer: bool = True,
+    ) -> Dict[str, Any]:
         """
         Load model from checkpoint.
 
@@ -837,7 +841,7 @@ class HallucinationTrainer(BaseTrainer):
         # Load optimizer
         optimizer_path = checkpoint_path / "optimizer.pt"
         optimizer_loaded = False
-        if optimizer_path.exists() and self.optimizer:
+        if load_optimizer and optimizer_path.exists() and self.optimizer:
             try:
                 optimizer_state = torch.load(
                     optimizer_path, map_location=self.device, weights_only=False

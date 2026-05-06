@@ -1,0 +1,278 @@
+EBA publishes revised Guidelines on outsourcing arrangements | European Banking Authority
+Skip to main content
+Menu
+Extranet
+Log in
+About us
+Back
+About us
+The EBA is an independent EU Authority. We play a key role in safeguarding the integrity and robustness of the EU banking sector to support financial stability in the EU.
+Learn more
+Mission, values and tasks
+Organisation and governance
+Governance structure and decision making
+EBA within the EU institutional framework
+Internal organisation
+Accountability
+Legal and policy framework
+EBA regulation and institutional framework
+Compliance with EBA regulatory products
+Sustainable EBA
+Diversity and inclusion
+Careers
+Vacancies
+Meet our team
+Budget
+Procurement
+Activities
+Back
+Activities
+To contribute to the stability and effectiveness of the European financial system, the EBA develops harmonised rules for financial institutions, promotes convergence of supervisory practices, monitors, and advises on the impact of financial innovation and the transition to sustainable finance.
+Start here
+Single Rulebook
+Implementing Basel III in Europe
+Supervisory convergence
+Supervisory convergence
+Supervisory disclosure
+Peer Reviews
+Mediation
+Breach of Union Law
+Colleges
+Training
+Direct supervision and oversight
+Markets in Crypto-assets
+Digital operational resilience Act
+Validation of pro forma-initial margin models
+Information for consumers
+National competent authorities for consumer protection
+How to complain
+Personal finance at the EU level
+Warnings
+Financial education
+National registers and national authorities responsible for handling complaints related to credit servicers
+Frauds and scams
+Research Workshops
+Ad hoc activities
+Our response to Covid-19
+Brexit
+Risk and data analysis
+Back
+Risk and data analysis
+To ensure the orderly functioning and stability of the financial system in the European Union, we monitor and analyse risks and vulnerabilities relevant for the regulation of banks and investment firms. We also facilitate information sharing among authorities and institutions through supervisory reporting and data disclosure.
+Learn more
+European Data Access Portal (EDAP)
+Risk analysis
+EU-wide stress testing
+EU wide transparency exercise
+Risk monitoring
+Thematic analysis
+Remuneration and diversity analysis
+Pillar 3 data hub
+Access to P3DH
+Reporting
+Reporting frameworks
+Reporting Time Traveller
+DPM data dictionary
+Integrated reporting
+Joint Bank Reporting Committee (JBRC)
+Data
+Registers and other list of institutions
+Guides on data
+Aggregate statistical data
+Secondary reporting: data from Competent Authorities to the EBA
+Data analytics tools
+Publications and media
+Back
+Publications and media
+Communicating to all our audiences in the most effective way and using the most appropriate channels is crucial for us. Through our publications, announcements, and participation in external events, we are committed to reaching out to all our stakeholders to report about our policies, activities, and initiatives.
+Learn more
+Publications
+Guidelines
+Regulatory Technical Standards
+Implementing Technical Standards
+Reports
+Consultation papers
+Opinions
+Decisions
+Staff papers
+Annual reports
+Press releases
+Speeches
+Interviews
+Events
+Media centre
+Factsheets
+Media gallery
+Media resources
+Breadcrumb
+Home
+Publications and media
+Back to Publications and media
+Publications
+Press releases
+Speeches
+Interviews
+Events
+Media centre
+Press releases
+EBA publishes revised Guidelines on outsourcing arrangements
+EBA publishes revised Guidelines on outsourcing arrangements
+Press Release
+4 March 2019
+The European Banking Authority (EBA) published today its revised Guidelines on outsourcing arrangements setting out specific provisions for the governance frameworks of all financial institutions within the scope of the EBA's mandate with regard to their outsourcing arrangements and related supervisory expectations and processes. The aim of the Guidelines is to establish a more harmonised framework for these financial institutions, namely credit institutions and investment firms subject to the Capital Requirements Directive (CRD), as well as payment and electronic money institutions. The recommendation on outsourcing to cloud service providers, published in December 2017, has also been integrated into the Guidelines.
+In the context of digitalisation and given the increasing importance of new financial technology (Fintech) providers, financial institutions are adapting their business models to embrace such innovations. Some have intensified the use of Fintech solutions and have launched projects to improve their cost efficiency also in response to the intermediation margins of the traditional banking business model being put under pressure by the low interest rate environment. Outsourcing is a way to get relatively easy access to new technologies and to achieve economies of scale.
+The new Guidelines, which are consistent with the requirements on outsourcing under the Payments Services Directive (PSD2), the Markets in Financial Instruments Directive (MiFID II) and the Commission's Delegated Regulation (EU) 2017/565
+[1]
+, aim at ensuring that institutions can apply a single framework on outsourcing for all their banking, investment and payment activities and services. Such a framework also ensures a level playing field between different types of financial institutions.
+In particular, the Guidelines clarify that the management body of each financial institution remains responsible for that institution and its activities at all times. To this end, the management body should ensure that sufficient resources are available to appropriately support and ensure the performance of those responsibilities, including overseeing all risks and managing the outsourcing arrangements. Outsourcing must not lead to a situation in which an institution becomes an ‘empty shell' that lacks the substance to remain authorised.
+Particular challenges to ensure the effective supervision of institutions and payment institutions exist when functions are outsourced to service providers located in third countries. Financial institutions are expected to ensure compliance with EU legislation and regulatory requirements (e.g. professional secrecy, access to information and data, protection of personal data) in particular regarding critical or important functions outsourced to service providers.
+In this respect, the Guidelines specify which arrangements with third parties are to be considered as outsourcing. The Guidelines differentiate between requirements on critical and important outsourcing arrangements and other outsourcing arrangements Outsourcing of critical and important functions has a higher impact on the institutions' and payment institutions' risk profile. Hence, the requirements are stricter as compared to the requirements for other less risky outsourcing arrangements.
+Finally, competent authorities are required to effectively supervise financial institutions' outsourcing arrangements, including identifying and monitoring risk concentrations at individual service providers and assessing whether or not such concentrations could pose a risk to the stability of the financial system. To identify such risk concentrations, competent authorities should be able to rely on comprehensive documentation on outsourcing arrangements compiled by financial institutions.
+Legal basis and next step
+Article 74 (1) of CRD requires that institutions must have robust governance arrangements, which include a clear organisational structure. Outsourcing arrangements are one aspect of institutions' and payment institutions' organisational structure. Paragraph (3) of that Article mandates the EBA to issue Guidelines on those arrangements, processes and mechanisms.
+Under Article 16 of Regulation (EU) No 1093/2010
+[2]
+(the EBA Regulation), the EBA is also required to issue guidelines and recommendations addressed to competent authorities and financial institutions with a view to establishing consistent, efficient and effective supervisory practices and ensuring the common, uniform and consistent application of Union law. In particular, the conditions for outsourcing of functions of banking activities by institutions are not harmonised to the same extent as for institutions and payment institutions subject to MiFID II and PSD2.
+The EBA Guidelines will enter into force on 30 September 2019 and contain some transitional periods for implementing a register of all outsourcing arrangements and to agree on cooperation agreements between competent authorities or to reintegrate outsourced functions or move them to other service providers, if the requirements of the guidelines can otherwise not be met.
+[1]
+Commission Delegated Regulation (EU) 2017/565 of 25 April 2016 supplementing Directive 2014/65/EU of the European Parliament and of the Council as regards organisational requirements and operating conditions for investment firms and defined terms for the purposes of that Directive
+[2]
+Regulation (EU) No 1093/2010 of the European Parliament and of the Council of 24 November 2010 establishing a European Supervisory Authority (European Banking Authority), amending Decision No 716/2009/EC and repealing Commission Decision 2009/78/EC (OJ L 331, 15.12.2010, p. 12).
+Documents
+EBA revised Guidelines on outsourcing arrangements
+(1.62 MB - PDF)
+Last update
+4 March 2019
+Download
+Other languages (22)
+bg
+Български
+(403.32 KB - PDF)
+Download
+cs
+Čeština
+(357.42 KB - PDF)
+Download
+da
+Dansk
+(262.56 KB - PDF)
+Download
+de
+Deutsch
+(333.55 KB - PDF)
+Download
+el
+Ελληνικά
+(482.57 KB - PDF)
+Download
+es
+Español
+(338.9 KB - PDF)
+Download
+et
+Eesti
+(301.4 KB - PDF)
+Download
+fi
+Suomi
+(276.22 KB - PDF)
+Download
+fr
+Français
+(341.86 KB - PDF)
+Download
+hr
+Hrvatski
+(328.64 KB - PDF)
+Download
+hu
+Magyar
+(386.41 KB - PDF)
+Download
+it
+Italiano
+(296.25 KB - PDF)
+Download
+lt
+Lietuvių
+(349.1 KB - PDF)
+Download
+lv
+Latviešu
+(365.85 KB - PDF)
+Download
+mt
+Malti
+(405.94 KB - PDF)
+Download
+nl
+Nederlands
+(294.86 KB - PDF)
+Download
+pl
+Polski
+(504.98 KB - PDF)
+Download
+pt
+Português
+(338.59 KB - PDF)
+Download
+ro
+Română
+(372.02 KB - PDF)
+Download
+sk
+Slovenčina
+(370.31 KB - PDF)
+Download
+sl
+Slovenščina
+(356.94 KB - PDF)
+Download
+sv
+Svenska
+(286.55 KB - PDF)
+Download
+Related content
+Guidelines
+Under consultation
+Guidelines on outsourcing arrangements
+Press contacts
+Franca Rosa Congiu
+press@eba.europa.eu
++33 1 86 52 7052
+Follow @EBA_News
+Footer
+EUROPEAN BANKING AUTHORITY
+Our mission is to contribute to the stability and effectiveness of the European financial system through simple, consistent, transparent, fair regulation and supervision that benefits all EU citizens.
+An agency of the EU
+EU Agencies Network
+Sustainable EBA
+Contact us
+Contacts
+Ask a general question
+Send a press query
+Ask a regulatory question
+Request access to documents
+File a complaint
+Whistleblower reports
+Stay up to date with our work
+Subscribe to our email alerts
+News & press RSS feed
+Follow us on Social media
+Bluesky
+LinkedIn
+X
+YouTube
+Find out about us
+The EBA at a glance
+Vacancies
+Privacy policy
+Legal notice
+Cookies policy
+Frauds and scams
+Explore related sites
+EIOPA
+ESMA
+ESRB
+CEBS archive

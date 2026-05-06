@@ -1,0 +1,62 @@
+# FinReg detector adaptation on top of the existing FEVER DeBERTa-v3-base detector.
+# This keeps the stronger NLI/FEVER initialization and only learns a small LoRA
+# adapter from pseudo-labeled RAG-aware FinReg examples.
+
+training:
+  model:
+    base_model: electra_deberta/final_fever_deberta_v3_base_model
+    num_labels: 3
+    cache_dir: ./models/training
+    lora:
+      enabled: true
+      r: 8
+      lora_alpha: 16
+      lora_dropout: 0.05
+      bias: none
+      task_type: SEQ_CLS
+      target_modules: ["query_proj", "key_proj", "value_proj"]
+      modules_to_save: ["classifier", "pooler", "score"]
+
+  hyperparameters:
+    learning_rate: 1.0e-5
+    weight_decay: 0.01
+    warmup_steps: 0
+    max_epochs: 4
+    batch_size: 4
+    gradient_accumulation_steps: 2
+    max_grad_norm: 1.0
+    mixed_precision: fp32
+    optimizer: adamw
+    scheduler: linear
+    loss:
+      type: weighted_ce
+      class_weights: [1.0, 1.0, 1.0]
+      label_smoothing: 0.02
+
+  data:
+    max_seq_length: 256
+    balance_classes: true
+    balance_strategy: undersample
+    train_sampling_strategy: balanced
+    train_sampling_power: 1.0
+
+  checkpointing:
+    save_dir: ./models/checkpoints/adamw_lora_finreg_detector_fever_ragaware_v1
+    save_strategy: best
+    save_every_n_epochs: 1
+    save_total_limit: 2
+    metric_for_best: f1_macro
+    mode: max
+
+  early_stopping:
+    enabled: true
+    patience: 2
+    metric: f1_macro
+    mode: max
+    min_delta: 0.0001
+
+  output:
+    training_data_dir: ./data/training/nli_dataset_finreg_detector_ragaware_v2
+    checkpoint_dir: ./models/checkpoints/adamw_lora_finreg_detector_fever_ragaware_v1
+    final_model_dir: ./models/hallucination_detector_adamw_lora_finreg_detector_fever_ragaware_v1
+    logs_dir: ./logs/training

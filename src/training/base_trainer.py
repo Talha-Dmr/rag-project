@@ -99,7 +99,11 @@ class BaseTrainer(ABC):
         pass
 
     @abstractmethod
-    def load_checkpoint(self, checkpoint_path: str) -> Dict[str, Any]:
+    def load_checkpoint(
+        self,
+        checkpoint_path: str,
+        load_optimizer: bool = True,
+    ) -> Dict[str, Any]:
         """
         Load model from checkpoint.
 

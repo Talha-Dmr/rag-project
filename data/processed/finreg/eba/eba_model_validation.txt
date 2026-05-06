@@ -1,0 +1,356 @@
+Model validation | European Banking Authority
+Skip to main content
+Menu
+Extranet
+Log in
+About us
+Back
+About us
+The EBA is an independent EU Authority. We play a key role in safeguarding the integrity and robustness of the EU banking sector to support financial stability in the EU.
+Learn more
+Mission, values and tasks
+Organisation and governance
+Governance structure and decision making
+EBA within the EU institutional framework
+Internal organisation
+Accountability
+Legal and policy framework
+EBA regulation and institutional framework
+Compliance with EBA regulatory products
+Sustainable EBA
+Diversity and inclusion
+Careers
+Vacancies
+Meet our team
+Budget
+Procurement
+Activities
+Back
+Activities
+To contribute to the stability and effectiveness of the European financial system, the EBA develops harmonised rules for financial institutions, promotes convergence of supervisory practices, monitors, and advises on the impact of financial innovation and the transition to sustainable finance.
+Start here
+Single Rulebook
+Implementing Basel III in Europe
+Supervisory convergence
+Supervisory convergence
+Supervisory disclosure
+Peer Reviews
+Mediation
+Breach of Union Law
+Colleges
+Training
+Direct supervision and oversight
+Markets in Crypto-assets
+Digital operational resilience Act
+Validation of pro forma-initial margin models
+Information for consumers
+National competent authorities for consumer protection
+How to complain
+Personal finance at the EU level
+Warnings
+Financial education
+National registers and national authorities responsible for handling complaints related to credit servicers
+Frauds and scams
+Research Workshops
+Ad hoc activities
+Our response to Covid-19
+Brexit
+Risk and data analysis
+Back
+Risk and data analysis
+To ensure the orderly functioning and stability of the financial system in the European Union, we monitor and analyse risks and vulnerabilities relevant for the regulation of banks and investment firms. We also facilitate information sharing among authorities and institutions through supervisory reporting and data disclosure.
+Learn more
+European Data Access Portal (EDAP)
+Risk analysis
+EU-wide stress testing
+EU wide transparency exercise
+Risk monitoring
+Thematic analysis
+Remuneration and diversity analysis
+Pillar 3 data hub
+Access to P3DH
+Reporting
+Reporting frameworks
+Reporting Time Traveller
+DPM data dictionary
+Integrated reporting
+Joint Bank Reporting Committee (JBRC)
+Data
+Registers and other list of institutions
+Guides on data
+Aggregate statistical data
+Secondary reporting: data from Competent Authorities to the EBA
+Data analytics tools
+Publications and media
+Back
+Publications and media
+Communicating to all our audiences in the most effective way and using the most appropriate channels is crucial for us. Through our publications, announcements, and participation in external events, we are committed to reaching out to all our stakeholders to report about our policies, activities, and initiatives.
+Learn more
+Publications
+Guidelines
+Regulatory Technical Standards
+Implementing Technical Standards
+Reports
+Consultation papers
+Opinions
+Decisions
+Staff papers
+Annual reports
+Press releases
+Speeches
+Interviews
+Events
+Media centre
+Factsheets
+Media gallery
+Media resources
+Breadcrumb
+Home
+Activities
+Back to Activities
+Research Workshops
+Single Rulebook
+Implementing Basel III in Europe
+Supervisory convergence
+Information for consumers
+Ad hoc activities
+Single Rulebook
+Back to Single Rulebook
+Accounting and auditing
+Anti-Money Laundering and Countering the Financing of Terrorism
+Colleges of supervisors
+Consumer protection
+Credit risk
+Depositor protection
+Digital finance
+External Credit Assessment Institutions (ECAI)
+Financial conglomerates
+Internal governance
+Investment firms
+Large exposures
+Leverage ratio
+Liquidity risk
+Market access
+Market infrastructures
+Market, counterparty and CVA risk
+Model validation
+Operational resilience
+Operational risk
+Other topics
+Own funds
+Passporting and supervision of branches
+Payment services and electronic money
+Recovery
+Remuneration
+Resolution
+Securitisation and Covered Bonds
+Supervisory Review and Evaluation Process (SREP) and Pillar 2
+Supervisory benchmarking exercises
+Supervisory reporting
+Sustainable finance
+Third country equivalence and international cooperation
+Transparency and Pillar 3
+Model validation
+Guidelines on Credit Risk Mitigation for institutions applying the IRB approach with own estimates of LGDs
+Guidelines on PD estimation, LGD estimation and treatment of defaulted assets
+Guidelines on the methodology to estimate and apply credit conversion factors under the Capital Requirements Regulation
+Regulatory Technical Standards and Guidelines on estimation and identification of an economic downturn in IRB modelling
+Regulatory Technical Standards on the conditions according to which competent authorities may grant permission for data waiver
+Supervisory handbook for the validation of internal ratings based systems
+Model validation
+The EBA is mandated to develop Binding Technical Standards (BTS), Guidelines and Reports to assess internal models with the aim of ensuring a harmonised implementation of the rules for Internal Rating Based (IRB) Approaches for credit risk, Internal Model Methods (IMM) for counterparty credit risk, Advanced Measurement Approaches (AMA) for operational risk and Internal Models Approaches (IMA) for market risk. The common denominator of this mandate is to harmonise the fundamentals of internal modeling governance related to the different types of risk. This should ensure consistency of practices within and across the different approaches while allowing for risk-specific requirements.
+links
+Single Rulebook Q&A on Model validation
+Technical Standards, Guidelines & Recommendations
+Technical standards
+Status
+- Any -
+Under consultation
+Under development
+Final draft RTS/ITS adopted by the EBA and submitted to the European Commission
+Draft RTS/ITS adopted by the European Commission [and under scrutiny by EU legislators]
+Final and awaiting translation into the EU official languages
+Adopted and published in the Official Journal of the EU
+Final and translated into the EU official languages
+Type of institution
+- Any -
+Legal act
+- Any -
+Regulation (EU) No 575/2013 (CRR)
+Directive 2013/36/EU (CRD)
+Regulation (EU) No 2022/2554 (DORA Reg)
+Regulation (EU) No 2023/1114 (MiCAR)
+Regulation (EU) No 2017/2402 (SecReg)
+Directive 2009/110/EC (EMD)
+Directive (EU) 2019/2034 (IFD)
+Directive 2014/17/EU (MCD)
+Directive 2002/65/EC (DMD) - relevant parts only
+Directive 2014/49/EU (DGSD)
+Directive (EU) 2023/2225 (CCD2)
+Directive 2014/59/EU (BRRD)
+Directive (EU) 2015/849 (AMLD)
+Directive 2014/92/EU (PAD)
+Directive 2015/2366/EU (PSD2)
+Directive 2008/48/EC (CCD) (repealed)
+Directive 2022/2556/EU (DORA Dir)
+Regulation (EU) 2015/751 (IcFR - Interchange Fee Reg)
+Regulation (EU) 2015/847 (WTR) (recast)
+Regulation (EU) 2023/1113 (WTR II)
+Regulation (EU) 2024/886 (IPR)
+Regulation (EU) No 2019/2033 (IFR)
+Regulation (EU) No 648/2012 (EMIR) - only RTS 2016/2251
+Regulation (EU) No 909/2014 (CSDR) - only RTS 2017/390
+Directive 2002/87/EC (FiCOD)
+Other
+Date
+Filter
+Under consultation
+Regulatory Technical Standards on the authorisation of initial margin models
+Adopted and published in the Official Journal of the EU
+Regulatory Technical Standards on the conditions according to which competent authorities may grant permission for data waiver
+Final draft RTS/ITS adopted by the EBA and submitted to the European Commission
+Regulatory Technical Standards on the conditions for assessing the materiality of extensions and changes of internal approaches for credit, market and operational risk
+Guidelines
+Status
+- Any -
+Under consultation
+Under development
+Final draft RTS/ITS adopted by the EBA and submitted to the European Commission
+Draft RTS/ITS adopted by the European Commission [and under scrutiny by EU legislators]
+Final and awaiting translation into the EU official languages
+Adopted and published in the Official Journal of the EU
+Final and translated into the EU official languages
+Type of institution
+- Any -
+Legal act
+- Any -
+Regulation (EU) No 575/2013 (CRR)
+Directive 2013/36/EU (CRD)
+Regulation (EU) No 2022/2554 (DORA Reg)
+Regulation (EU) No 2023/1114 (MiCAR)
+Regulation (EU) No 2017/2402 (SecReg)
+Directive 2009/110/EC (EMD)
+Directive (EU) 2019/2034 (IFD)
+Directive 2014/17/EU (MCD)
+Directive 2002/65/EC (DMD) - relevant parts only
+Directive 2014/49/EU (DGSD)
+Directive (EU) 2023/2225 (CCD2)
+Directive 2014/59/EU (BRRD)
+Directive (EU) 2015/849 (AMLD)
+Directive 2014/92/EU (PAD)
+Directive 2015/2366/EU (PSD2)
+Directive 2008/48/EC (CCD) (repealed)
+Directive 2022/2556/EU (DORA Dir)
+Regulation (EU) 2015/751 (IcFR - Interchange Fee Reg)
+Regulation (EU) 2015/847 (WTR) (recast)
+Regulation (EU) 2023/1113 (WTR II)
+Regulation (EU) 2024/886 (IPR)
+Regulation (EU) No 2019/2033 (IFR)
+Regulation (EU) No 648/2012 (EMIR) - only RTS 2016/2251
+Regulation (EU) No 909/2014 (CSDR) - only RTS 2017/390
+Directive 2002/87/EC (FiCOD)
+Other
+Date
+Filter
+Final and translated into the EU official languages
+Guidelines on Credit Risk Mitigation for institutions applying the IRB approach with own estimates of LGDs
+Final and translated into the EU official languages
+Guidelines on PD estimation, LGD estimation and treatment of defaulted assets
+Opinions, Reports and other Publications
+Opinions
+Keywords
+Date
+Apply
+31 August 2020
+EBA-Op-2020-12 Opinion on RTS on Downturn.pdf
+Opinion on the European Commission’s amendments relating to the final draft RTS on the specification of the nature, severity and duration of an economic downturn
+Download document
+View press release
+Reports
+Keywords
+Date
+Apply
+7 August 2023
+Supervisory handbook on the validation of IRB rating systems.pdf
+Supervisory handbook on the validation of IRB rating systems
+Download document
+View press release
+4 August 2023
+Follow-up report on machine learning for IRB models.pdf
+Follow-up report on the use of machine learning for internal ratings-based models
+Download document
+View press release
+10 March 2020
+EBA Opinion on credit insurance EBAOp-2020-05.pdf
+EBA Opinion on credit insurance
+Download document
+View press release
+9 July 2019
+Progress report on IRB roadmap.pdf
+Download document
+View press release
+20 November 2017
+EBA Report on IRB modelling practices.pdf
+EBA Report on IRB modelling practices
+Download document
+View press release
+Other publications
+Keywords
+Date
+Apply
+17 July 2024
+Statement on the application of CRR 3 in the area of credit risk for the Internal Ratings Based Approach
+Download document
+View press release
+26 July 2022
+Consultation paper on the supervisory handbook on the validation of IRB rating systems.pdf
+Consultation paper on the supervisory handbook on the validation of IRB rating systems
+Download document
+View press release
+21 June 2022
+Principles on representativeness of COVID-19 impacted IRB relevant data.pdf
+Principles that should be applied in ensuring representativeness of the IRB-relevant data impacted by the COVID-19 pandemic and related measures
+Download document
+View press release
+16 December 2016
+EBA qualitative survey on IRB models.xlsx
+Download document
+View press release
+16 December 2016
+Instructions for the EBA qualitative survey on IRB models (Dec 2016).pdf
+Download document
+View press release
+Footer
+EUROPEAN BANKING AUTHORITY
+Our mission is to contribute to the stability and effectiveness of the European financial system through simple, consistent, transparent, fair regulation and supervision that benefits all EU citizens.
+An agency of the EU
+EU Agencies Network
+Sustainable EBA
+Contact us
+Contacts
+Ask a general question
+Send a press query
+Ask a regulatory question
+Request access to documents
+File a complaint
+Whistleblower reports
+Stay up to date with our work
+Subscribe to our email alerts
+News & press RSS feed
+Follow us on Social media
+Bluesky
+LinkedIn
+X
+YouTube
+Find out about us
+The EBA at a glance
+Vacancies
+Privacy policy
+Legal notice
+Cookies policy
+Frauds and scams
+Explore related sites
+EIOPA
+ESMA
+ESRB
+CEBS archive

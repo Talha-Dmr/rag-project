@@ -1,0 +1,42 @@
+{
+  "raw_root": "data/processed/finreg",
+  "seed": 23,
+  "max_sentences_per_doc": 8,
+  "max_per_label": 120,
+  "candidate_sentences": 160,
+  "pool": {
+    "count": 276,
+    "labels": {
+      "entailment": 78,
+      "neutral": 120,
+      "contradiction": 78
+    },
+    "source_orgs": {
+      "PRA-BoE": 62,
+      "BCBS": 52,
+      "ECB": 76,
+      "EBA": 73,
+      "Federal Reserve": 13
+    },
+    "themes": {
+      "governance": 65,
+      "rdarr": 20,
+      "stress_testing": 28,
+      "operational_resilience": 4,
+      "climate": 23,
+      "liquidity": 21,
+      "model_risk": 20,
+      "branch_governance": 8,
+      "srep": 13,
+      "outsourcing": 31,
+      "ict": 23,
+      "general": 20
+    },
+    "pair_types": {
+      "extractive_entailment": 78,
+      "cross_source_neutral": 120,
+      "minimal_contradiction": 78
+    }
+  },
+  "note": "Auto-generated candidate pool. Review before using for gold eval or training."
+}

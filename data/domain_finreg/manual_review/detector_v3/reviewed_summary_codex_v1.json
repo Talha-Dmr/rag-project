@@ -1,0 +1,34 @@
+{
+  "input": "data/domain_finreg/manual_review/detector_v3/review_set.csv",
+  "reviewed_csv": "data/domain_finreg/manual_review/detector_v3/reviewed_set_codex_v1.csv",
+  "reviewed_jsonl": "data/domain_finreg/manual_review/detector_v3/reviewed_set_codex_v1.jsonl",
+  "reviewer": "codex_first_pass",
+  "total": 90,
+  "kept": 78,
+  "dropped": 12,
+  "kept_labels": {
+    "contradiction": 27,
+    "entailment": 29,
+    "neutral": 22
+  },
+  "dropped_labels": {
+    "neutral": 8,
+    "entailment": 1,
+    "contradiction": 3
+  },
+  "dropped_ids": [
+    "frdr_v3_0005",
+    "frdr_v3_0011",
+    "frdr_v3_0017",
+    "frdr_v3_0018",
+    "frdr_v3_0024",
+    "frdr_v3_0040",
+    "frdr_v3_0041",
+    "frdr_v3_0044",
+    "frdr_v3_0047",
+    "frdr_v3_0053",
+    "frdr_v3_0063",
+    "frdr_v3_0074"
+  ],
+  "note": "First-pass review. Treat as training candidates, not held-out gold evaluation data."
+}

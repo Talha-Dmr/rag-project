@@ -1,0 +1,28 @@
+{
+  "config": "gating_finreg_ebcar_logit_mi_sc009",
+  "limit_questions": 0,
+  "note": "Controlled automatic eval over real retrieved FinReg contexts; use as detector diagnostic, not final human gold.",
+  "per_label": 45,
+  "questions": "data/domain_finreg/questions_finreg_conflict_phase1_refined_v2_50.jsonl",
+  "retrieve_k": 20,
+  "seed": 17,
+  "summary": {
+    "count": 135,
+    "generation_methods": {
+      "retrieved_controlled_v1": 135
+    },
+    "labels": {
+      "contradicted": 45,
+      "supported": 45,
+      "unsupported": 45
+    },
+    "source_families": {
+      "BCBS": 18,
+      "EBA": 51,
+      "ECB": 48,
+      "Fed-OCC": 3,
+      "PRA-BoE": 15
+    }
+  },
+  "top_k": 10
+}

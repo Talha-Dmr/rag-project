@@ -57,17 +57,30 @@ data/*
 !artifact_manifest_phase2_2.json
 *.pdf
 *.txt
+!data/processed/
+!data/processed/finreg/
+!data/processed/finreg/**
 !data/domain_health/
 !data/domain_health/README.md
 !data/domain_health/questions_health_conflict.jsonl
 !data/domain_finreg/
 !data/domain_finreg/README.md
 !data/domain_finreg/questions_finreg_conflict.jsonl
+!data/domain_finreg/questions_finreg_conflict_phase1_refined_v2*.jsonl
+!data/domain_finreg/questions_finreg_conflict_phase1_refined_v2*_labels.jsonl
+!data/domain_finreg/detector_candidate_pool_v*.jsonl
+!data/domain_finreg/detector_candidate_pool_v*_summary.json
+!data/domain_finreg/detector_eval_finreg_v1.jsonl
+!data/domain_finreg/finreg_retrieved_detector_eval_v1.jsonl
+!data/domain_finreg/finreg_retrieved_detector_eval_v1.summary.json
+!data/domain_finreg/manual_review/
+!data/domain_finreg/manual_review/**
 !data/domain_disaster/
 !data/domain_disaster/README.md
 !data/domain_disaster/questions_disaster_conflict.jsonl
 
 # Vector DB
+data/vector_db/
 *.chroma/
 *.faiss
 *.index

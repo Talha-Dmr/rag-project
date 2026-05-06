@@ -1,0 +1,579 @@
+CP6/22 – Model risk management principles for banks | Bank of England
+Our use of cookies
+We use necessary cookies to make our site work (for example, to manage your session). We’d also like to use some non-essential cookies (including third-party cookies) to help us improve the site. By clicking ‘Accept recommended settings’ on this banner, you accept our use of optional cookies.
+Necessary cookies
+Analytics cookies
+Yes
+Yes
+Accept recommended cookies
+Yes
+No
+Proceed with necessary cookies only
+Necessary cookies
+Necessary cookies enable core functionality on our website such as security, network management, and accessibility. You may disable these by changing your browser settings, but this may affect how the website functions.
+Analytics cookies
+We use analytics cookies so we can keep track of the number of visitors to various parts of the site and understand how our website is used. For more information on how these cookies work please see our
+Cookie policy
+.
+Skip to main content
+Main menu
+Close main menu
+Topics
+Open Topics sub menu
+Back
+to main menu
+Banknotes
+Open Banknotes sub menu
+Back
+to main menu
+Counterfeit banknotes
+Current banknotes
+Damaged and contaminated banknotes
+Exchanging old banknotes
+Note Circulation Scheme
+Advice for retailers and businesses
+Scottish and Northern Ireland banknotes
+Using images of banknotes
+Wholesale cash supervision
+Withdrawn banknotes
+Careers
+Open Careers sub menu
+Back
+to main menu
+Application tips
+Career Returner Programme
+Future talent
+Our locations
+Research careers
+We value diversity and inclusion
+What we offer you
+Why you should join us
+Climate change
+Digital pound
+Education
+Open Education sub menu
+Back
+to main menu
+Competitions
+Education resources
+Research support programme
+Request a speaker for your school
+Financial stability
+Open Financial stability sub menu
+Back
+to main menu
+Digital Securities Sandbox (DSS)
+Financial market infrastructure supervision
+Operational resilience of the financial sector
+Resolution
+Trade Repository (TR) Data Collections
+Gold
+Markets
+Open Markets sub menu
+Back
+to main menu
+Bank of England Market Operations Guide
+Eligible collateral
+Fair and Effective Markets
+Foreign currency reserves
+Greening our Corporate Bond Purchase Scheme (CBPS)
+Market intelligence
+Money Markets Committee and UK Money Markets Code
+Settlement and collateral management
+SONIA interest rate benchmark
+The Sterling Bond Portfolio
+Transition from LIBOR to risk-free rates
+Monetary policy
+Open Monetary policy sub menu
+Back
+to main menu
+Inflation and the 2% target
+Quantitative easing
+Interest rates and Bank Rate
+Payment and settlement
+Open Payment and settlement sub menu
+Back
+to main menu
+Banking services
+CHAPS
+Cross-border payments
+Payment and settlement statistics
+RTGS Renewal Programme
+Prudential regulation
+Open Prudential regulation sub menu
+Back
+to main menu
+Authorisations
+New Bank Start-up Unit
+New Insurer Start-up Unit
+Policy
+Prudential and Resolution Policy Index
+Regulatory reporting
+Our secondary objectives
+Supervision
+The Bank of England’s approach to enforcement
+Research
+Open Research sub menu
+Back
+to main menu
+Bank of England Agenda for Research, 2025-2028
+Fintech
+The Future of Finance - our response
+Research Visitor Programme
+Research funding and fellowships
+Researchers
+Statistics
+Open Statistics sub menu
+Back
+to main menu
+Banknote statistics
+Bankstats tables
+Data collection
+Exchange rates
+Gold statistics
+Gross Domestic Product Real-Time Database
+Research datasets
+Statistics requested by users
+Yield curves
+About
+Open About sub menu
+Back
+to main menu
+Get involved
+Open Get involved sub menu
+Back
+to main menu
+Citizens’ Forum
+Community Forum
+Partners
+Youth Voice
+Governance and funding
+Open Governance and funding sub menu
+Back
+to main menu
+Staff codes and policies
+History
+Our people
+Open Our people sub menu
+Back
+to main menu
+Agents
+Chief Cashiers
+Court of Directors
+Executive Directors
+Financial Policy Committee
+Financial Market Infrastructure Committee
+Governors
+Monetary Policy Committee
+Prudential Regulation Committee
+News and publications
+Open News and publications sub menu
+Back
+to main menu
+Events
+News and minutes
+Prudential regulation publications
+Publications
+Speeches
+Statistical releases
+Upcoming
+Museum
+Contact
+Search
+Nothing searched for. Please enter a search term.
+Home
+Prudential regulation
+CP6/22 – Model risk management principles for banks
+CP6/22 – Model risk management principles for banks
+Consultation Paper 6/22
+Related links
+Related links
+PS6/23 – Model risk management principles for banks
+Published on
+21 June 2022
+Browse content
+Contents
+By responding to this consultation, you provide personal data to the Bank of England. This may include your name, contact details (including, if provided, details of the organisation you work for), and opinions or details offered in the response itself.
+The response will be assessed to inform our work as a regulator and central bank, both in the public interest and in the exercise of our official authority. We may use your details to contact you to clarify any aspects of your response.
+The consultation paper will explain if responses will be shared with other organisations (for example, the Financial Conduct Authority). If this is the case, the other organisation will also review the responses and may also contact you to clarify aspects of your response. We will retain all responses for the period that is relevant to supporting ongoing regulatory policy developments and reviews. However, all personal data will be redacted from the responses within five years of receipt. To find out more about how we deal with your personal data, your rights or to get in touch please visit
+Privacy and the Bank of England
+.
+Information provided in response to this consultation, including personal information, may be subject to publication or disclosure to other parties in accordance with access to information regimes including under the Freedom of Information Act 2000 or data protection legislation, or as otherwise required by law or in discharge of the Bank’s functions.
+Please indicate if you regard all, or some of, the information you provide as confidential. If the Bank of England receives a request for disclosure of this information, we will take your indication(s) into account, but cannot give an assurance that confidentiality can be maintained in all circumstances. An automatic confidentiality disclaimer generated by your IT system on emails will not, of itself, be regarded as binding on the Bank of England.
+Responses are requested by Friday 21 October 2022.
+The PRA prefers all responses to be sent by email to:
+CP6_22@bankofengland.co.uk
+.
+Alternatively, please address any comments or enquiries to:
+Diederick Potgieter
+Prudential Regulation Authority
+20 Moorgate
+London
+EC2R 6DA
+1: Overview
+1.1 This Consultation Paper (CP) sets out the Prudential Regulation Authority’s (PRA) proposed expectations regarding banks’ management of model risk. The PRA has developed a proposed set of principles which it considers to be key in establishing an effective model risk management (MRM) framework.
+1.2 The PRA considers MRM as a risk discipline in its own right, and proposes to embed these principles, in a proportionate manner, as supervisory expectations for all regulated United Kingdom (UK)-incorporated banks, building societies, and PRA-designated investment firms (hereinafter ‘firms’).
+footnote
+[1]
+The proposed expectations on MRM are set out in a proposed new Supervisory Statement (SS) ‘Model risk management principles for banks’ (Appendix 1).
+1.3 This CP is relevant to all firms in the wider banking sector and their external auditors.
+footnote
+[2]
+Credit unions, insurance, and reinsurance firms would not be in scope of the proposed expectations.
+1.4 The MRM principles are intended to address specific shortcomings currently observed in UK banks. Although the proposed expectations would not apply to third-country firms operating in the UK through a branch, the PRA considers that those firms would find the proposed principles useful and would be welcome to consider them to manage model risk within their firm. While the proposals may be relevant to insurance firms, given the ongoing Solvency II review, the PRA has decided not to extend the proposals to insurers at this point in time. The PRA intends to consider at a later stage whether there is a need to strengthen MRM practices for insurers.
+1.5 The purpose underpinning the PRA’s proposed principles is a policy intention to support firms in the further development and implementation of policies, procedures, and practices to identify, manage and control the risks inherent in the use of models. While current PRA expectations in relation to models have been published for selected model types (eg internal capital models and stress testing and those expectations will continue to apply) the proposals in this CP set out the PRA’s proposed expectations for MRM more broadly. The proposed principles covers all elements of the model lifecycle and would be applicable to all types of models that are used to inform key business decisions, whether developed in-house or externally (including vendor models)
+footnote
+[3]
+and models used for financial reporting purposes.
+1.6 The PRA considers the need for sound model governance and effective MRM practices to have increased significantly, and that its proposals would help raise the standard of MRM at UK firms, would support the safe adoption of newly advanced technologies, and would thereby advance the PRA’s general objective of promoting the safety and soundness of the firms it regulates. The PRA’s desired outcome is that firms take a strategic approach to MRM as a risk discipline in its own right. Ensuring consistency of firms’ approaches to MRM is also in line with the PRA’s secondary competition objective.
+Summary of proposals
+1.7 The PRA proposes all firms to adopt five principles which it considers key in establishing an effective model risk management (MRM) framework. The principles are intended to complement existing requirements and supervisory expectations in force on MRM, and include proposals for:
+a proportionate implementation within firms and across firms, in particular for firms that would qualify as a ‘simpler-regime firm’;
+footnote
+[4]
+the identification and allocation of responsibility for the overall MRM framework to the most appropriate Senior Management Function (SMF) holder;
+reporting on the effectiveness of MRM for financial reporting to the audit committee; and
+identifying and managing the risks associated with the use of Artificial Intelligence (AI) technology in modelling techniques such as Machine Learning (ML) to the extent that it applies to the use of models more generally.
+Background
+1.8 The PRA considers firms’ use of models as a key basis for informing important business decisions, to have increased significantly in recent years. This is due, in part, to new regulations and reporting requirements (eg IFRS 9), and regulatory expectations in respect of stress testing.
+1.9 With the rapidly changing environmental, digital landscapes, and evolution of more sophisticated modelling techniques, the PRA anticipates firms' use of models will continue to increase and become more complex as new model types are introduced. Examples include the quantification of the financial risks associated with climate change and the introduction of AI and ML techniques.
+1.10 The PRA has found evidence of poor MRM when reviewing firms’ applications for internal regulatory model permissions and when reviewing approaches to expected credit loss accounting under IFRS 9.
+footnote
+[5]
+The 2018 annual concurrent stress test included a review of the effectiveness of firms’ stress testing MRM practices against the key elements of the MRM principles described in SS3/18 ‘Model risk management principles for stress testing’. The review concluded that a number of areas required improvement and, in some cases, substantial improvement was needed in areas such as board involvement and understanding.
+footnote
+[6]
+1.11 The increasing use of models to inform key business decisions and the increasing complexity of models invariably increases firms' potential exposure to model risk. Inadequate or flawed design and implementation, and inappropriate use of models could lead to adverse consequences that pose risks to the safety and soundness of firms and overall financial stability.
+Implementation and ongoing self-assessment
+1.12 The PRA proposes that the implementation date would be set at 12 months following the publication of the final SS.
+1.13 The PRA proposes that, by the implementation date of the policy, all firms applying the proposed principles would have undertaken an initial self-assessment against the proposals and, where necessary, prepared remediation plans to address any identified shortcomings.
+1.14 The PRA proposes that self-assessments should be updated annually thereafter, and any remediation plans should be reviewed and updated on a regular basis. Both the findings from the self-assessment and remediation plans should be documented and shared with firms’ boards in a timely manner. Firms’ boards should be updated on remediation progress on a regular basis. Firms that qualify as a ‘simpler-regime firm’ would be expected to complete an initial self-assessment, and thereafter at an appropriate frequency that could be less frequent than annual.
+1.15 The PRA proposes that a board appointed accountable individual for MRM would be responsible for ensuring remediation plans are in place with clear ownership for any actions needed. Firms would not be expected to share the remediation plans or self-assessment routinely with the PRA, but should be able to provide them upon request.
+1.16 The PRA considers that the assessment of firms' model development, independent validation, and risk mitigation practices will continue to underpin the PRA’s review of firms’ internal regulatory capital models (internal capital for credit, market, and counterparty credit risk). The PRA intends to seek opportunities to embed the assessment and review of firms’ overall MRM framework into the business as usual supervision of firms, risk assessments, and making use of the work of external auditors.
+Responses and next steps
+1.17 This consultation closes on Friday 21 October 2022. The PRA invites responses to the proposals set out in this consultation. Please address any comments or enquiries to
+CP6_22@bankofengland.co.uk
+. Please indicate in your response if you believe any of the proposals in this CP are likely to impact persons who share protected characteristics under the Equality Act 2010, and if so, please explain which groups and what the impact on such groups might be.
+2: Proposals
+Overview of the model risk management principles for banks
+2.1 The PRA proposes a supervisory expectation for firms to meet five model risk management principles – and in most cases a number of subprinciples - designed to cover all elements of the model lifecycle. The proposed principles set out what the PRA considers to be the core disciplines necessary for a sound MRM framework to manage model risk effectively across all model and risk types. The PRA’s proposed MRM principles are:
+Principle 1 – Model identification and model risk classification
+Firms have an established definition of a model that sets the scope for MRM, a model inventory, and a risk-based tiering approach to categorise models to help identify and manage model risk.
+Principle 2 – Governance
+Firms have strong governance oversight with a board that promotes an MRM culture from the top through setting clear model risk appetite. The board approves the MRM policy and appoints an accountable individual to assume the responsibility to implement a sound MRM framework that will ensure effective MRM practices.
+Principle 3 – Model development, implementation and use
+Firms have a robust model development process with standards for model design and implementation, model selection, and model performance measurement. Testing of data, model construct, assumptions, and model outcomes are performed regularly in order to identify, monitor, record, and remediate model limitations and weaknesses.
+Principle 4 – Independent model validation
+Firms have a validation process that provides ongoing, independent, and effective challenge to model development and use. The individual or body within a firm responsible for the approval of a model ensures that validation recommendations for remediation or redevelopment are actioned so that models are suitable for their intended purpose.
+Principle 5 – Model risk mitigants
+Firms have established policies and procedures for the use of model risk mitigants when models are under-performing, and have procedures for the independent review of post-model adjustments.
+2.2 The PRA considers its proposed principles and sub-principles provide an overarching framework for MRM against which firms' MRM practices can be assessed by the PRA. The PRA considers that the proposed principles are in line with similar supervisory expectations in other countries, eg SR11-7 in the Unites States (US).
+footnote
+[7]
+The PRA considers that this helps promote greater consistency in supervisory assessment across firms, model and risk types, and across regulatory authorities and consistency in the development of future prospective modelling techniques.
+2.3 The PRA also considers that firms’ adoption of the proposed principles would raise the standard of MRM at UK banks, and improve the engagement and participation of senior management and boards, supporting its safety and soundness objective.
+2.4 The PRA considers the proposal would support banks in realising the benefits of developing new models and adopting advanced technologies in a safe and efficient manner. The pace of innovation is increasing, and it is important for the PRA to support firms in safely adopting new technology. However, there are inherent limitations in any new technology and models, which need to be subject to robust controls to mitigate the risks arising from those limitations. Therefore, the PRA considers that firms strengthening their MRM is a crucial step to enable firms to realise the benefits of new technology safely and efficiently.
+Interaction with current policy
+2.5 The PRA’s proposals are intended to be broad expectations for MRM relevant to all model and risk types, and have been designed to be broad enough to accommodate prospective future policies, for example in relation to AI and ML. The PRA’s proposals are intended to complement, not supersede, existing requirements and supervisory expectations that are currently in force for selected model types. These include (not an exhaustive list):
+for credit risk: Article 185: Validation of internal estimates, Article 188: Validation and documentation, Article 189: Corporate governance of the CRR;
+footnote
+[8]
+for counterparty credit risk: Article 288: Review of CCR management system, Article 292 integrity of the modelling process, Article 294 Validation requirements of the CRR;
+for market risk: Article 368 Qualitative requirements, Article 369 Internal Validation of the CRR; and
+the high-level information outlined in ‘The PRA’s approach to banking supervision’.
+footnote
+[9]
+2.6 Under the proposals, firms would continue to apply the supervisory expectations and relevant guidance applicable to them and their particular models. These include:
+the PRA's expectations regarding the use of internal ratings based (IRB) approaches.
+footnote
+[10]
+the PRA's expectations in relation to post-approval changes to Counterparty Credit Risk Internal Model Method (IMM), and internal models approach for master netting agreements (Repo VaR) models.
+footnote
+[11]
+the PRA's expectations of firms in relation to market risk.
+footnote
+[12]
+the PRA's expectation as to the model risk management practices firms should adopt when using stress test models.
+footnote
+[13]
+the PRA's expectations of a firm’s risk management and governance of algorithmic trading.
+footnote
+[14]
+the Basel Committee on Banking Supervision’s guidance on credit risk and accounting for expected credit losses.
+footnote
+[15]
+2.7 In future, the PRA may seek to rationalise existing references to MRM under a single overarching policy framework, where the proposed broad expectations would be applicable to all model and risk types and where specific requirements (such as IRB model requirements) and any more detailed expectations in relation to specific model types (current and prospective) would be seen as model or risk-specific chapters. Diagram 1 illustrates the interaction of the draft SS with current supervisory expectations relevant to particular models.
+Diagram 1: Current, proposed and potential future envisaged supervisory framework for MRM
+Proportionality
+2.8 The PRA considers the MRM principles to represent core risk management practices for all models and all risk types. The PRA proposes that, for all firms, the principles should be applied in a way commensurate with their size, business activities, and the complexity and extent of their model use. For example, for firms with a smaller number of models or less complex models, maintaining a model inventory would be considered less burdensome and the criteria for classifying models into tiers is expected to be materially simpler than for firms with a wider range of models or more complex models.
+2.9 The PRA also proposes the framework to be applied proportionately within each firm. The rigour, intensity, prioritisation, and frequency of model validation, application of risk controls, independent review, performance monitoring, and re-validation would be expected to be commensurate with the associated model tier assigned to a model.
+2.10 The PRA proposes in addition that, firms that qualify as a ‘simpler-regime firm’
+footnote
+[16]
+would apply Principle 1 (establish the model definition, keep an inventory and classify models) in full, but would be expected to only focus on the basic elements of Principle 2, Governance:
+The board approves the MRM policy and appoints an accountable individual to assume the responsibility to implement a sound MRM framework that will ensure effective MRM practices.
+Firms have clearly documented policies and procedures that formalise the MRM framework and support its effective implementation.
+Internal Audit (IA) periodically assess both the effectiveness of the MRM framework.
+Boards and senior management retain responsibility for the management of model risk when the firm uses externally developed models, third party and vendor products.
+2.11 Simpler-regime firms
+footnote
+[17]
+would be expected to identify if there are any models that have a material bearing on business decisions and which are complex in nature (the PRA anticipates a simpler-regime firm to have a limited number such models or possibly no such models). These firms would be expected to apply Principles 3, 4 and 5 only to those models identified as having a material bearing and which are complex. Furthermore where simpler-regime firms identify specific models where Principles 3, 4, and 5 would apply, the PRA proposes that the focus to be on meeting the highest-level outcome as described for each Principle, and only apply the individual sub-principles where this is necessary to achieve this objective.
+SMF accountability for model risk management framework
+2.12 The PRA proposes that firms would identify and allocate responsibility for the overall MRM framework to the most appropriate SMF holder, with the responsibility for the risks resulting from models operated by the firm, and ensure the responsibilities in the SMF’s Statement of Responsibilities reflect this. The PRA would expect firms to take a centralised approach to allocate responsibility for their MRM frameworks to an SMF. Given their role in the overall risk management within a firm, in many cases it may be that the Chief Risk Function (SMF4) is the most appropriate to fulfil this proposed expectation.
+2.13 The PRA has considered an accountable SMF is the most effective way to create a clear responsibility for the establishment of an MRM framework within firms, given that models can be used in various parts of a firm. A robust MRM framework should have a senior individual within the firm who is responsible for the whole framework. However, the creation of an accountable individual for the framework would not relieve business risk and control functions of their responsibilities in relation to development and use of individual models within the firm.
+2.14 The PRA considers active senior management, and the involvement of the board of directors in firms’ MRM governance processes, as key to robust and effective MRM practices. The PRA considers that strengthening the accountability of firms and individuals to manage model risk would improve the engagement and participation of senior management and boards in the implementation process which would drive a successful, robust implementation of MRM and thereby support its safety and soundness objective.
+Financial reporting and external auditors
+2.15 The PRA proposes that firms report on the effectiveness of MRM for financial reporting to their audit committee on a regular basis, and at least annually, and ensure that this report is available on a timely basis, to facilitate effective audit planning. The PRA considers that it gains substantial insights into the control environment of regulated firms through the auditor-PRA supervisor dialogue, which includes direct engagement with auditors and audit committees.
+2.16 The PRA considers that the expectations in the draft supervisory statement are also relevant to models used for accounting purposes. Although the PRA has no role in setting, interpreting, or enforcing accounting standards, it has an interest in how the standards are implemented, where the application of those accounting standards has an impact on its statutory objectives. Given the reliance on models in the application of accounting standards, the PRA considers effective MRM for financial reporting to be important in ensuring the safety and soundness of firms.
+2.17 The PRA considers that the effectiveness of MRM for financial reporting is relevant to the auditor’s assessment of, and response to, the risk of material misstatement as part of the statutory audit, including its understanding of a firm’s processes for monitoring the effectiveness of its system of internal controls and its understanding of a firm’s control activities. The PRA considers that the benefit of auditors engaging with the effectiveness of MRM for financial reporting and discussing their findings as part of the auditor-supervisor dialogue is that it enables supervisors to make effective use of auditors’ work in reviewing firms’ MRM.
+Firms’ use of Artificial Intelligence and Machine Learning models
+2.18 Since there are no PRA expectations that address model risk in a generic and non-domain specific manner, the proposed SS provides a cross-cutting definition of a ‘model’, and defines the overarching framework for firms’ MRM. As such, the proposals in this CP set out principles and expectations that apply to all models, including the use of AI technology in modelling techniques such as ML.
+2.19 The PRA considers that the use of AI technology in modelling techniques such as ML introduces risks unique to the use of the technology, but also magnifies existing model risks associated with the use of (non-AI and ML) models. The sources of these risks are primarily driven by the operating speed of the systems supporting the technology, the opacity, and complexity of the underlying models, the ability for continuous learning and dynamic recalibration, and data risks stemming from the use of larger datasets, including alternative or unstructured data.
+footnote
+[18]
+2.20 The risks relating to the use of AI and ML models have been considered by the PRA in the design of the proposed principles, to the extent that they apply to models in general. The PRA would be interested to receive industry responses concerning the adequacy of the proposed principles to address the general model risks magnified by the use of AI and ML models. The PRA invites responses to the following question:
+In your view, are there any components of the MRM framework where the proposed principles are not sufficient to identify, manage, monitor, and control the risks associated with AI or ML models?
+Please address any comments or enquiries to
+CP6_22@bankofengland.co.uk
+.
+3: The PRA’s duty to consult
+3.1 In carrying out its policy making functions, the PRA is required to comply with several legal obligations. When not making rules, the PRA has a public law duty to consult widely where it would be fair to do so.
+3.2 The PRA fulfils its statutory obligations and public law duties by providing the following in relation to the proposed policy:
+a cost benefit analysis
+;
+compatibility with the PRA’s objectives:
+an explanation of the PRA’s reasons for considering that making the proposed policy is compatible with the PRA’s duty to act in a way that advances its general objective,
+footnote
+[19]
+and secondary competition objective;
+footnote
+[20]
+FSMA regulatory principles:
+an explanation of the ways in which having regard to the regulatory principles has affected the proposed policy;
+footnote
+[21]
+impact on mutuals:
+a statement as to whether the impact of the proposed policy will be significantly different to mutuals than to other persons;
+footnote
+[22]
+HM Treasury (HMT) recommendation letters:
+the Prudential Regulation Committee (PRC) should have regard to aspects of the Government’s economic policy as recommended by HMT;
+footnote
+[23]
+and
+equality and diversity:
+the PRA is also required by the Equality Act 2010
+footnote
+[24]
+to have due regard to the need to eliminate discrimination and to promote equality of opportunity in carrying out its policies, services, and functions.
+3.3 Appendix 2 lists the statutory obligations applicable to the PRA’s policy development process. The analysis in this chapter explains how the proposals have had regard to the most relevant matters listed in paragraph 3.2, including an explanation of the ways in which having regard to these matters has affected the proposals.
+PRA objectives
+3.4 In discharging its general functions of determining general policy and principles, the PRA must, so far as reasonably possible, act in a way that advances its general objective to promote the safety and soundness of the firms it regulates. The PRA’s proposed expectations for MRM are intended to support banks in the development and implementation of policies and procedures to identify, manage, and control the risks inherent in the use of model output in their decision making. The PRA considers that this would ensure the implementation of good risk management practices that would reduce or mitigate to some extent against financial losses and associated risks to the advancement of the PRA’s primary objective of promoting the safety and soundness of firms, due to model errors.
+3.5. When discharging its general functions in a way that advances its primary objectives, the PRA has, as a secondary objective, to act so far as is reasonably possible in a way that facilitates competition. The PRA considers that its proposed expectations would facilitate effective competition by ensuring that the regulatory burden is commensurate with the benefits. This is achieved through the scope of the proposed principles, and the proposal of a proportionate application customised to be commensurate with a firm's size and business activities.
+Have regards FSMA regulatory principles
+3.6 In developing these proposals, the PRA has had regard to the regulatory principles. The PRA considers that five of the regulatory principles are of particular relevance:
+The principle that the PRA should exercise its functions transparently:
+The PRA has set out key information relevant to its proposals, giving respondents the opportunity to comment. The PRA considers its proposed overarching MRM framework is complementary to existing supervisory expectations for models, and the PRA intends to use the proposed MRM framework to inform future policy proposals relating to models. Therefore, the PRA considers that the proposals outlined in this CP would bring greater clarity and transparency on the PRA’s expectations concerning MRM, and help firms to consider the interdependencies between existing supervisory expectations, as well as any future policy proposals, relating to models.
+The principle that a burden or restriction which is imposed on a person should be proportionate to the benefits which are expected to result from the imposition of that burden:
+The proposals have been structured by the PRA around high-level principles designed so that firms are able to adopt a proportionate approach to meeting the PRA’s proposed expectations. The PRA considers the benefits of an overarching MRM framework applicable to all model and risk types could support firms to realise the benefits of new technology safely, for example AI and ML, more efficiently and safely. The proposals also make clear that firms’ actions to meet the expectations should be commensurate with the nature and scale of the firm, and the materiality of the models in question. The proposed expectations are tailored further for smaller firms, who are likely to fall within the PRA’s proposed simpler regime.
+The need to use the resources of the PRA in the most efficient and economical way:
+The PRA considers its proposals aim to help reduce pressure on its resources by enabling the continuous assessment of MRM to be more efficiently embedded into the business as usual supervision of firms. The PRA considers this would deliver more efficient outcomes, compared to supervisors assessing the adequacy of firms MRM without an overarching framework. The PRA considers an overarching MRM framework that could be applied to all models, would also support the PRA in developing future policy proposals to respond to risks arising from new technologies, such as AI and ML.
+Recognising differences in businesses:
+The PRA considers its proposals reflect consideration of the types of firms to which the proposed expectations should apply, given the proposals are structured around high-level principles designed to enable proportionate application for firms using less complex models, or making less use of models to inform business decisions.
+The responsibilities of senior management of persons subject to requirements imposed by or under FSMA:
+The PRA considers that this principle is reflected in its proposal that firms nominate a senior management function as responsible for MRM.
+3.7 The PRA has considered the remaining FSMA regulatory principles (see references in Appendix 2), and considers that they are not relevant to the proposals.
+Impact on mutuals
+3.8 The PRA considers that the impact of the proposals on mutuals is expected to be no different from the impact on other firms.
+HM Treasury recommendation letters
+3.9 HMT has made recommendations to the Prudential Regulation Committee (PRC) about aspects of the Government’s economic policy to which the PRC should have regard when considering how to advance the PRA’s objectives and apply the regulatory principles.
+Competition:
+The PRA considers its proposals would support banks in realising the benefits of new developing models and advanced technologies in a safe and efficient manner. The PRA considers its proposals would support more efficient capital allocation for the banking system overall, and that support sound risk management and individual firms taking timely decisions to mitigate potential losses.
+Competitiveness:
+The PRA considers its proposed MRM principles would help raise the standard of MRM at larger UK firms by setting supervisory expectations in line with their international peers.
+Innovation:
+The PRA considers its proposals address risks emphasised by new technology and data driven methods such as AI and/or ML. The PRA considers that this would support the safe adoption of AI technology, support the strategy of the UK government and would not fetter AI and/or ML innovation.
+Climate Change Act 2008 (Carbon Target for 2050)
+and the government’s energy security strategy:
+The PRA does not consider that the proposals will have any adverse impact on the carbon target for 2050 as set out in section 1 of the Climate Change Act 2008, and the government’s energy security strategy.
+3.10 The PRA has considered the remaining aspects of government economic policy as laid out in the HMT recommendation letters (see references in Appendix 2), and considers that they are not relevant to this proposal.
+Equality and diversity
+3.11 The PRA considers that the proposals do not create any equality and diversity implications.
+Cost benefit analysis
+3.12 The PRA considers that the proposals in this CP would result in costs for some firms (both one-off and ongoing), particularly firms’ that have no existing model risk framework, and so would need to meet all of the proposed expectations within the CP.
+3.13 However, the PRA considers that a significant number of firms will already have some components of the framework in place, either because of existing requirements (such as internal model approvals) or because of requirements established by authorities in other jurisdictions (eg SR11-7 in the US). Therefore, the cost to firms’ would vary depending on the maturity of an individual firm’s current MRM frameworks.
+3.14 The PRA recognises the potential upfront and ongoing costs of its proposals. Therefore, the PRA proposes to include a 12-month implementation period, by the end of which firms would be expected to complete a self-assessment and remediation plan.
+3.15 The PRA considers the proposals in this CP would generate economic benefits to individual firms as well as to the broader economy. Development of a robust MRM framework would improve understanding and management of the risks created by the use of models throughout firms. Firms use models to inform business decisions as well for regulatory purposes, and a robust MRM framework would lead to better models, which in turn, could lead to improved business decisions, better pricing and customer management.
+3.16 Improved MRM frameworks would enable firms to better manage the risks associated with the use of new and advancing modelling techniques, such as AI and ML.
+3.17 The PRA considers a better understanding of the risks from model use, and the limitations of models, would mean that firms are less likely to build risk unknowingly. This improvement in risk management across the industry could in turn lead to a reduced probability and severity of future crises in the financial sector.
+The term ‘banks’ will be used where the PRA need to differentiate between the banking and insurance sectors.
+Firms’ external auditors are invited to respond to this CP given their role in assessing firms’ implementation of expected credit loss accounting under Financial Reporting Standards 9 (IFRS 9).
+Vendors and external consultants that provide vendor models may find this CP useful as it sets out the PRA's expectations for firms’ MRM frameworks.
+As defined in
+CP5/22 ‘The strong and simple framework: a definition of a simple-regime firm’
+, noting that this is a working term that might be revised in due course.
+September 2021:
+Letter from Victoria Saporta ‘Thematic feedback from the 2020/2021 round of written auditor reporting’.
+December 2018:
+Effectiveness of stress‑testing model risk management
+.
+‘Supervisory Guidance on Model Risk Management’, Board of Governors of the Federal Reserve System, Office of the Comptroller of the Currency, April 2011.
+Capital Requirements Regulation (575/2013) as it has effect in domestic law (CRR).
+PRA’s approach to supervision of the banking and insurance sector
+, October 2018.
+SS11/13 'Internal Ratings Based (IRB) approaches'
+, October 2021.
+SS12/13 'Counterparty Credit Risk'
+, October 2021.
+SS13/13 'Market risk’
+, November 2020.
+SS3/18 'Model risk management principles for stress testing'
+, April 2018.
+SS5/18 'Algorithmic trading'
+, June 2018.
+‘Guidance on credit risk and accounting for expected credit losses’
+, December 2015.
+As defined in
+CP5/22 ‘The strong and simple framework: a definition of a simple-regime firm’
+, noting that this is a working term that might be revised in due course.
+‘Simpler-regime firms’ are not expected to have any IRB models.
+Key finding published in the
+final report of the Artificial Intelligence Public-Private Forum (AIPPF)
+, February 2022.
+Section 2B of FSMA.
+Section 2H(1) of FSMA.
+Sections 2H(2) and 3B of FSMA.
+Section 138K of FSMA.
+Section 30B of the Bank of England Act 1998.
+Section 149.
+Section 149.
+Close
+Section 30B of the Bank of England Act 1998.
+Close
+Section 138K of FSMA.
+Close
+Sections 2H(2) and 3B of FSMA.
+Close
+Section 2H(1) of FSMA.
+Close
+Section 2B of FSMA.
+Close
+Key finding published in the
+final report of the Artificial Intelligence Public-Private Forum (AIPPF)
+, February 2022.
+Close
+‘Simpler-regime firms’ are not expected to have any IRB models.
+Close
+As defined in
+CP5/22 ‘The strong and simple framework: a definition of a simple-regime firm’
+, noting that this is a working term that might be revised in due course.
+Close
+‘Guidance on credit risk and accounting for expected credit losses’
+, December 2015.
+Close
+SS5/18 'Algorithmic trading'
+, June 2018.
+Close
+SS3/18 'Model risk management principles for stress testing'
+, April 2018.
+Close
+SS13/13 'Market risk’
+, November 2020.
+Close
+SS12/13 'Counterparty Credit Risk'
+, October 2021.
+Close
+SS11/13 'Internal Ratings Based (IRB) approaches'
+, October 2021.
+Close
+PRA’s approach to supervision of the banking and insurance sector
+, October 2018.
+Close
+Capital Requirements Regulation (575/2013) as it has effect in domestic law (CRR).
+Close
+‘Supervisory Guidance on Model Risk Management’, Board of Governors of the Federal Reserve System, Office of the Comptroller of the Currency, April 2011.
+Close
+December 2018:
+Effectiveness of stress‑testing model risk management
+.
+Close
+September 2021:
+Letter from Victoria Saporta ‘Thematic feedback from the 2020/2021 round of written auditor reporting’.
+Close
+As defined in
+CP5/22 ‘The strong and simple framework: a definition of a simple-regime firm’
+, noting that this is a working term that might be revised in due course.
+Close
+Vendors and external consultants that provide vendor models may find this CP useful as it sets out the PRA's expectations for firms’ MRM frameworks.
+Close
+Firms’ external auditors are invited to respond to this CP given their role in assessing firms’ implementation of expected credit loss accounting under Financial Reporting Standards 9 (IFRS 9).
+Close
+The term ‘banks’ will be used where the PRA need to differentiate between the banking and insurance sectors.
+Close
+Appendices
+Model risk management principles for banks
+(PDF 1MB)
+Convert this page to PDF
+Other prudential regulation releases
+Prudential Regulation // PRA Regulatory Digest
+01 April 2026
+PRA Regulatory Digest – March 2026
+PRA Regulatory Digest – March 2026
+Prudential Regulation // Consultation paper
+01 April 2026
+CP6/26 – High loan to income lending
+CP6/26 – High loan to income lending
+Prudential Regulation // Policy statement
+31 March 2026
+PS8/26 – Financial Services Compensation...
+PS8/26 – Financial Services Compensation Scheme – Management Expenses Levy Limit (MELL) 2026/27
+Prudential Regulation // Supervisory statement
+26 March 2026
+SS9/17 - Recovery planning
+SS9/17 - Recovery planning
+View more
+Other prudential regulation releases
+Back to top
+Follow us
+Follow us
+Connect with us on LinkedIn
+Follow us on Twitter
+Add us on Facebook
+Follow us on Instagram
+Follow us on Threads
+Follow us on TikTok
+Watch us on Youtube
+Find us on Flickr
+Museum
+Like the Bank of England museum on Facebook
+Follow the Bank of England museum on Instagram
+Follow the Bank of England museum on Threads
+Follow the Bank of England museum on TikTok
+Useful links
+Useful links
+About us
+Archive
+Careers
+Contact us
+Explainers
+FAQs
+Freedom of Information
+Glossary
+Museum
+Subscribe to emails
+Bank of England
+Threadneedle Street, London, EC2R 8AH
+Switchboard:
++44(0)20 3461 4444
+Enquiries:
++44(0)20 3461 4878
+Bank of England Museum
+Bartholomew Lane, London, EC2R 8AH
+Accessibility statement
+Cookies
+Cymraeg
+Legal
+Privacy
+Sitemap
+©2026 Bank of England

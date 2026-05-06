@@ -434,8 +434,8 @@ def build_markdown_report(
     lines.append("")
     lines.append("## Detector Summary")
     lines.append("")
-    lines.append("| Variant | Answered Rate | Abstain Rate | Contradiction Rate | Unsupported Answer Rate | Global C Mean | Global E Mean | Dominant Contradiction Count | Conflict Trigger Count |")
-    lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+    lines.append("| Variant | Answered Rate | Abstain Rate | Detector Run Rate | Model Abstain Rate | Contradiction Rate | Unsupported Answer Rate | Global C Mean | Global E Mean | Dominant Contradiction Count | Conflict Trigger Count |")
+    lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
     for alias, _ in variants:
         summary = summaries[alias]
         status = "invalid" if not summary.get("detector_available", True) else "ok"
@@ -444,6 +444,8 @@ def build_markdown_report(
             + f"{alias} ({status}) | "
             + f"{summary['answered_rate']:.3f} | "
             + f"{summary['abstain_rate']:.3f} | "
+            + f"{summary['detector_run_rate']:.3f} | "
+            + f"{summary['model_requested_abstain_rate']:.3f} | "
             + f"{summary['contradiction_rate']:.3f} | "
             + f"{summary['unsupported_answer_rate']:.3f} | "
             + f"{summary['contradiction_prob_mean_global']:.3f} | "
@@ -460,6 +462,14 @@ def build_markdown_report(
         lines.append(f"### {alias}")
         lines.append("")
         lines.append(f"- Detector available: `{summary.get('detector_available', True)}`")
+        lines.append(
+            f"- Detector ran on `{summary.get('detector_ran_count', 0)}` / "
+            f"`{summary.get('total_questions', 0)}` questions"
+        )
+        lines.append(
+            f"- Model requested abstain on `{summary.get('model_requested_abstain_count', 0)}` / "
+            f"`{summary.get('total_questions', 0)}` questions"
+        )
         lines.append(f"- Detector model path: `{summary.get('detector_model_path')}`")
         if summary.get("detector_error"):
             lines.append(f"- Detector error: `{summary['detector_error']}`")
@@ -543,6 +553,8 @@ def compute_summary(
     answered = sum(1 for row in rows if row["final_decision"] == "answer")
     total = len(rows)
     abstain = sum(1 for row in rows if row["is_abstain"])
+    detector_ran = sum(1 for row in rows if row.get("hallucination_detector_ran"))
+    model_requested_abstain = sum(1 for row in rows if row.get("model_requested_abstain"))
     contradiction_cases = sum(1 for row in rows if row["predicted_detector_label"] == "contradiction")
     unsupported_cases = sum(
         1 for row in rows
@@ -573,6 +585,10 @@ def compute_summary(
         "total_questions": total,
         "answered_rate": (answered / total) if total else 0.0,
         "abstain_rate": (abstain / total) if total else 0.0,
+        "detector_run_rate": (detector_ran / total) if total else 0.0,
+        "detector_ran_count": detector_ran,
+        "model_requested_abstain_rate": (model_requested_abstain / total) if total else 0.0,
+        "model_requested_abstain_count": model_requested_abstain,
         "contradiction_rate": (contradiction_cases / total) if total else 0.0,
         "unsupported_answer_rate": (unsupported_cases / total) if total else 0.0,
         "contradiction_prob_mean_global": _mean(contradiction_values),
@@ -653,7 +669,9 @@ def run_variant(
             "hallucination_score": _to_float(result.get("hallucination_score")),
             "hallucination_detected": result.get("hallucination_detected"),
             "hallucination_error": result.get("hallucination_error"),
-            "detector_available": bool(result.get("hallucination_detected") is not None),
+            "detector_available": bool(rag.hallucination_detector is not None),
+            "hallucination_detector_ran": bool(result.get("hallucination_detector_ran")),
+            "model_requested_abstain": bool(result.get("model_requested_abstain")),
             "detector_model_path": str(detector_model_path),
             "predicted_detector_label": "",
             "final_decision": final_decision,

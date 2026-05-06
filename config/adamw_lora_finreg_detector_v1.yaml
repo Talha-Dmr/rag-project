@@ -1,0 +1,69 @@
+# FinReg-aware continuation config for DeBERTa-v3-small LoRA detector adaptation.
+# Intended use:
+#   1. Build data:
+#      PYTHONPATH=. venv312/bin/python scripts/build_finreg_detector_nli_dataset.py
+#   2. Warm-start from the current best proxy detector:
+#      PYTHONPATH=. venv312/bin/python scripts/train_hallucination_model.py \
+#        --config adamw_lora_finreg_detector_v1 \
+#        --data-dir data/training/nli_dataset_finreg_detector_v1 \
+#        --output-dir models/checkpoints/adamw_lora_finreg_detector_v1 \
+#        --init-from detector-assets/models/checkpoints/adamw_lora_balanced_recovery_v2/best_model
+
+training:
+  model:
+    base_model: microsoft/deberta-v3-small
+    num_labels: 3
+    cache_dir: ./models/training
+    lora:
+      enabled: true
+      r: 8
+      lora_alpha: 16
+      lora_dropout: 0.05
+      bias: none
+      task_type: SEQ_CLS
+      target_modules: ["query_proj", "key_proj", "value_proj"]
+      modules_to_save: ["classifier", "pooler", "score"]
+
+  hyperparameters:
+    learning_rate: 5.0e-6
+    weight_decay: 0.01
+    warmup_steps: 0
+    max_epochs: 3
+    batch_size: 8
+    gradient_accumulation_steps: 1
+    max_grad_norm: 1.0
+    mixed_precision: fp32
+    optimizer: adamw
+    scheduler: linear
+    loss:
+      type: weighted_ce
+      class_weights: [1.0, 1.25, 1.1]
+      label_smoothing: 0.02
+
+  data:
+    max_seq_length: 192
+    balance_classes: true
+    balance_strategy: undersample
+    train_sampling_strategy: balanced
+    train_sampling_power: 1.0
+
+  checkpointing:
+    save_dir: ./models/checkpoints/adamw_lora_finreg_detector_v1
+    save_strategy: best
+    save_every_n_epochs: 1
+    save_total_limit: 2
+    metric_for_best: f1_macro
+    mode: max
+
+  early_stopping:
+    enabled: true
+    patience: 2
+    metric: f1_macro
+    mode: max
+    min_delta: 0.0001
+
+  output:
+    training_data_dir: ./data/training/nli_dataset_finreg_detector_v1
+    checkpoint_dir: ./models/checkpoints/adamw_lora_finreg_detector_v1
+    final_model_dir: ./models/hallucination_detector_adamw_lora_finreg_detector_v1
+    logs_dir: ./logs/training

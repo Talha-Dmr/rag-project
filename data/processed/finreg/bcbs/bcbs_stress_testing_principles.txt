@@ -1,0 +1,65 @@
+Stress testing principles
+Stress testing principles
+This version
+BCBS
+|
+Guidelines
+|
+17 October 2018
+|
+Status:
+Current
+PDF full text
+(208kb)
+|
+15
+pages
+Topics:
+Basel core principles
+,
+Macroprudential / systemic importance
+,
+Supervisory cooperation
+The Basel Committee on Banking Supervision has issued its
+Stress testing principles
+, which replace the
+Principles for sound stress testing practices and supervision
+published in May 2009.
+The 2009 principles were designed to address key weaknesses in stress testing practices as highlighted by the global financial crisis. Since then, the role of stress testing has rapidly evolved and grown in importance in many jurisdictions. The principles published today have been updated to reflect that stress testing is now both a critical element of risk management for banks and a core tool for banking supervisors and macroprudential authorities. The updated principles are set at a high level so that they can be applied across banks and jurisdictions while remaining relevant as stress testing practices continue to evolve.
+The principles are guidelines that focus on the core elements of stress testing frameworks. These include the objectives, governance, policies, processes, methodology, resources and documentation that guide stress testing activities and facilitate the use, implementation and oversight of stress testing frameworks. Each principle is followed by a short description of considerations that are equally relevant for banks and authorities. This description is followed by additional points applicable to either banks or authorities, as follows:
+Additional points for banks: points with particular relevance to (a) banks' own internal stress testing activities and (b) their participation in bank-run supervisory stress tests.
+Additional points for authorities: points with particular relevance to (a) supervisor-run stress tests and (b) the authorities' role in bank-run supervisory stress tests. They also cover the role of authorities in their oversight of banks' internal stress testing activities.
+A
+consultative version
+of the Stress testing principles was published in December 2017. The Committee wishes to thank all those who contributed time and effort to
+express their views
+during the consultation process.
+Related information
+Press
+release:
+Basel Committee issues final "Stress testing principles"
+Principles
+for sound stress testing: Basel Committee issues consultative paper
+Sound
+stress testing principles issued by Basel Committee
+Implementation
+of stress testing practices by supervisors: Basel Committee publishes peer review
+Consultative
+document on stress testing principles and a range of practices report issued by the Basel Committee
+Top
+Share this page
+Stay connected
+Follow us
+Sign up to receive email alerts
+About BIS
+Sitemap
+FAQ
+Contact
+Careers
+Translations
+Legal information
+Terms and conditions
+Copyright and permissions
+Privacy notice
+Cookies notice
+Email scam warning

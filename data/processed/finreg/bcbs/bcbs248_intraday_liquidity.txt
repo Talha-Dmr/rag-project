@@ -1,0 +1,61 @@
+Monitoring tools for intraday liquidity management
+Monitoring tools for intraday liquidity management
+This version
+BCBS
+|
+Standards
+|
+11 April 2013
+|
+Status:
+Consolidated
+PDF full text
+(341kb)
+|
+26
+pages
+Topics:
+Liquidity risk
+Note
+This standard has been integrated into the consolidated
+Basel Framework
+.
+This document is the final version of the Committee's
+Monitoring tools for intraday liquidity management
+. It was developed in consultation with the Committee on Payment and Settlement Systems to enable banking supervisors to better monitor a bank's management of intraday liquidity risk and its ability to meet payment and settlement obligations on a timely basis. Over time, the tools will also provide supervisors with a better understanding of banks' payment and settlement behaviour.
+The framework includes:
+the detailed design of the monitoring tools for a bank's intraday liquidity risk;
+stress scenarios;
+key application issues; and
+the reporting regime.
+Management of intraday liquidity risk forms a key element of a bank's overall liquidity risk management framework. As such, the set of seven quantitative monitoring tools will complement the qualitative guidance on intraday liquidity management set out in the Basel Committee's 2008
+Principles for Sound Liquidity Risk Management and Supervision
+. It is important to note that the tools are being introduced for monitoring purposes only and that internationally active banks will be required to apply them. National supervisors will determine the extent to which the tools apply to non-internationally active banks within their jurisdictions.
+Basel III: The Liquidity Coverage Ratio and liquidity risk monitoring tools
+(January 2013), which sets out one of the Committee's key reforms to strengthen global liquidity regulations does not include intraday liquidity within its calibration. The reporting of the monitoring tools will commence on a monthly basis from 1 January 2015 to coincide with the implementation of the LCR reporting requirements.
+An earlier version of the framework of monitoring tools was
+issued for consultation in July 2012
+. The Committee wishes to thank those who provided
+feedback and comments
+as these were instrumental in revising and finalising the monitoring tools.
+Related information
+Press
+release:
+Framework on monitoring tools for intraday liquidity management issued by the Basel Committee
+Top
+Share this page
+Stay connected
+Follow us
+Sign up to receive email alerts
+About BIS
+Sitemap
+FAQ
+Contact
+Careers
+Translations
+Legal information
+Terms and conditions
+Copyright and permissions
+Privacy notice
+Cookies notice
+Email scam warning

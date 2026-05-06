@@ -1,0 +1,1367 @@
+[Page 1]
+Supervisory Statement | SS5/21
+International banks: The PRA’s
+approach to branch and
+subsidiary supervision
+July 2021
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 2]
+Supervisory Statement | SS5/21
+International banks: The PRA’s
+approach to branch and subsidiary
+supervision
+July 2021
+© Bank of England 2021
+Prudential Regulation Authority | 20 Moorgate | London EC2R 6DA
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 3]
+Contents
+Introduction 1
+Overall approach of responsible openness 3
+General approach, size, and systemic importance 6
+Information, co-operation, and controls to be effectively supervised 11
+Integration and independence 23
+Additional considerations for the supervision and authorisation of branches 27
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 4]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 1
+Introduction
+This Supervisory Statement (SS) expands on the Prudential Regulation Authority’s (PRA’s)
+approach to banking supervision.1 It applies to all PRA-authorised banks and designated investment
+firms that are headquartered outside of the UK or are part of a group based outside of the UK.2 In
+this SS, such firms are referred to as ‘international banks’. It therefore covers those firms operating
+in the UK as a subsidiary or through a branch. Accordingly, this SS replaces SS1/18 ‘International
+banks: the Prudential Regulation Authority’s approach to branch authorisation and supervision’.3
+Although this SS largely consolidates the PRA’s existing approach to international banks, the PRA
+recognises that firms (including firms operating with deemed authorisations under the temporary
+permissions regime (TPR)) may need additional time to adjust.4 Accordingly, the PRA will adopt a
+proportionate approach to implementation. Firms operating under the TPR will not need to meet
+the expectations in this SS immediately, but will need to do so as soon as practicable (taking into
+account their individual business model and systemic impact), and in any event by the time they are
+authorised by the PRA and exit the TPR. As part of pre-authorisation discussions, the PRA will expect
+such firms to demonstrate how they intend to meet these expectations. The PRA expects all other
+authorised firms within the scope of this SS to meet the expectations set out within a reasonable
+time, taking into account the firm’s current position and the scale of change that might be required.
+These firms should provide their supervisors with a clear explanation of any gaps they need to
+address and their proposed timeframe for doing so.
+Many of the expectations in this SS apply both to subsidiaries and to firms operating through a
+UK branch. To the extent possible, this SS seeks to draw a distinction between the PRA’s
+expectations which are specific to UK branches or to UK subsidiaries (rather than those that apply to
+both). While this SS draws out and elaborates on matters discussed in other SSs that are particularly
+relevant for international banks, it is to be read with, and does not replace, international banks’
+obligations under applicable legislation, the PRA’s rules, and the expectations set out in its policy
+publications.5
+This SS sets out the PRA’s expectations for receiving information concerning the risks in the
+wider group and co-operation from other supervisory authorities concerned with the firm or its
+wider group.6 This is necessary for the PRA to be satisfied that the international bank is meeting
+threshold conditions, particularly the threshold condition concerning the effective supervision of the
+firm. This SS also sets out expectations of international banks in meeting the threshold condition on
+the prudent conduct of business, including their systems and controls and risk management.
+This SS is structured as follows:
+ Chapter 2 summarises the PRA’s overall approach and the relationship between (i) a firm’s size
+and systemic importance; (ii) the information, co-operation, and controls likely to be required
+to be effectively supervised; and (iii) the degree of independence between UK and overseas
+business.
+1 October 2018:: https://www.bankofengland.co.uk/prudential-regulation/publication/pras-approach-to-supervision-of-the-banking-
+and-insurance-sectors.
+2 PRA designated investment firms list: www.bankofengland.co.uk/prudential-regulation/authorisations/which-firms-does-the-pra-
+regulate.
+3 March 2018: https://www.bankofengland.co.uk/prudential-regulation/publication/2018/international-banks-pras-approach-to-
+branch-authorisation-and-supervision-ss.
+4 https://www.bankofengland.co.uk/eu-withdrawal/temporary-permissions-regime.
+5 Available at: https://www.bankofengland.co.uk/prudential-regulation/policy.
+6 In this SS, references to a group include, in the case of a branch, the legal entity of which the branch forms part.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 5]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 2
+ Chapter 3 then elaborates on the first of those points – the relationship between a firm’s size
+and systemic importance – as well as setting out some general expectations.
+ Chapter 4 expands on the information, co-operation, and controls likely to be required to be
+effectively supervised.
+ Chapter 5 explains how the degree of independence between UK and overseas business in the
+firm or group needs to be commensurate with the two factors above and, in particular, how the
+PRA may use its supervisory tools, if necessary, to ensure that this is achieved.
+ Chapter 6 explains additional expectations the PRA has for firms operating in the UK through a
+branch, whether or not they are part of a wider group. In particular, it sets out in more detail
+the specific factors considered when deciding whether to authorise firms to undertake activities
+in the UK as a branch or a subsidiary instead.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 6]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 3
+Overall approach of responsible openness
+The PRA’s supervisory approach is grounded in the risks to its statutory objective of promoting
+the safety and soundness of PRA authorised firms, particularly by seeking to avoid adverse effects on
+the stability of the financial system of the UK. The PRA has to be satisfied that a firm is capable of
+meeting threshold conditions on an ongoing basis, including the requirement that it is capable of
+being effectively supervised by the PRA. For international banks, this will depend in part on the risks
+in the wider group being visible to the PRA, and the level of co-operation and information it is
+receiving from the firm and relevant overseas supervisory and resolution authorities.7 This is
+because the PRA needs to understand what risks the UK branch or subsidiary is exposed to and how
+these are dependent on the business and risk profile of the rest of the firm or the group.
+For UK subsidiaries of groups based outside the UK, the PRA applies the same regulatory
+requirements and follows the same supervisory framework as for firms that are based in the UK and
+are either not part of a group or are part of a group based in the UK. However, its supervisory
+approach takes into account the links between the subsidiary and the rest of the group of which it
+forms a part. Where that group is not based in the UK, the PRA will typically have less information on
+the risks arising in the group, and less ready access to those responsible for group risk management.
+The PRA tailors its supervisory approach according to the nature, scale, and complexity of a firm’s UK
+operations and potential impact on financial stability in the UK, and also according to the extent to
+which the UK operations are integrated with overseas operations. Accordingly, the PRA’s
+expectations of subsidiaries of groups based outside the UK may well differ in some areas from
+those of subsidiaries belonging to groups based in the UK. Details of how the PRA’s expectations
+vary in this regard are set out in this SS.
+For firms that operate through a UK branch, the branch forms part of a legal entity incorporated
+outside the UK. It follows that its operations are necessarily dependent on those of the legal entity
+as a whole. It will be subject to prudential regulation by its home state supervisory authority
+according to where it is based. Unlike UK subsidiaries, the PRA applies a different set of rules to such
+firms, recognising that while PRA authorisation applies to the whole firm, it is appropriate to rely on
+the home state supervisor for certain aspects of supervision. The expectations that the PRA has for
+information relevant to the PRA’s objectives will therefore also vary in this regard.
+The Financial Conduct Authority (FCA) is the conduct regulator for all banks and investment
+firms operating in the UK. Therefore, for such firms, whether operating as subsidiaries or through
+branches in the UK, the FCA’s threshold conditions and conduct of business rules apply, including in
+areas such as anti-money laundering. Authorisation can be granted only where both the FCA and the
+PRA are satisfied that their respective requirements have been met. The FCA will independently
+assess applicants against its own requirements and objectives.
+Subject to these foundations, the PRA recognises the efficiency benefits that banks’
+international operations can bring. As such it is open, in principle, to hosting subsidiaries of
+international groups that operate a highly integrated global business model, and to allowing firms to
+operate in the UK through a branch or subsidiary.
+7 ‘Home jurisdiction’ and ‘home state supervisor’ refer to the jurisdiction and supervisory authority that has assumed responsibility for
+consolidated prudential supervision where a firm is part of a group, together with any other jurisdiction or supervisory authority with
+a regime that is particularly relevant to the way in which an international bank does business in the UK. They also include the
+supervisory authority responsible for the prudential supervision of a firm with a UK branch. ‘Home resolution authority’ refers to the
+resolution authority responsible for the resolution of the overall group and coordination of resolution plans.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 7]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 4
+The PRA recognises that many wholesale businesses, and investment banking and trading in
+particular, are operated on a global and highly integrated basis.
+The PRA has different expectations for businesses that engage in retail banking activities, since
+those activities tend to have a greater effect on financial stability. Additional requirements would
+apply to firms that would fall within the scope of the UK’s ring-fencing regime.8 Large retail banking
+activities can be more effectively supervised if they are separated from other activities in the wider
+group. Above certain thresholds, the PRA will consider authorising firms as subsidiaries in the UK
+rather than permitting them to operate through a UK branch, thereby increasing the separation of
+the UK retail business from risks arising overseas.9 However, below the threshold at which ring-
+fencing requirements apply, the PRA does not have any greater expectation for the separation of
+retail business. It does, however, expect to receive more information on any financial and
+operational dependencies (including cross-subsidies) between that retail business and wholesale
+business, whether within the same firm or between related group entities.
+The PRA’s overall approach is summarised in Figure 1 below (which may be read in conjunction
+with Figure 2, which specifically covers branches).
+Each element in Figure 1 is considered below in more detail.
+It should be noted, however, that apart from ring-fencing requirements, there is no automatic
+or fixed outcome that the PRA applies in terms of the degree of integration or separation that is
+appropriate. The PRA applies a graduated set of expectations which are tailored to each firm’s
+circumstances. The exact measures that the PRA may take, according to the degree of integration or
+independence appropriate for a subsidiary or branch, are described in Chapter 5. The requirements
+imposed by the ring-fencing regime are in addition to the PRA’s expectations concerning the
+information and controls required for a firm that is a ring-fenced body to be capable of being
+adequately supervised as a consequence of its membership of a wider group. Specifically, with
+respect to branches, where the PRA identifies concerns that a branch would fail to meet the PRA’s
+expectations for effective supervision, the PRA may exercise its powers under the Financial Services
+and Markets Act 2000 (FSMA) to apply specific regulatory requirements at the level of the branch on
+a case-by-case basis. These would principally be intended to ensure there are sufficient financial and
+operational resources, and appropriate governance at the UK branch level.
+8 https://www.bankofengland.co.uk/prudential-regulation/key-initiatives/ring-fencing.
+9 One threshold is £100 million of retail and small company transactional deposits, but the PRA also considers the number of such
+deposit accounts and the total potential liability to the Financial Services Compensation Scheme. See Chapter 6 for full details.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 8]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 5
+Figure 1: PRA expectations for effective supervision
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 9]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 6
+General approach, size, and systemic importance
+The PRA has general expectations that underpin its ability to effectively supervise banks and
+designated investment firms which are part of international groups or headquartered overseas.
+Subject to these, the PRA’s expectations then vary according to the nature, size, and systemic
+importance of the UK operations. This, coupled with the degree of information available,
+effectiveness of co-operation with the home state supervisor, and controls that are in place,
+influences the degree of separation or integration that is acceptable to the PRA as an operational
+outcome.
+General expectations for effective supervision
+For firms that are part of international groups carrying on banking business in the UK, the PRA
+first assesses the general factors that must be in place for effective supervision to be possible, and
+then assesses the factors specific to each international bank and any group of which it is a member.
+The general factors the PRA considers are:
+(a) whether the home jurisdiction’s prudential supervision regime is sufficiently equivalent to the
+UK regime;
+(b) whether there is sufficient supervisory co-operation with the home state supervisor; and
+(c) the efficacy of the arrangements for resolution. Consistent with the expectations set out in the
+PRA’s Fundamental Rule 8 and the Bank of England’s (the Bank) Resolvability Assessment
+Framework where relevant, these arrangements will be assessed in consultation with the Bank
+as the UK resolution authority.10
+a) Equivalence
+The PRA assesses the degree to which the home jurisdiction’s prudential supervision regime is
+equivalent, taking account of the following characteristics of the home state supervisor (this is not
+an exhaustive list):
+ its regulatory framework;
+ powers;
+ general approach to the supervision of individual firms and the consolidated group;
+ information sharing;
+ confidentiality; and
+ the competence and independence of supervision.
+The PRA will make an overall assessment of whether the home state supervisor is sufficiently
+equivalent, and whether its regime is consistent with the UK regulatory framework in delivering
+appropriate outcomes that meet the PRA’s objectives.11 The PRA assesses these factors in their
+10 Details available at: https://www.bankofengland.co.uk/paper/2019/the-boes-approach-to-assessing-resolvability.
+11 The PRA’s assessment of equivalence is based on the outcomes achieved and is for the purposes of authorisation and supervision by
+the PRA, which is separate from advice the PRA may provide to HM Treasury where HM Treasury may make determinations of
+equivalence for other purposes. The PRA may give advice to HM Treasury pursuant to Regulation 4 of The Equivalence
+Determinations for Financial Services and Miscellaneous Provisions (Amendment etc.) (EU Exit) Regulations 2019 (SI 2019/541).
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 10]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 7
+totality, but will place considerable weight on assessing the extent and quality of co-operation with
+the home state supervisor. The PRA will take into account the supervision of individual firms
+(including branches) and their consolidated group, and it will consider the nature and scale of a
+firm’s activities in the UK.
+The PRA’s supervisory equivalence assessments are reviewed periodically. The frequency of
+review is determined by the number, size, and systemic importance of the firms from a home state.
+The assessments of the home state supervisor focus on the degree to which the home state
+supervisor’s regime is compliant with the Basel principles in terms of supervisory approach, tools,
+and practices. In performing the assessments, the PRA will base its analysis on the Basel capital and
+group supervision standards, the Basel Committee’s Regulatory Consistency Assessment Programme
+reviews,12 the International Monetary Fund’s Financial Sector Assessment Programme reviews,13
+and the Financial Stability Board’s (FSB) peer reviews14 where appropriate, supplemented by other
+sources as necessary. The PRA will also take account of its own experiences in its interactions with
+the home state supervisors. It will also be important for the PRA to factor in any conduct concerns
+that the FCA may raise concerning a jurisdiction.
+Where, in the PRA’s view, a home state supervisor is sufficiently equivalent but there are
+weaknesses in the way the firm operates, the PRA may propose to add limitations to the nature and
+scale of activities performed in the UK. In exceptional circumstances, the PRA may not be satisfied
+that a home jurisdiction delivers equivalent outcomes, but may still authorise a firm to operate as a
+subsidiary in the UK. However, in those circumstances the PRA will expect the UK subsidiary to
+operate with a very high degree of independence from the overseas operations, and that the PRA
+has a high degree of direct supervisory influence on the group in relation to the activities of the
+subsidiary.
+b) Supervisory co-operation
+In considering whether there is sufficient supervisory co-operation with the home and other
+relevant supervisors, the PRA has the following approach.
+Supervisory co-operation is usually underpinned by the PRA entering into a memorandum of
+understanding (MoU) with the relevant home state supervisory authority.15 These establish a formal
+basis for: co-operation, including the exchange of information and investigative assistance; the
+facilitation of timely and effective supervision; and for the identification of risks to the financial
+system, including emergency situations.
+In developing this co-operation framework, the PRA has taken account of the following Bank
+for International Settlements publications: ‘High-level principles for the cross-border
+implementation of the New Accord’,16 ‘Principles for effective supervisory colleges’,17 and Principle
+13: Home-host relationships in ‘Core Principles for Effective Banking Supervision’ 18
+The PRA considers not just whether such arrangements have been agreed, but how well in
+practice their aims are achieved. The high-level outcomes the PRA expects to see include:
+transparency over the financial and operational resilience of the group, and the group’s capacity to
+12 November 2019: https://www.bis.org/bcbs/publ/d482.htm.
+13 https://www.imf.org/external/NP/fsap/fsap.aspx.
+14 https://www.fsb.org/work-of-the-fsb/implementation-monitoring/peer_reviews/.
+15 The PRA has entered into a new MoU with the European Banking Authority (EBA), and MoUs with other competent authorities in the
+European Economic Area (EEA), to facilitate continued supervisory co-operation and information sharing. All current MoUs are
+available here: https://www.bankofengland.co.uk/about/governance-and-funding.
+16 August 2003: https://www.bis.org/publ/bcbs100.htm
+17 June 2014: https://www.bis.org/publ/bcbs287.htm
+18 September 2012: https://www.bis.org/publ/bcbs230.htm.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 11]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 8
+support the international bank; appropriate equivalence of the home state supervision in practice;
+and transparency over when and how the home state regulator might intervene to remedy non-
+compliance with prudential standards along with any triggers for pre-emptive action. To achieve this,
+the PRA expects there to be regular structured engagement with the home state supervisor, either
+through a college or bilateral meetings or both, as appropriate, which should facilitate a technical
+discussion of the material risks and risk management practices at the firm.
+The degree of co-operation with the home state supervisor that the PRA expects is
+commensurate with the size of the firm, the degree of cross-border integration of its business, and
+the systemic nature of any wholesale branches operating in the UK.
+c) The efficacy of the arrangements for resolution
+This will be a factor in the PRA’s judgements when forming a view on its risk appetite towards
+subsidiaries and branches operating in the UK. For subsidiaries and branches that perform critical
+functions in the UK,19 the PRA, in consultation with the Bank as UK resolution authority, will assess:
+ the credibility or feasibility of the home state supervisor and home resolution authority’s
+approach to resolvability and resolution execution (including its compliance with the FSB Key
+Attributes);20
+ the ability of the PRA, in consultation with the Bank, to rely on the home state supervisor and
+home resolution authority to deliver resolvability and if necessary execute the resolution
+strategy for the group and firm, including the home state supervisor and home resolution
+authority’s operational capability to implement a resolution and to put in place adequate co-
+ordination mechanisms between home and host authorities;
+ the adequacy of the group’s and firm’s resolution arrangements:
+(i) for the relevant subsidiaries21, taking into account the Bank’s views as to whether the
+capabilities of the resolution group would deliver resolvability outcomes that are
+broadly comparable to those set out in the Statement of Policy (SoP) ‘The Bank of
+England’s Approach to Assessing Resolvability’;22
+(ii) for branches, although the Bank’s Resolvability Assessment Framework (RAF) does not
+apply to these entities,23 the resolvability outcomes set out in the Bank’s SoP provide
+relevant context for the Bank’s engagement with the PRA in respect of the
+authorisation and supervision of the UK branches of overseas banking groups; and
+ the willingness of the home resolution authority to share resolution plans with the PRA on
+request, and to engage in a dialogue with the PRA and the Bank regarding progress on
+resolvability and the implications of the resolution strategy for any UK subsidiary or branch
+operating in the UK.
+Structural profitability
+The PRA has a minimum expectation that UK subsidiaries of international groups should be on
+a path to being structurally profitable on a standalone basis (or that the group’s viability depends on
+19 Critical functions are defined in section 3(1) of the Banking Act 2009. Available at:
+https://www.legislation.gov.uk/ukpga/2009/1/section/3.
+20 ‘Key Attributes of Effective Resolution Regimes for Financial Institutions’, October 2014: www.fsb.org/wp-
+content/uploads/r_141015.pdf.
+21 July 2019: https://www.bankofengland.co.uk/paper/2020/updates-to-the-boes-approach-to-assessing-resolvability.
+22 Ibid.
+23 Ibid, paragraph 2.7.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 12]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 9
+supporting the UK operations). That is, they should not be solely cost centres for the group with
+accumulated costs that are extinguished by periodic capital injections from the group. Rather, the
+firm should be capable of accreting at least some of its own capital (or contributing to the accretion
+of group capital), so that operating costs of the international bank are covered on a day-to-day basis
+by income that it generates. That income may be in the form of service charges to the rest of the
+group or cross-subsidies built into the pricing and funding arrangements between wholesale and
+retail business in the firm or other group companies. It is important that the firm and PRA
+understand the extent of such cross-subsidies in order to assess the soundness of the business. The
+PRA may request that firms provide evidence that parental support will be provided and the parent
+has a clear strategy to do so.
+New retail businesses in particular may be loss-making, but as they mature and grow, the PRA
+expects them to become more profitable and secure. Accordingly, the PRA expects to receive
+information on the degree of cross-subsidy between the UK retail business and wholesale business
+within the firm and between the firm and the rest of the group.
+The PRA’s expectation of structural profitability for UK subsidiaries of international groups does
+not preclude the use of group service companies by firms, whether engaged in retail business or
+wholesale business, provided operational resilience and operational continuity expectations are
+met.
+Specific considerations for retail business
+The consideration of retail business is of sufficient weight that the PRA considers that good
+visibility of the risks in the wider group and good supervisory co-operation are not always sufficient
+to mitigate risks to the PRA’s objectives without separation from the wider group. Chapter 6 of this
+SS sets out the additional factors that the PRA considers when deciding whether authorisation for a
+firm to operate a UK branch is appropriate, including certain thresholds above which retail deposits
+may lead the PRA to conclude that separation of the UK business into a UK subsidiary would be more
+appropriate (see Chapter 6). Significantly greater amounts of UK retail business may take a firm
+above the threshold at which it is required to ring-fence its ‘core activities’ under Part IX B of FSMA
+(as amended).24 This effectively leads to that business being required to have a further degree of
+separation from the rest of the group.
+Where ring-fencing is not required, the PRA does not expect any greater separation to be
+necessary to mitigate risks to retail business in the UK operations. In general, the degree of
+separation appropriate will therefore follow the same framework as for wholesale business, as set
+out below. However, there are three areas which are worth emphasising for firms that are part of
+international groups regarding their compliance with PRA rules applicable to international banks:
+ When branches or subsidiaries outsource to parent or affiliated companies outside the UK, they
+should ensure that the outsourced service is provided in compliance with UK legal and
+24 £25 billion of ‘core deposits’, as specified in the Financial Services and Markets Act 2000 (Ring-fenced Bodies and Core Activities)
+Order 2014. Available at: https://www.legislation.gov.uk/ukdsi/2014/9780111117118.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 13]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 10
+regulatory requirements, even if these firms are bound by policies, procedures, or written
+agreements set by their overseas group or parent companies.
+ Depositor protection in the UK may be different from that applicable to the overseas group or
+head office, and so the PRA will pay particular attention to compliance with the Depositor
+Protection Part of the PRA Rulebook, including the Single Customer View Requirements.
+ While the PRA does not require any separation of a firm’s retail business from the rest of the
+group, or from its wholesale activities, the PRA does expect to receive information on the
+degree of financial, operational, and other business dependencies (including cross-subsidies)
+between the UK retail business and wholesale business within the firm, and between the firm
+and the rest of the group.
+Specific considerations for wholesale business
+Wholesale business poses risks to financial stability, particularly when it reaches a scale in the
+UK that significant losses or operational dependences could cause problems in financial markets or
+the failure of other financial institutions. The PRA considers size to be a factor when deciding
+whether to designate investment firms as PRA-regulated firms. The PRA’s approach to this is set out
+in the SoP ‘Designation of investment firms for prudential supervision by the Prudential Regulation
+Authority’.25 This SoP sets out the factors that the PRA considers, which include a firm’s total gross
+assets, or the total gross assets of investment firms in the same group, exceeding £15 billion.
+For international banks with UK branches undertaking wholesale business, in assessing
+whether the branch is systemically important, the PRA considers (among other things) a similar
+threshold, where the total gross assets attributed to the branch, and where relevant other UK
+branches in the group, exceed an average of £15 billion. This is discussed in detail in Chapter 6.
+25 March 2013: https://www.bankofengland.co.uk/prudential-regulation/publication/2013/designation-of-investment-firms-for-
+prudential-supervision-by-the-pra.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 14]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 11
+Information, co-operation, and controls to be effectively supervised
+Firm-specific expectations for effective supervision
+The factors that the PRA considers in assessing its ability to effectively supervise a particular
+international bank include whether:
+(a) the PRA receives sufficient co-operation, and financial and regulatory information on the
+overseas risks and financial position connected with the firm, from its group or head office and
+relevant overseas supervisory authorities (see Box 1);
+(b) any wider group to which the firm belongs has the capacity and willingness to support the firm;
+(c) where the firm’s governance is provided by individuals with roles in a wider group, that
+governance is effective in taking into account the risks to the firm and, conversely, where the
+firm’s governance is provided by individuals whose only role is within the firm, those individuals
+have appropriate influence within the wider group’s management;
+(d) booking arrangements are transparent and effective, and the firm appropriately manages the
+risks that it originates, receives, and transfers out to affiliates (see Box 2);
+(e) operational resilience arrangements that are in place with other group members are sufficient,
+in the case of a UK subsidiary, to allow compliance with PRA operational resilience
+requirements; or, in the case of a UK branch, to assure the PRA that the services the branch
+offers in the UK are operationally resilient. For branches, the PRA will consider whether the
+home state’s operational resilience regime is sufficiently robust to deliver outcomes similar to
+those required by the UK regime, including whether the home state supervisor has adopted the
+Basel Principles on Operational Resilience and whether the firm can demostrate that it is in
+compliance with its home state regime.26 The PRA will also look to gain assurance that
+operational disruption at group level does not represent undue risk to the group as a whole,
+and thereby provision of services by the UK business; and
+(f) a credible group resolution strategy, or plans to support or wind up the firm in line with the
+Bank’s resolution objectives, are in place.
+a) Financial and regulatory information, and co-operation
+The PRA expects to have access to certain categories of financial and regulatory information for
+every international bank in order to be able to assess whether it would meet threshold conditions on
+authorisation and continue to meet them on an ongoing basis, and to assess the impact that the
+firm’s activities may have on the stability of the UK financial system. The level of detail will vary
+according to the size and complexity of the firm’s business. The PRA also expects to receive a
+broader range of information in situations where the international bank poses a higher risk to
+financial stability, or where its business is more highly integrated with overseas operations and
+hence more at risk from activities outside of the PRA’s direct supervision.
+The PRA also follows, and expects other supervisory authorities to follow, the guidance provided
+by relevant international committees (the Basel Committee on Banking Supervision in particular)
+concerning supervisory co-operation. In practice, the PRA finds certain aspects particularly
+conducive to constructive relationships and effective supervision. These matters of what might be
+regarded as ‘good practice’ are included in Box 1 below under ‘Examples of information that the PRA
+26 Basel Committee on Banking Supervision: ‘Principles for Operational Resilience’ (March 2021), at
+https://www.bis.org/bcbs/publ/d516.htm.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 15]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 12
+sees when a strong and co-operative relationship exists with home state supervisors and firms’.
+These are illustrative rather than a substitute for internationally agreed standards of co-operation.
+Appropriate visibility of group risks is achieved by a combination of an effective co-operative
+relationship with the home state supervisor and appropriate information sharing by the home state
+supervisor and the firm. This is particularly relevant at the point of authorisation or where a firm’s
+circumstances change materially. Where the firm’s scale and operating model require the PRA to
+have certain information on group risks, the PRA will first discuss the information that it requires
+with the home state supervisor (with a view to the home state supervisory authority providing this
+information where possible). The PRA will then discuss appropriate arrangements with the firm
+concerning any additional information it requires. The PRA, in consultation with the Bank in its
+capacity as resolution authority, may also require additional information from the home resolution
+authority and firm regarding the resolution arrangements of firms of such size and complexity that
+they may pose a higher risk to UK financial stability.
+For each firm that is part of an international group, commensurate with its systemic importance
+and the degree of cross-border integration of its UK business, the PRA:
+ aims to contribute to the supervisory strategy for the group as a whole, and to have insight into
+the group supervisory strategy, as necessary to achieve the PRA’s objectives;
+ expects to agree with the home state supervisor how best to co-ordinate supervisory work
+where common areas of interest are identified, and to undertake supervisory work in
+conjunction with the home state supervisor. This could include joint visits to the UK subsidiary
+or branch in appropriate cases where both the PRA and the home state supervisor have
+prioritised work in particular areas. It could also include the PRA having direct access to
+management in the international group or parent where that is relevant to the PRA’s
+understanding of strategy and risks that may affect the UK operations;
+ expects to have a regular and proactive exchange of supervisory assessments with the home
+state supervisor, such as the results of firm visits or analyses in areas that are of particular
+relevance to the UK entity;
+ expects a prompt exchange of information and proactive notification of issues materially
+relevant to the UK entity;
+ expects to have access to information on governance and financial resilience for the firm as a
+whole, and the group of which it is part, where it is relevant for the PRA’s supervision of the
+international bank and the PRA’s objectives; and
+ needs to be satisfied, in consultation with the Bank as UK resolution authority, that the
+resolution authority or authorities in the relevant home jurisdictions for the group have
+adequate powers and plans for the group’s resolution.
+Box 1 sets out the additional information on group risks, beyond what it receives in respect of
+the UK business, that the PRA expects to see. In broad terms, the PRA is open to discussion with the
+home state supervisor and the firm as to how this information is provided. For example, it could be
+provided through engagement at supervisory colleges, in a structured way as provided to or agreed
+by relevant supervisory authorities, or in the form of management information prepared by the firm
+for internal purposes. The PRA also has no specific expectation as to whether information prepared
+by entities in the group is provided by those entities, the UK entity, or any supervisor, or whether
+information prepared by supervisors is received directly from supervisors or provided by group
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 16]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 13
+entities. Firms and their home state supervisors may decide the process for the provision of
+information to the PRA based on their individual circumstances. In the case of the smallest firms, the
+PRA will seek to obtain most of this information from the home state supervisor during its routine
+supervisory engagement with the PRA and in keeping with arrangements described in an MoU
+(where this exists between authorities).
+In taking this approach, the PRA aims to minimise the time and effort required to produce the
+information it needs from supervisory authorities, international banks, or their group entities. The
+PRA acknowledges that some information, such as supervisory assessments and peer group
+analyses, can only be provided by supervisory authorities. The PRA expects the information to be
+refreshed periodically to ensure that it remains relevant over practical timescales and the practical
+arrangements can be agreed between the home state supervisor, the firm, and the PRA.
+The precise information and data that the PRA will expect to receive may change over time,
+especially as events and risks crystallise. The PRA will keep its expectations under review and will
+aim to be proportionate in its requests.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 17]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 14
+Box 1: The PRA’s expectations for information sharing
+The PRA’s expectations for access to information to ensure appropriate visibility of the financial
+and operational risks of international banks
+The PRA needs sufficient information on risks in the group to which the international bank belongs
+to be satisfied that the threshold condition relating to the PRA’s ability to supervise the firm
+effectively is met. This information may be provided by the home state supervisor or by the firm.
+The information that the PRA expects to have access to will be proportionate, tailored to the firm’s
+activities and structure, and focused on those group risks which have a direct bearing on the risk
+profile of the international bank in the context of the PRA’s objectives (eg global trading business
+lines for which risk is managed or booked to the UK entity). Some information is likely to be provided
+on a regular basis and some in response to ad hoc requests or particular events.
+These will vary according to:
+ the firm’s potential impact on the financial stability of the UK economy;
+ the degree of interconnection of the UK operations with the overseas part of the firm and group;
+ whether the markets in which the firm and group operates are functioning normally or are
+stressed; and
+ any idiosyncratic stresses affecting the firm and its proximity to failure.
+The firms and groups in respect of which the PRA would expect to receive the most information are
+therefore the largest UK subsidiaries and the systemic branches, including those belonging to groups
+designated as globally systemically important, and those which are most interconnected with the
+group’s overseas business.
+During group or market-wide stress events, the PRA will expect information from the home state
+supervisor and the firm on the nature, cause, and extent of any idiosyncratic stress, and the
+frequency and scope of the information shared in some key areas, notably liquidity and profit and
+loss, will usually need to increase, even for small firms.
+Baseline information
+The PRA expects, when requested, access to certain categories of information from all international
+banks, both in times of crisis and normal business, namely proportionate and timely information on:
+ the nature of the firm’s and group’s business model, and any material changes in it, to the
+extent that they could have a material impact upon the firm or the group’s ability or willingness
+to support it.
+ the financial resilience of the firm and the firm’s immediate (and ultimate, if different) overseas
+parent, or the consolidated international financial group to which the firm belongs. Information
+on financial resilience includes capital and liquidity positions relative to relevant regulatory
+requirements;
+ the operational resilience of the firm and group, including risks arising elsewhere in the group
+that may affect the ability of the firm to deliver its important business services or critical
+operations (such as those provided through intragroup outsourcing or other inter-affiliate
+arrangements);27
+ material risks to the firm’s survival emanating from any group to which it belongs, including
+enforcement or legal actions;
+ the group’s recovery plan, including details regarding financial and non-financial dependencies
+between group entities, consistency of recovery operations, and the impact of group recovery
+options on the UK firm; and
+27 Important business services refers to services as defined in the Operational Continuity Part of the PRA Rulebook which applies to CRR
+firms – ie UK subsidiaries of international groups. Critical operations refers to services as defined in the Basel Committee on Banking
+Supervision’s ‘Principles for Operational Resilience’ (March 2021), found at https://www.bis.org/bcbs/publ/d516.pdf, and is relevant
+for UK branches.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 18]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 15
+ resolution planning, including information regarding the group’s preparations for resolution
+consistent with Fundamental Rule 8 (the PRA, and the Bank as resolution authority, will discuss
+with one or both among the home state supervisor and home resolution authority, and then
+consider if any additional information is required from the firm).
+Under normal market conditions, the PRA will usually expect to receive more than this baseline of
+information only for those international banks that have the potential to cause some disruption to
+the UK financial system. For the smallest firms, the PRA will seek to obtain most of this information
+from the firm’s home state supervisor during its routine supervisory engagement with the PRA and
+in keeping with arrangements described in any relevant MoU.
+Additional information expected for highly integrated or systemically significant businesses
+The PRA expects to receive additional information in situations where a firm’s business model or
+operations are highly integrated with its group’s overseas business and where it is significant
+systemically.
+Firms typically run their investment banking and trading activities on a global basis, with complex
+booking arrangements (see also Box 2). The PRA needs to understand the portion of global risk that
+is managed in the UK, what UK risk is managed elsewhere, and how the UK business performance
+sits within the overall performance of the firm and group. For trading activities, timely information
+on business line performance is a critical indicator of emerging market and firm-specific risks.
+For highly integrated firms that rely on global systems, including custodians, the PRA may expect
+additional information relating to group operational resilience and the performance of group IT
+systems.
+Examples of information that the PRA sees when a strong and co-operative relationship exists
+with home state supervisors and firms
+For the largest firms with the most potential impact on UK financial stability, the PRA will first
+discuss with the home state supervisor what information the PRA requires and what might be
+provided by the home state supervisor. The PRA will then discuss appropriate arrangements with the
+firm concerning any additional information required. Illustrative examples of such information
+include:
+ the provision by the firm of daily or weekly profit and loss figures covering global and local
+investment banking and trading business lines;
+ information on the firm’s structural profitability and any material element of cross-subsidy
+between business lines;
+ weekly or monthly group market risk reports;
+ provision by the home state supervisory authorities of the outputs from reviews, for example,
+the Supervisory Review and Evaluation Processes;
+ provision by the home state supervisory authorities and the firms of information on their stress
+tests and how these affect the UK branch or subsidiary;28
+ provision by one or both of the home state supervisory authorities and the relevant firms of
+group liquidity information, regularly in business-as-usual periods and more frequently once
+there is agreement that we have entered a period of market stress;
+ any material change in the operational resilience of the firm or group, for example cyber-attacks,
+that may affect the group systems that are used by the UK business or which threaten the
+survival of the firm or group;
+ material findings from internal risk or audit functions, or external audit reviews (particularly
+where there are common group wide systems and controls);
+28 UK investment banking subsidiaries of foreign owned banks are currently outside the UK system wide stress testing framework on
+the basis that the relevant results of home state testing are shared. See Box 5 of the ‘The Bank of England’s approach to stress
+testing’, October 2015, available at: https://www.bankofengland.co.uk/-/media/boe/files/stress-testing/2015/the-boes-approach-to-
+stress-testing-the-uk-banking-system.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 19]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 16
+ information on the home state and group approach to climate risks, where these may help the
+PRA to understand the group risk profile and how this may affect operations in the UK; and
+ from the home resolution authority or through crisis management groups, and the group’s
+resolution planning information, including the group’s plans and capability to wind down trading
+activities in an orderly and solvent fashion insofar as these affect UK operations.
+b) Capacity and willingness to support the international bank
+As regards the group’s capacity and willingness to support a subsidiary, the PRA expects UK
+subsidiaries to be financially resilient on a standalone basis. But beyond this, there are situations
+where the ability of the group to support other group entities, including the UK operations, needs to
+be taken into account. These are, for example, where assessments need to be made of the
+diversification of risks within the group and of the extent to which funding through debt at the
+parent level is used to support equity at a subsidiary level, increasing reliance on distributions from
+equity to service such debt. It is also a consideration when assessing intragroup large exposures and
+whether parental support to entities in the wider group mitigates the risk that amounts owed to UK
+subsidiaries will not be repaid. The PRA also has expectations concerning information on the firm’s
+operational resilience where this depends on group systems (see paragraph 4.26).
+There may be some situations where explicit guarantees of international banks are expected
+from another group entity, for example with respect to an international bank’s ability to access
+central bank funding.
+The PRA will establish a view, at least at a minimum in qualitative terms, on the capacity and
+willingness of the group to support subsidiaries in stressed scenarios, and any barriers to that
+support arising from the regulatory regimes that apply to it.
+The Bank already takes a similar approach when setting internal minimum requirements for
+own funds and eligible liabilities (MREL) for hosted subsidiaries. As set out in the Bank’s SoP ‘The
+Bank of England’s approach to setting a minimum requirement for own funds and eligible liabilities,
+in deciding whether to set internal MREL for a material sub-group or subsidiary above 75% scaling,
+the Bank will take into account the resolution strategy applicable to the group and the credibility of
+the resolution plan for delivering it, and the availability of other uncommitted resources within the
+group that could be readily deployed to support the material subsidiary, among other factors.29
+c) Governance and risk management
+The PRA recognises the fiduciary duties of directors of subsidiaries. Subsidiary boards must also
+be capable of acting in the best interests of the firm for which they are responsible, as well as
+safeguarding its safety and soundness.30
+The principles of good governance should apply to all PRA-regulated subsidiaries, including the
+principle that boards should have sufficient independence, to help ensure they can provide effective
+challenge to the business. Where a smaller and less complex subsidiary proposes not to have an
+independent non-executive chair, the firm should still be able to explain how its governance
+arrangements will otherwise satisfy the need for independent oversight of the executives.
+Moreover, all firms have an obligation to ensure that all their directors, in particular non-executives,
+act with sufficient independence of mind and ‘make their own sound, objective and independent
+29 June 2018: https://www.bankofengland.co.uk/paper/2018/boes-approach-to-setting-mrel-2018.
+30 Section 12, SS5/16 ‘Corporate governance: Board responsibilities’, March 2016: https://www.bankofengland.co.uk/prudential-
+regulation/publication/2016/corporate-governance-board-responsibilities-ss.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 20]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 17
+decisions and judgments when performing their functions and responsibilities’.31 The non-executive
+directors on the board should hold management to account against the matters delegated, and be
+able to challenge the executive effectively and promptly. Firms should have regard to the
+expectations on board responsibilities outlined in SS5/16 ‘Corporate governance: Board
+responsibilities’.32
+The UK subsidiary or branch should establish, implement, and maintain adequate risk
+management policies and procedures, including effective procedures for risk assessment, which
+identify the risks relating to its activities, processes, and systems, and where appropriate, set its risk
+appetite or the level of risk tolerated.33 As noted in the PRA’s approach to banking supervision,
+senior management should embed the principle of safety and soundness in the culture of their
+organisation.34
+Where group risk management decisions are being taken which could have an effect on the UK
+subsidiary or branch, those decisions should take into account the views of representatives from the
+subsidiary or branch. Those representatives should be given sufficient access to, and influence in,
+the relevant decision-making committee(s). Firms should take into account their size and internal
+organisation and the nature, scale, and complexity of their activities when developing and
+implementing policies and procedures.35
+To meet the PRA’s expectations on information sharing, it is desirable to ensure appropriate
+connectivity between the firm and its head office or with the parent company board. For example, in
+the case of a UK subsidiary, a non-executive director from the group board may sit on the local
+board (or vice versa), or the local chairs of the Risk and Audit Committees may meet regularly with
+their counterparts at the parent.
+Where the group has a large-scale operation comprising both a branch and subsidiary in the
+UK, and together they are systemically important, then even though the PRA generally expects
+branches and subsidiaries to have independent governance arrangements (to safeguard against
+conflicts of interest in how risks are booked into the UK), the need for there to be a holistic view of
+UK risks may be more important. In those circumstances, it may be appropriate to have either a UK
+or regional Chief Executive Officer (CEO) overseeing the whole UK footprint, and potentially other
+arrangements to ensure it has a comprehensive view of the risks the firm runs in the UK.36
+Accountability of Senior Management Functions (SMFs)
+A subsidiary should ensure that they have an appropriate number of SMFs according to its size,
+complexity, and governance structure, in line with the principles outlined in SS28/15 ‘Strengthening
+individual accountability in banking’.37 Firms should particularly ensure that Management
+31 Joint European Securities and Markets Authority (ESMA) and EBA Guidelines on the assessment of the suitability of members of the
+management body, paragraph 80. Available at: https://eba.europa.eu/regulation-and-policy/internal-governance/joint-esma-and-
+eba-guidelines-on-the-assessment-of-the-suitability-of-members-of-the-management-body. See also the General Organisational
+Requirements Part of the PRA Rulebook.
+32 March 2016: https://www.bankofengland.co.uk/prudential-regulation/publication/2016/corporate-governance-board-
+responsibilities-ss.
+33 SS4/16 ‘Internal governance of third country branches’, February 2016: https://www.bankofengland.co.uk/prudential-
+regulation/publication/2016/internal-governance-of-third-country-branches-ss and the General Organisational Requirements Part of
+the PRA Rulebook.
+34 Paragraph 42, October 2018: https://www.bankofengland.co.uk/prudential-regulation/publication/2018/pra-approach-documents-
+2018.
+35 EBA ‘Guidelines on internal governance under Directive 2013/36/EU’, paragraph 18. Available at:
+https://eba.europa.eu/sites/default/documents/files/documents/10180/1972987/eb859955-614a-4afb-bdcd-
+aaa664994889/Final%20Guidelines%20on%20Internal%20Governance%20(EBA-GL-2017-11).pdf.
+36 This includes consideration of group risks; see for example the Risk Control and Group Risk Systems Parts of the PRA Rulebook.
+37 July 2015: https://www.bankofengland.co.uk/prudential-regulation/publication/2015/strengthening-individual-accountability-in-
+banking-ss.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 21]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 18
+Responsibilities Maps and Statements of Responsibilities (SoR) are up to date and that
+responsibilities are allocated in accordance with the Allocation of Responsibilities Part of the PRA
+Rulebook and SS28/15.38
+Where applicable, the PRA expects firms to allocate the responsibility for overseeing the firm’s
+booking arrangements to an SMF, and record this appropriately in their Statement of
+Responsibilities. Where individuals in the parent or in group entities exercise significant influence
+over the management or conduct of one or more aspects of the firm’s UK regulated activities, it may
+be appropriate for them to be approved as a Group Entity Senior Manager (SMF7). However, firms
+have applied for individuals performing a range of functions to be approved as SMF7. Examples
+include:
+ group executives on the board of a UK subsidiary (including smaller firms where parent
+executives may sit on a UK subsidiary board as non-executives);
+ global business line heads operating as senior executives at a UK branch or subsidiary; and
+ individuals who combine a global or group role with key responsibilities in the UK (and with
+significant influence over the UK branch or subsidiary), such as global heads of technology,
+heads of internal audit, and global heads of operations.
+However, while these examples may be helpful, ultimately whether an individual requires
+approval as a SMF7 is assessed by the PRA on a case-by-case basis.
+In the case of a firm that has a UK systemic wholesale branch which is part of a group based
+overseas, and an individual in a related group entity has significant influence over the branch’s
+booking arrangements, that individual should seek approval as SMF7 (see Box 3).
+Where applicable, the PRA expects firms to allocate the responsibility for overseeing the firm’s
+booking arrangements to an SMF, and to record this appropriately in their SoR.
+d) Booking arrangements
+The PRA is open to firms operating a diverse range of booking arrangements, including globally
+integrated structures, provided that they meet the PRA’s expectations as set out in Box 2.
+By booking arrangements, the PRA means the front-to-back lifecycle of trading, from
+origination, trade execution, risk capture and transfer, through to back-office settlement. The PRA
+seeks to ensure that firms have appropriate controls for the full lifecycle of their trades. At the start
+of the lifecycle, a firm should include within its control framework those traders managing the risk
+directly and those facilitating the execution and delivery of risk to the firm’s balance sheet, such as
+sales people or sales traders. In terms of activity, the PRA’s expectations in Box 2 relate primarily to
+the trading book. However, the PRA recognises that some of items housed in the banking book will
+pose similar risks given their nature, and firms should consider whether and how their booking
+frameworks and controls should be extended to cover them.
+38 Statements of Responsibilities are those required by section 60 (2A) of FSMA. Available at:
+https://www.legislation.gov.uk/ukpga/2000/8/section/60.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 22]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 19
+Box 2: The PRA’s expectations for booking arrangements
+Booking arrangements should be transparent and the firm should appropriately manage the
+trading risks that it originates, receives, and transfers out to affiliates.
+Transparency
+For those international firms with large-scale trading businesses, characterised by global risk
+management hubs, it is essential that the risks in the relevant global business, and how this affects
+the risk profile of UK operations, are visible to the PRA and that the PRA and home state supervisor
+have the same understanding of those risks. With a global business line, risks may crystallise
+anywhere in the group. Given the UK’s role as a global centre for trading, those risks are often
+observed first in the UK. Therefore, if the firm is to operate a fully integrated global business model,
+the PRA needs to understand the risk profile of an entity in the context of the global business lines of
+which that entity is a part.
+The PRA has a number of expectations concerning how the local entity should organise its booking
+arrangements in order that it meets the threshold conditions on the prudent conduct of business
+and its obligations under Fundamental Rules 3, 5, 6, and 8, relating to risk management and
+resolvability.
+Management and controls: The PRA’s expectations
+1. Firms should set out a clear rationale for their booking arrangements, document the booking
+arrangements, and have them approved by the appropriate governance body.
+Firms should have a policy document that sets out a clear rationale for their UK booking
+arrangements, and how those arrangements align with the business model for its UK authorised
+business. The firm’s arrangements should be part of a coherent strategy for the group and firm. The
+policies should be drafted with sufficient coverage and detail, such that the role of the international
+bank within the group’s global booking arrangements is clear.
+This document should be approved by the relevant governance body in the UK. For example, this
+may be the board for a subsidiary or the executive management committee for a branch.
+2. Firms should have adequate systems and controls in place to ensure that intended booking
+arrangements are followed in practice.
+The PRA’s rules require firms to have comprehensive and proportionate controls and to review their
+adequacy regularly.39 The PRA has certain expectations as to how these booking arrangements
+should be controlled.
+Firms should regularly assess the risks that they face due to the booking model choices they apply,
+rate them as for any other risk, and consider effective mitigations, including the need for new or
+modified controls. These controls should ensure that the intended booking arrangements are
+followed — ie a firm’s booking policy should always be translated into appropriately enforced
+controls through its control framework to avoid ambiguity. This control framework should also be
+approved by the relevant governance body in the UK, as outlined in point 1 above.
+For example, an international bank with a material trading business should have a mix of detective
+and preventative trading controls — ie pre-trade (soft and hard block) checks and post-trade checks.
+ Remote bookers (traders in non-UK entities booking onto a UK entity) should be subject to
+appropriate controls and formal oversight, including an appropriate risk assessment. Where the
+UK entity allows material remote booking onto its books, but the trader is not subject to direct
+trader oversight by the UK entity (often called ‘orphan books’), it may be appropriate to assign
+shared coverage of this remote book to a UK-based trader or to UK-based risk management
+staff. This includes risks that may arise at all stages of the trade life-cycle, including back-office
+settlement.
+39 Including Fundamental Rules, General Organisational Requirements 2.1–2.2, Compliance and Internal Audit 2.1, Internal Governance
+of Third-Country Branches 2, 6, and 8, and Risk Control.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 23]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 20
+ Where a firm relies on back-to-back booking extensively, a higher degree of assurance should be
+obtained through the use of automated trade mirroring, reconciliation, and monitoring
+processes.
+ Management information related to trades undertaken or booked in the UK, booking risks, and
+compliance monitoring should be timely and comprehensive, disaggregating the relationship
+between the UK entities and those of affiliates and providing measures of change. It should
+distinguish between remote booking into and out of the UK entities. The management
+information should be routinely shared with the appropriate committees, and any breaches of
+the policy should be subject to appropriate sanctions.
+Any deviations from the booking model policy should occur rarely and only by way of an explicitly
+approved exception process documented in the same policy with appropriate involvement of the UK
+entity.
+These procedures are expected to be subject to internal audit assessment.
+For an international group, the location of the resulting risks should be transparent to each legal
+entity. This requires an ability for the reporting of such risks to be readily disaggregated by entity.
+3. Firms with major trading activities should ensure that responsibility for ensuring that there are
+appropriate controls in place to manage its booking arrangements, including remote booking,
+is allocated to a senior management function.
+The responsibilities for ensuring that the firm’s booking arrangements are appropriately controlled
+and monitored should be explicitly set out in the statement of responsibilities for the responsible
+senior management functions.
+4. The international bank should have an appropriate local risk management capability.
+While a firm may rely extensively on its group for booking, risk management, and other services, the
+PRA considers that the firm should have sufficient risk management capabilities if it is to satisfy the
+relevant threshold conditions and comply with the Fundamental Rules. In particular, it will need
+adequate financial and non-financial resources, including a sufficient number of qualified staff
+dedicated to the management and control of the UK branch or subsidiary. The risk management
+capabilities should be explicitly considered and sized appropriately during the approval of the UK
+booking model policy and the controls required, as described above.
+The need for sufficient local risk management capabilities is primarily to support the entity’s
+effective supervision of UK-based traders, but also aims to manage the risks to the UK entities arising
+from the global booking model. For example, the UK branch or subsidiary may hold risk that has
+been transferred to the UK from elsewhere in the group, rather than risk originated from UK client
+business.
+Where there is risk transfer onto the firm’s balance sheet, through remote or back-to-back booking
+from an affiliate, there should be appropriate controls around that process. If those risks are
+analogous to risks arising from dealings with external third parties, then they should be subject to
+commensurate controls, as would be appropriate for direct dealings with external third parties. Staff
+in the UK entity should have accountability for managing such risks.
+Firms will also need sufficient local risk management capabilities if their booking structures,
+exposures, and associated risk management are to be resilient in the event of interruption to the
+flow of group services.
+Having a portion of group risk managed in the UK is likely to facilitate an orderly group and local
+resolution. The more important the international bank is to the wider group, the more likely it is that
+its survival is essential to the group’s resolution.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 24]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 21
+5. There should be a broad alignment of risk and returns at the entity level.
+Subsidiaries should not be designed to be structurally-loss-making, but should aim to be solvent and
+viable.
+Firms operating in the UK may act as service providers to their groups, but they should be
+appropriately remunerated for those services.
+6. The firm’s booking arrangements should not be an impediment to the firm’s recovery and
+resolution or to any plan to wind down trading in a solvent and orderly fashion.
+While a global booking model may not be considered a direct impediment under a single point of
+entry resolution strategy, it could add complexity to the restructuring of the group post resolution.
+Under a multiple-point-of-entry (MPE) strategy, the inter-connectivity between the UK entity and
+the group associated to a global booking could be an impediment to resolution that the firm should
+address.40 Similarly, where contingency plans to be able to wind down trading books in a solvent
+and orderly fashion are important to any orderly exit, recovery, or resolution strategy, the PRA
+expects that the particular booking model adopted by a firm will have been fully taken into account
+in those plans.
+e) Operational resilience
+The PRA expects international banks to understand the services they provide to external end
+users in the UK, and the risk posed to the firm’s safety and soundness in the event of a severe but
+plausible disruption to such services.41 The PRA expects that firms should be prepared to identify
+these services to the PRA, and articulate the point at which disruption to these services poses a risk
+to the firm’s safety and soundness or the financial stability of the UK (if appropriate).
+The PRA considers international banks should have a sufficient understanding of the necessary
+operational resources that are used to deliver such services, regardless of geographic location, in
+order to adequately understand the risk posed to the firm’s safety and soundness or the financial
+stability of the UK in the event of severe but plausible operational disruptions.
+In addition, the PRA will consider the robustness of the home state’s operational resilience
+regime, to gain assurance that operational disruption at the group level does not represent undue
+risk to the group as a whole, and thereby provision of services by the UK business. This will be
+particularly relevant where functions are outsourced by the international bank to other parts of its
+group, and for branches, as they are not subject to the PRA’s rules on operational resilience.
+f) Group-specific resolution strategy
+The PRA works with the Bank as UK resolution authority to ensure that where a firm fails, it
+does so in a way that avoids significant disruption to the supply of critical functions to its customers
+and other counterparties. It is the Bank’s responsibility to set the resolution strategy, set MREL, and
+ultimately execute any resolution, but the PRA acts in co-operation with the Bank to ensure that
+firms have appropriate resolution arrangements in place as part of going concern supervision,
+consistent with Fundamental Rule 8. Consequently, resolvability is an important consideration in the
+PRA’s supervisory approach to international banks. The effectiveness of the home state regime and
+40 MPE refers to a resolution strategy that envisages applying resolution powers to multiple entities within a group. See ‘The Bank of
+England’s approach to resolution’, October 2017: https://www.bankofengland.co.uk/paper/2017/the-bank-of-england-approach-to-
+resolution.
+41 The relevant services are, in the case of UK subsidiaries, the ‘important business services’ as defined in the Operational Continuity
+Part of the PRA Rulebook, and in the case of UK branches, the PRA will, in the first instance, look to the ‘critical operations’ a firm
+may have identified, as defined in the Basel Committee on Banking Supervision’s ‘Principles for Operational Resilience’ (March 2021),
+available at https://www.bis.org/bcbs/publ/d516.pdf.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 25]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 22
+the credibility of a group’s resolution strategy, and the resolvability outcomes set out in the Bank’s
+RAF, where relevant, are an integral part of the assessment.
+The PRA will consider in particular:
+ the alignment of the firm’s group resolution strategy set by the home resolution authority with
+the PRA’s objectives, including whether it ensures the continuity of the firm’s critical functions
+in the UK;
+ the credibility and feasibility of the firm’s group resolution strategy, including a clear process to
+identify and remove barriers to resolution by the home state supervisor or home resolution
+authority involving the host authorities, including the PRA; and
+ the adequacy of the firm’s resolution arrangements, consistent with Fundamental Rule 8 and
+the RAF:
+o for the relevant subsidiaries, the PRA will take into account the Bank’s assessments as
+to whether the capabilities of the group would deliver resolvability outcomes that are
+broadly comparable to those set out in the Bank’s SoP ‘The Bank of England’s Approach
+to Assessing Resolvability’;42 and
+o for branches, although the RAF does not apply to these entities, the resolvability
+outcomes set out in the Bank’s SoP provide relevant context for the Bank’s engagement
+with the PRA in respect of the authorisation and supervision of the UK branches of
+overseas banking groups.43
+42 July 2019: https://www.bankofengland.co.uk/paper/2019/the-boes-approach-to-assessing-resolvability.
+43 Ibid, paragraph 2.7.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 26]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 23
+Integration and independence
+Once the PRA has considered the effectiveness of supervision that it is possible to exercise given
+the understanding it has of risks in the wider group, including the level of co-operation and
+information it is receiving and the controls in place, as well as the size and systemic importance of
+the international bank, it will consider whether the degree of operational integration or separation is
+commensurate with those factors. The aspects of integration considered are:
+(a) governance;
+(b) capital and liquidity;
+(c) booking risk management;
+(d) operational resilience;
+(e) resolution strategy; and
+(f) structural profitability.
+There is no automatic or fixed outcome that the PRA applies in terms of the degree of
+integration or separation that is appropriate, but the PRA applies a graduated set of expectations
+which are tailored to each firm’s circumstances (see also Chapter 6). The better expectations on
+effective supervision are met, the more the PRA is content for a business in the UK to be highly
+integrated with the wider foreign group, or with the foreign operations of the firm if it is operating
+through a branch.
+Where the information or co-operation the PRA receives are such that the PRA’s expectations
+for effective supervision are not fully met given the degree of operational integration that an
+international bank currently has, then the PRA will consider taking measures to require the UK
+operations of the international bank to be more independent.
+a) Governance
+The PRA is likely to expect that there is a greater degree of independence of the governance
+committees of an international bank subsidiary when the PRA has limited information on how much
+influence is being exerted by group management, when the degree of influence that UK
+management has on the group’s strategy is inadequate, or when management of the UK entity is
+dominated by group strategy. This could be in the form of the proportion of independent non-
+executive directors on the board of the international bank, for instance.
+As set out in SS5/16, the PRA also considers it generally undesirable for some key positions on
+the board of a subsidiary, such as chair, chair of the key board sub-committees, chief executive, or
+finance director, to be occupied by executive members of the group or parent board. In
+circumstances where these appointments may be permissible, such as for certain smaller less
+complex firms, the firm should be able to explain how its governance arrangements will otherwise
+satisfy the need for independent oversight of the executives.
+Where the PRA has concerns about the effectiveness of supervision over UK branches owing to
+their relationship with their head office, other UK branches, or UK subsidiaries, or any wider group,
+additional governance requirements may be considered. For example, to ensure appropriate
+governance at the UK branch level, the PRA may require the firm to apply for additional SMFs (such
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 27]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 24
+as Chief Risk Officer (CRO), Chief Finance Officer (CFO), Chief Operating Officer (COO), or a group
+executive under SMF7), or to create a local management committee (or equivalent) for the branch.
+b) Capital and liquidity requirements
+Capital
+The PRA’s assessment of the PRA buffer will take into account the extent to which wider group
+risks are visible to the PRA, taking into consideration the systemic importance and the degree of
+integration of the international bank. Capital is not set at UK branch level.
+As explained in the SoP ‘The PRA’s methodologies for setting Pillar 2 capital’, where the PRA
+assesses a firm’s risk management and governance to be significantly weak, it may also set the PRA
+buffer to cover the risks posed by those weaknesses until they are addressed.44 This will generally
+be calibrated in the form of a scalar applied to the amount of Common Equity Tier 1 (CET1) capital
+required to meet the Total Capital Requirements (TCR). The scalar could be up to 40% of the total
+CET1 TCR.
+A firm’s exposures to entities in its own group are generally treated as exposures to a third party
+and are subject to large exposure limits. Firms can however apply to the PRA for a non-core large
+exposures group permission, which allows firms to apply a higher large exposure limit to certain
+entities within their group provided these entities meet certain conditions.45
+These permissions increase connectivity with the wider group and increase the contagion risk
+to the UK entity. For this reason, the PRA will still make a wider judgement whether it is appropriate
+to grant these permissions, even where the conditions are met. The PRA will consider whether group
+entities are strongly incentivised to support each other, and whether the treatment is consistent
+with the overall business model of the firm and furthers the PRA’s safety and soundness
+objective.46
+Liquidity
+In deciding what liquidity guidance to give a firm under Pillar 2, the PRA will consider how
+integrated the UK business is with that of the wider group, and the quality of its relationship and the
+information exchange with the home state supervisor.47
+The liquidity guidance may be flexed by adjusting the Pillar 2 liquidity add-ons, applying
+different preferential treatments of intragroup liquidity flows in the Liquidity Coverage Requirement,
+or by using committed facilities from parent entities.
+Where the PRA has concerns about the liquidity position of the firm or the effectiveness of
+supervision over branches, the PRA may set additional branch liquidity requirements to ensure
+appropriate liquidity at the UK branch level, for example by requiring the holding of additional
+liquidity to ensure sufficient resources are held locally to allow time to respond to a stress at the
+branch.
+44 February 2020: https://www.bankofengland.co.uk/prudential-regulation/publication/2015/the-pras-methodologies-for-setting-pillar-
+2-capital.
+45 SS16/13 ‘Large Exposures’, June 2018: https://www.bankofengland.co.uk/prudential-regulation/publication/2013/large-exposures-
+ss.
+46 See paragraph 3.9 of SS16/13.
+47 See SoP ‘Pillar 2 liquidity’, October 2018: https://www.bankofengland.co.uk/prudential-regulation/publication/2018/pillar-2-
+liquidity.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 28]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 25
+c) Booking risk management
+The PRA has a number of high-level expectations of how firms should manage their booking
+arrangements for trading activity, as set out in Box 2. These are aimed at ensuring that a firm’s
+booking arrangements are transparent and well-controlled.
+The PRA is open in principle to a wide range of booking models. It recognises that trading
+activity is often run as a global business model. The UK entity may rely extensively on its affiliates for
+business origination and for risk management services, but the UK entity remains responsible for
+ensuring that the level of risk management is appropriate to the risks undertaken.
+Where a firm meets the PRA’s expectations for booking models, the PRA is open to hosting
+highly integrated and large-scale trading operations.
+Where a firm is not able to meet these expectations, the PRA may require more local risk
+management or limit the degree of connectivity that the firm has with the rest of the group so that
+less risk is brought into or transferred out of the entity. The PRA may consider a firm unable to meet
+these expectations if:
+ its controls are not commensurate to the risks posed by a complex booking arrangement;
+ there is inadequate visibility of the group risk profile, inadequate information sharing, or
+inadequate home state co-operation; or
+ booking arrangements would impede the execution of the resolution plan.
+d) Operational resilience
+The PRA expects firms to observe high standards in the management of operational as well as
+financial risks. If the PRA does not have sufficient understanding of how operational resilience is
+assured when an international bank is dependent on group or overseas systems and policies, then
+the PRA would expect those systems or policies to be improved and made clear to the PRA, or for
+the international bank to become less dependent on those systems.
+e) Resolution strategy
+The PRA may not have sufficient confidence regarding resolvability if, in consultation with the
+Bank as resolution authority:
+ the group resolution strategy lacks credibility or feasibility;
+ it is not clear if it is able to rely on the home state supervisor and home resolution authority to
+execute the group’s resolution strategy, including the home state supervisor and home
+resolution authority’s operational capability to implement a resolution and put in place
+adequate coordination mechanisms between home and host authorities; or
+ it has concerns about the arrangements for the subsidiary or its resolution group to deliver
+orderly resolution, taking into account the resolution outcomes that are broadly comparable
+outcomes as those set out in the Bank’s RAF SoP.48
+48 Paragraph 2.7 of the RAF SoP sets out that: ‘This SoP does not apply to the UK branches of overseas banking groups. The Bank
+engages with international counterparts regarding the resolvability of these branches. The resolvability outcomes in this SoP will
+therefore inform this engagement and so will be of interest to overseas banking groups in this context. The SoP also provides
+relevant context for the Bank’s engagement (in its capacity as UK resolution authority) with the PRA in respect of the authorisation
+and supervision of the UK branches of overseas banking groups’. May 2021: https://www.bankofengland.co.uk/paper/2020/updates-
+to-the-boes-approach-to-assessing-resolvability.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 29]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 26
+Where the PRA does not have sufficient confidence over the resolvability of a subsidiary and its
+resolution group, this may mean that it would be necessary for the UK subsidiary to be supervised
+on a more standalone basis, consistent with a MPE resolution strategy that would be determined by
+the Bank.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 30]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 27
+Additional considerations for the supervision and authorisation of
+branches
+As discussed in Chapter 2, a branch of an international bank forms part of a legal entity
+incorporated outside the UK. It follows that its operations are necessarily dependent on those of the
+legal entity as a whole. PRA authorisation applies to the whole firm. However, the PRA’s approach is
+to place appropriate reliance on the prudential supervision of the overseas firm by the home state
+supervisor, subject to appropriate safeguards. For example, the PRA does not apply capital
+requirements to a firm operating only through a UK branch, and the PRA looks to the home state
+regime to apply solo capital requirements to the firm.
+While the PRA’s expectations set out in Chapters 3, 4, and 5 of this SS apply to international
+banks that operate in the UK via branches as well as to subsidiaries, in the case of a branch there are
+additional expectations which arise since:
+ there are potential risks arising in the head office or other branches of the firm which may
+affect the UK branch operations;
+ the PRA authorises the firm as a whole; that is, the entire legal entity and not only the UK
+branch, and so the firm as a whole must meet threshold conditions; and
+ there is a home state supervisory authority which will be responsible for the prudential
+supervision of the firm as a whole, and with which the PRA will need to agree how each
+regulator’s respective responsibilities are to be discharged in accordance with their legal duties
+and, for the PRA, in a proportionate and cost-effective manner.
+The matters that the PRA considers when deciding whether it may be content to authorise a
+firm to operate in the UK through a branch are summarised in Figure 2 below (which was originally
+published in SS1/18). This diagram should be read in conjunction with Figure 1, which relates to both
+firms that are part of groups and firms that have branches.
+Threshold conditions
+In determining whether its threshold conditions are met, the PRA may have regard to the
+opinion of an overseas regulator, if relevant, taking into account the nature and scope of supervision
+exercised by it.49 The PRA will have appropriate regard to the opinion of the home state supervisor
+about the firm’s compliance with the PRA’s threshold conditions when forming its own judgement.
+Equivalence
+The PRA’s approach to assessing supervisory equivalence for UK branches is the same as for UK
+subsidiaries of foreign groups (see Chapter 3).
+49 Section 55D of FSMA. Available at: https://www.legislation.gov.uk/ukpga/2000/8/section/55D.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 31]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 28
+Figure 2: PRA considerations for branch authorisation
+Supervisory co-operation
+There are additional expectations the PRA has for co-operation concerning branches:
+ The PRA will seek to establish a clear acceptance from the home state supervisor of its
+prudential responsibility for branches in the UK. This will include confirmation from the home
+state supervisor that the whole firm meets the PRA’s threshold conditions, and requires the
+existence of a specific agreement with the home state supervisor on the split of responsibilities
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 32]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 29
+for prudential supervision of branches from that jurisdiction. The latter typically covers the
+performance of respective supervisory tasks and responsibilities, the reliance each supervisor
+may place on the other, co-operation and information sharing, meetings with and information
+requests to the firm, and how each risk element will be assessed.
+ The PRA will expect there to be agreement concerning the information required from the home
+state supervisor in relation to the firm, which may include information on liquidity; this
+supplements the whole-firm liquidity information that the PRA expects the firm to provide.50
+Both would be subject to periodic review to ensure each authority is meeting the other’s
+expectations.
+Groups with both UK subsidiaries and UK branches
+Where firms operate in the UK with both a subsidiary and a branch (or one or more of each), the
+PRA expects appropriate governance to oversee and manage the linkages between the entities.51 In
+supervising these firms, the PRA will delineate its supervision between the entities, and expect the
+firm to have a clear booking arrangement in place setting out what it will book in each entity and
+how its application will be verified.
+Resolution
+The assessment of the home state resolution framework for UK branches is the same as for UK
+subsidiaries of foreign groups (see Chapter 3), but in addition the PRA considers whether depositors
+of the UK branch will receive fair treatment under the home jurisdiction’s insolvency and resolution
+regime.
+The PRA will also assess the group resolution strategy and broader resolution arrangements in
+a similar way to that of UK subsidiaries of foreign groups (see Chapter 4). In particular, the PRA will
+take into account the Bank’s assessments as to whether the group resolution strategy would deliver
+orderly resolution in the UK, with reference to the provisions set out in the Bank’s RAF.
+Treatment of UK depositors and creditors
+While the PRA, in consultation with the Bank as UK resolution authority, can gain assurance
+over resolution plans and the stated intentions of the home state supervisor and home resolution
+authority, doubts may remain over the certainty with which these plans will be applied in practice.
+The PRA’s starting point is that UK creditors and depositors should be treated equally with their
+home state equivalents. Where that is not, or may not, be the case, the PRA will consider the impact
+on its objectives in deciding what action, if any, to take.
+If there is a legally clear form of domestic depositor preference, then this is a known risk that
+can be assessed.52 However, the PRA will also take account of two related risks that are harder to
+assess:
+ the risk of short-notice legislative change in the home jurisdiction during a crisis that is intended
+to favour domestic depositors or creditors; and
+50 SS1/17 sets out the PRA’s expectations for liquidity reporting by PRA-regulated branches of third-country and non-EEA credit
+institutions and designated investment firms, February 2017: www.bankofengland.co.uk/prudential-
+regulation/publication/2017/supervising-international-banks-the-pras-approach-to-branch-supervision-liquidity-reporting-ss.
+51 SS4/16 ‘Internal governance of third country branches’, February 2016: www.bankofengland.co.uk/prudential-
+regulation/publication/2016/internal-governance-of-third-country-branches-ss.
+52 FSA Consultation Paper 12/23, ‘Addressing the implications of non-EEA national depositor preference regimes’, September 2012:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2013/addressing-the-implications-of-non-eea-national-
+depositor-preference-regimes.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 33]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 30
+ the risk that, actual administrative discrimination against foreign depositors or creditors takes
+place during the post-failure liquidation or resolution process.
+The PRA’s preferred approach is to gain assurance that the home resolution authority’s
+resolution regime will deliver the appropriate outcomes for the PRA’s and the Bank’s objectives as
+UK resolution authority. In the absence of adequate levels of assurance, the PRA will likely not be
+prepared to host such a branch from that jurisdiction.53 In the case of an international bank
+operating through an existing branch, it may be required to establish a UK subsidiary. If there is
+insufficient assurance over the home state resolution arrangements, this may in turn mean that it
+would be necessary for the firm to be supervised on a more standalone basis consistent with a MPE
+approach to resolution.
+Approach to significant retail activities
+In general, the PRA will not be content for branches to undertake retail banking activities
+beyond the levels described in the next paragraph. This ensures that the PRA is able to meet its
+supervisory objectives and mitigate the risks to UK financial stability.
+In assessing whether the PRA will be content for an international bank to undertake retail
+activities in the UK through a branch, the PRA will make a determination based on the following:
+ the value and type of account: while this is not a hard threshold and may vary on a firm-by-firm
+basis, the PRA expects branches to have under £100 million of retail and small company54
+transactional or instant access account balances covered by the Financial Services
+Compensation Scheme (FSCS);55
+ the number of customers: in addition to the value of deposits, the PRA will also take into
+account the number of customers. Where branches have in aggregate more than 5,000 retail
+and small company customers with accounts that are used for transactional purposes, this may
+be of concern, though this may differ on a firm-by-firm basis;
+ planned growth: while a branch’s existing retail deposits could be within the PRA’s appetite, the
+PRA may conclude that the branch’s plans to grow retail deposits are outside its risk appetite.
+The PRA’s approach to authorising and supervising international banks that propose to
+undertake significant retail banking activities through branches is also driven by the fact that eligible
+deposits of these branches are covered by the FSCS. In the event of failure, if the FSCS were unable
+to recoup the amount it paid out via the bank insolvency procedure from recoveries, ultimately
+there would be a liability to the UK financial system. Given this, the PRA will not, in general, be
+content for a branch to undertake deposit activity where the total potential liability to the FSCS in
+relation to covered deposits (as defined in the Depositor Protection Part of the PRA Rulebook) is in
+excess of £500 million.
+53 The Bank has certain resolution powers over branches, including the power to resolve branches on a standalone basis in certain
+circumstances.
+54 A ‘small company’ is defined as under the Companies Act 2006:
+http://www.legislation.gov.uk/ukpga/2006/46/part/15/chapter/1/crossheading/companies-subject-to-the-small-companies-regime.
+This definition is used here for supervisory purposes only, and firms should use this definition for their branch return submissions.
+For the avoidance of doubt, the definition of ‘micro, small and medium-sized enterprises’ for the purposes of the Depositor
+Protection Part of the PRA Rulebook remains unchanged.
+55 In general, the PRA starts from the understanding that an account, while it may have transactional functionality, is only considered a
+‘transactional account’ if withdrawals from it have been made nine or more times within a three month period, but it may
+additionally consider other factors. The PRA will continue to take a pragmatic, judgement-based view as to whether the accounts are
+transactional in practice.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 34]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 31
+The PRA expects new branches of international banks operating in the UK to focus primarily on
+wholesale banking activities.
+Where the PRA requires an international bank to use a subsidiary in order to undertake retail
+banking activities in the UK beyond certain levels, it does not automatically mean that the Bank, as
+resolution authority, would expect to apply its resolution powers on the subsidiary in the event of
+failure. This reflects the fact that it may be consistent with the PRA’s objectives to gain greater
+supervisory influence over a firm, even if the test for use of stabilisation tools is different. The actual
+approach taken to resolve a firm will depend on the circumstances at the time of its failure.
+Approach to systemic wholesale branches
+Given the cross-border nature of many wholesale banking activities, wholesale branches tend
+to involve greater complexity in terms of structures, business models, and booking arrangements.
+Accordingly, where they may become of systemic importance, the PRA has additional expectations.
+Systemic importance
+The PRA will identify wholesale branches as systemically important when their size, complexity,
+and interconnectedness indicate that the failure of the firm could have significant consequences for
+financial stability in the UK. The PRA will inform the firm in cases where its wholesale branch is
+determined to be systemically important.
+As its starting point, the PRA will have regard to the size of a firm’s UK footprint in deciding
+whether to determine that a wholesale branch is systemically important, specifically whether it
+exceeds an average of £15 billion total gross assets. In calculating this figure, the PRA will take
+account both of assets booked onto the balance sheet of the branch, and assets traded or originated
+in the UK but booked remotely to another jurisdiction. The PRA will use the data provided in the
+Branch Return to assist in determining whether the wholesale branch is systemically important.56
+Where a group maintains more than one UK branch, the PRA will aggregate the UK footprint of
+those branches to assess the overall significance of the UK branches of the group. Where a group
+also maintains a UK branch of an investment firm, the PRA may also take into account the assets of
+that branch.
+The PRA’s assessment will also take account of the likelihood that a firm will exceed the
+threshold in future.
+The £15 billion threshold is only indicative. In determining systemic importance, the PRA will
+also focus on the overall complexity and interconnectedness of the business undertaken in the
+branch, including where a branch provides significant operational services or is otherwise
+interconnected to a systemically important UK bank. It will also take account of the level of provision
+of critical functions the branch undertakes.
+Box 3 sets out the PRA’s expectations of systemic wholesale branches.
+Box 3: The PRA’s expectations of systemic wholesale branches
+Expectations of systemic wholesale branches
+56 See: https://www.bankofengland.co.uk/prudential-regulation/regulatory-reporting/regulatory-reporting-banking-sector/banks-
+building-societies-and-investment-firms.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 35]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 32
+Whereas the PRA expects all branches’ organisational arrangements to be comprehensive yet
+proportionate to the nature, scale, and complexity of their business, the PRA has additional
+expectations for systemic wholesale branches.57
+Where the PRA identifies wholesale branches as being of systemic importance to the UK, the
+intensity of the PRA’s supervision of the branch will generally be greater, and the PRA’s expectations
+of its organisational arrangements will be higher. The specific arrangements will vary across firms,
+but the PRA has the following general expectations.
+Supervisory engagement
+Systemic wholesale branches are among those firms for whom the PRA has a continuous assessment
+programme. This programme includes an assessment of the business undertaken by the branch, the
+authorised entity of which it is part, and the group. It also includes consideration of booking
+arrangements as set out in Box 2. This assessment informs the depth and nature of the information
+and engagement the PRA expects from both the home state supervisor and the branch.
+The PRA will look to the Head of Overseas Branch (SMF19) to ensure it receives the requisite
+information it expects for all branches. For systemic wholesale branches, as part of its supervisory
+programme, the PRA will expect to meet at least annually as part of existing annual meetings with
+the CEO or the CRO, or both, of the authorised entity of which the branch is part, to discuss the
+PRA’s expectations on information sharing, as outlined in Box 1, for the firm.
+Governance
+All branches must have the SMF19 approved by the PRA, with FCA consent. Individual(s) performing
+the SMF19 should have the highest degree of individual decision-making authority within the branch
+over activities and areas subject to UK regulation.
+For systemic wholesale branches, the person exercising SMF19 is expected to be a senior figure
+within the firm, who is credible and influential at the group executive level. That person should be
+well-informed on group developments and how these will affect the operations of the branch. This
+person should be in a position to ensure that the PRA receives the information set out in Box 1
+where this information can be provided by the firm.
+In addition to having such an individual holding the SMF19 function, systemic wholesale branches
+should consider, whether they need the following SMFs: CROf (SMF4), CFO (SMF2), and COO
+(SMF24). The PRA may also expect or require the firm to have these positions in respect of the
+branch.
+Where an individual based in the head office of the firm, or in another undertaking which is a
+member of the firm’s group, has significant influence over the branch’s booking arrangements, then
+that individual should seek approval as Group Entity Senior Manager function (SMF7). This includes
+where there is a group executive responsible for firm-wide systems or operations upon which the
+branch relies (for example, in custody, which is often run as a globally integrated activity). However,
+where other persons provide the appropriate connectivity with the authorised entity or group, the
+PRA may judge that this may not be necessary (for example, where the branch manager is on the
+firm’s executive committee).
+Risk management
+A branch should establish, implement, and maintain adequate risk management policies and
+procedures, including effective procedures for risk assessment, which identify the risks relating to
+the branch’s activities, processes, and systems, and where appropriate, set its risk appetite or the
+57 See SS4/16 ‘Internal governance of third country branches’, February 2016: https://www.bankofengland.co.uk/prudential-
+regulation/publication/2016/internal-governance-of-third-country-branches-ss.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss
+
+[Page 36]
+International banks: The PRA’s approach to branch and subsidiary supervision July 2021 33
+level of risk tolerated by the branch.58 For systemic wholesale branches, the PRA will expect to see
+evidence of this and to understand the firm’s policies governing the nature and amount of risk
+associated with business undertaken through the branch. It can do this either through seeing
+policies written at the branch level, or policies written for the firm as a whole, which identify how
+the branch risks are to be managed.
+The PRA expects these policies to set out criteria against which to judge whether business should be
+undertaken through the branch or elsewhere in the firm. These policies should include an
+assessment of non-financial risks (legal, reputational, conduct, operational, etc) that may arise
+through branch activities.
+The branch should have in place the appropriate governance for booking policies and controls that
+mirror those set out in Box 2, which describes booking arrangements as between different entities
+within a group. In the case of international banks with UK branches, the arrangements should
+differentiate between what is booked to the firm’s head office and what is booked to the UK branch.
+UK footprint
+Where a systemic wholesale branch operates in the UK alongside a material subsidiary, the PRA
+expects there to be controls around the division of risks accepted though the subsidiary and the
+branch (for example, in the supply of key services between those entities and in the booking of
+higher risk and unprofitable business). While there is scope for key risk management function-
+holders to combine roles across the UK entities (subsidiary and branch), firms will need to ensure
+that any conflicts of interest that may arise for the function holder as a result are appropriately
+managed.
+58 See SS4/16 ‘Internal governance of third country branches’, February 2016: https://www.bankofengland.co.uk/prudential-
+regulation/publication/2016/internal-governance-of-third-country-branches-ss.
+This SS has been superseded on 20 May 2025. Please visit:
+https://www.bankofengland.co.uk/prudential-regulation/publication/2021/july/pra-approach-to-branch-and-subsidiary-supervision-ss

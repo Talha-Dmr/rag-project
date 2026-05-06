@@ -195,6 +195,20 @@ class HallucinationDetector:
 
         raise RuntimeError("Could not find classifier head for representation sampling.")
 
+    def _load_checkpoint_metadata(self, state_path: Path) -> Dict[str, Any]:
+        """Load local training metadata, including PyTorch 2.6 checkpoint files."""
+        try:
+            return torch.load(state_path, map_location="cpu")
+        except Exception as exc:
+            if "Weights only load failed" not in str(exc):
+                raise
+
+            logger.warning(
+                "Loading checkpoint metadata with weights_only=False: %s",
+                state_path,
+            )
+            return torch.load(state_path, map_location="cpu", weights_only=False)
+
     def _load_model(self) -> None:
         """Load model and tokenizer."""
         model_pt = self.model_path / "model.pt"
@@ -271,12 +285,16 @@ class HallucinationDetector:
             state_path = self.model_path / "training_state.pt"
             if state_path.exists():
                 try:
-                    checkpoint_state = torch.load(state_path, map_location="cpu", weights_only=False)
+                    checkpoint_state = self._load_checkpoint_metadata(state_path)
                     cfg = checkpoint_state.get("config", {})
                     base_model = base_model or cfg.get("model", {}).get("base_model")
                     lora_config = lora_config or cfg.get("model", {}).get("lora")
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning(
+                        "Could not infer checkpoint metadata from %s: %s",
+                        state_path,
+                        exc,
+                    )
 
             if not lora_config:
                 lora_config = self._infer_lora_config_from_checkpoint(checkpoint_weights)

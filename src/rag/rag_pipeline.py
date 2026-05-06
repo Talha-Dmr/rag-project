@@ -794,7 +794,9 @@ class RAGPipeline:
 
             result = {
                 'answer': answer,
-                'num_docs_retrieved': len(retrieved_docs)
+                'num_docs_retrieved': len(retrieved_docs),
+                'model_requested_abstain': model_requested_abstain,
+                'hallucination_detector_ran': False,
             }
 
             # Hallucination detection
@@ -805,6 +807,7 @@ class RAGPipeline:
                 logger.info("Checking for hallucinations...")
 
                 try:
+                    result['hallucination_detector_ran'] = True
                     detection_result = self.hallucination_detector.verify_answer_with_contexts(
                         answer=answer,
                         contexts=context_texts,

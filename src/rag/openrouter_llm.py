@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 
@@ -26,6 +27,13 @@ class OpenRouterLLM(BaseLLM):
         super().__init__(config)
 
         self.model_name = self.config.get("model_name", "openrouter/free")
+        fallback_cfg = self.config.get("fallback_models", [])
+        if isinstance(fallback_cfg, str):
+            self.fallback_models = [m.strip() for m in fallback_cfg.split(",") if m.strip()]
+        elif isinstance(fallback_cfg, list):
+            self.fallback_models = [str(m).strip() for m in fallback_cfg if str(m).strip()]
+        else:
+            self.fallback_models = []
         self.base_url = self.config.get(
             "base_url",
             "https://openrouter.ai/api/v1/chat/completions",
@@ -35,6 +43,8 @@ class OpenRouterLLM(BaseLLM):
         self.site_url = self.config.get("site_url")
         self.app_name = self.config.get("app_name", "rag-project")
         self.timeout_sec = int(self.config.get("timeout_sec", 180))
+        self.max_retries = int(self.config.get("max_retries", 2))
+        self.retry_backoff_sec = float(self.config.get("retry_backoff_sec", 1.5))
         self.max_new_tokens = int(
             self.config.get("max_new_tokens", self.config.get("max_tokens", 512))
         )
@@ -78,9 +88,15 @@ class OpenRouterLLM(BaseLLM):
             return "\n".join(parts).strip()
         return str(content).strip()
 
-    def _chat(self, messages: List[Dict[str, str]], temperature: float, max_tokens: int) -> str:
+    def _chat_single(
+        self,
+        model_name: str,
+        messages: List[Dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
         payload = {
-            "model": self.model_name,
+            "model": model_name,
             "messages": messages,
             "max_tokens": int(max_tokens),
             "temperature": float(temperature),
@@ -94,24 +110,80 @@ class OpenRouterLLM(BaseLLM):
             headers=self._headers(),
             method="POST",
         )
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
-                raw = resp.read().decode("utf-8")
-                data = json.loads(raw)
-        except urllib.error.HTTPError as e:
-            detail = ""
+        retryable_codes = {408, 429, 500, 502, 503, 504, 529}
+        data: Dict[str, Any] = {}
+        last_error: Optional[Exception] = None
+        for attempt in range(self.max_retries + 1):
             try:
-                detail = e.read().decode("utf-8", errors="replace")
-            except Exception:
-                detail = str(e)
-            raise RuntimeError(f"OpenRouter HTTP {e.code}: {detail}") from e
-        except Exception as e:
-            raise RuntimeError(f"OpenRouter request failed: {e}") from e
+                with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
+                    raw = resp.read().decode("utf-8")
+                    data = json.loads(raw)
+                break
+            except urllib.error.HTTPError as e:
+                detail = ""
+                try:
+                    detail = e.read().decode("utf-8", errors="replace")
+                except Exception:
+                    detail = str(e)
+
+                if e.code in retryable_codes and attempt < self.max_retries:
+                    sleep_sec = self.retry_backoff_sec * (2**attempt)
+                    logger.warning(
+                        "OpenRouter HTTP %s for model %s (retry %s/%s) - waiting %.1fs",
+                        e.code,
+                        model_name,
+                        attempt + 1,
+                        self.max_retries,
+                        sleep_sec,
+                    )
+                    time.sleep(sleep_sec)
+                    continue
+
+                raise RuntimeError(f"OpenRouter HTTP {e.code}: {detail}") from e
+            except Exception as e:
+                last_error = e
+                if attempt < self.max_retries:
+                    sleep_sec = self.retry_backoff_sec * (2**attempt)
+                    logger.warning(
+                        "OpenRouter request error for model %s (retry %s/%s): %s - waiting %.1fs",
+                        model_name,
+                        attempt + 1,
+                        self.max_retries,
+                        e,
+                        sleep_sec,
+                    )
+                    time.sleep(sleep_sec)
+                    continue
+                raise RuntimeError(f"OpenRouter request failed: {e}") from e
+
+        if not data:
+            raise RuntimeError(
+                f"OpenRouter request failed with empty response for model {model_name}: {last_error}"
+            )
 
         if "error" in data:
             raise RuntimeError(f"OpenRouter error: {data['error']}")
 
         return self._extract_text(data)
+
+    def _chat(self, messages: List[Dict[str, str]], temperature: float, max_tokens: int) -> str:
+        models_to_try = [self.model_name] + [m for m in self.fallback_models if m != self.model_name]
+        errors: List[str] = []
+        for idx, model_name in enumerate(models_to_try):
+            try:
+                if idx > 0:
+                    logger.warning("OpenRouter fallback model activated: %s", model_name)
+                return self._chat_single(
+                    model_name=model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            except RuntimeError as e:
+                errors.append(str(e))
+                continue
+
+        raise RuntimeError("OpenRouter all model attempts failed: " + " | ".join(errors))
 
     def generate(
         self,
@@ -159,10 +231,14 @@ class OpenRouterLLM(BaseLLM):
             "\nUser:",
             "\nSystem:",
             "\nDeveloper:",
+            "\nYou're an AI language model",
+            "\nYou are Claude",
             "Human:",
             "Assistant:",
             "QUESTION:",
             "CONTEXT:",
+            "You're an AI language model",
+            "You are Claude",
         ]:
             if marker in answer:
                 answer = answer.split(marker, 1)[0].strip()
@@ -182,6 +258,9 @@ class OpenRouterLLM(BaseLLM):
             r"\bInstruction:\s",
             r"\bPrompt:\s",
             r"\bHuman Resources Manager:\s",
+            r"You're an AI language model",
+            r"You are Claude",
+            r"\bClaude\.",
         ]
 
         earliest = None
@@ -195,4 +274,3 @@ class OpenRouterLLM(BaseLLM):
         if earliest is not None and earliest > 0:
             return answer[:earliest].strip()
         return answer.strip()
-

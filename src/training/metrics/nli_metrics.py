@@ -124,6 +124,25 @@ class NLIMetrics:
         precision_per_class = precision_score(labels, predictions, average=None, labels=class_labels, zero_division=0)
         recall_per_class = recall_score(labels, predictions, average=None, labels=class_labels, zero_division=0)
 
+        # Unsupported-answer risk view:
+        # 0=entailment is the only supported/safe class; 1/2 are risk classes.
+        gold_risk = labels != 0
+        pred_risk = predictions != 0
+        risk_tp = int(np.sum(gold_risk & pred_risk))
+        risk_fp = int(np.sum(~gold_risk & pred_risk))
+        risk_fn = int(np.sum(gold_risk & ~pred_risk))
+        risk_tn = int(np.sum(~gold_risk & ~pred_risk))
+        unsupported_precision = risk_tp / (risk_tp + risk_fp) if (risk_tp + risk_fp) else 0.0
+        unsupported_recall = risk_tp / (risk_tp + risk_fn) if (risk_tp + risk_fn) else 0.0
+        unsupported_f1 = (
+            2 * unsupported_precision * unsupported_recall
+            / (unsupported_precision + unsupported_recall)
+            if (unsupported_precision + unsupported_recall)
+            else 0.0
+        )
+        false_accept_rate = risk_fn / (risk_tp + risk_fn) if (risk_tp + risk_fn) else 0.0
+        false_abstain_rate = risk_fp / (risk_fp + risk_tn) if (risk_fp + risk_tn) else 0.0
+
         metrics = {
             'accuracy': accuracy,
             'f1_macro': f1_macro,
@@ -132,6 +151,11 @@ class NLIMetrics:
             'f1_weighted': f1_weighted,
             'precision_weighted': precision_weighted,
             'recall_weighted': recall_weighted,
+            'unsupported_precision': unsupported_precision,
+            'unsupported_recall': unsupported_recall,
+            'unsupported_f1': unsupported_f1,
+            'false_accept_rate': false_accept_rate,
+            'false_abstain_rate': false_abstain_rate,
         }
 
         # Add per-class metrics
@@ -216,6 +240,13 @@ class NLIMetrics:
             logger.info(f"  ECE: {metrics['ece']:.4f}")
         if 'brier' in metrics:
             logger.info(f"  Brier: {metrics['brier']:.4f}")
+        logger.info(
+            f"  Unsupported risk: "
+            f"P={metrics['unsupported_precision']:.4f}, "
+            f"R={metrics['unsupported_recall']:.4f}, "
+            f"F1={metrics['unsupported_f1']:.4f}, "
+            f"false_accept={metrics['false_accept_rate']:.4f}"
+        )
 
         logger.info(f"\n{prefix}Per-class metrics:")
         for label_name in self.LABEL_NAMES:

@@ -66,7 +66,10 @@ class HallucinationDetector:
         swag_config: Optional[Dict[str, Any]] = None,
         logit_sampling_config: Optional[Dict[str, Any]] = None,
         representation_sampling_config: Optional[Dict[str, Any]] = None,
-        artifact_verifier_config: Optional[Dict[str, Any]] = None
+        artifact_verifier_config: Optional[Dict[str, Any]] = None,
+        risk_mode: str = "contradiction",
+        unsupported_threshold: float = 0.5,
+        hypothesis_format: str = "answer_only",
     ):
         """
         Initialize hallucination detector.
@@ -102,6 +105,9 @@ class HallucinationDetector:
         self.artifact_verifier_confidence_threshold = float(
             self.artifact_verifier_config.get("confidence_threshold", 0.42)
         )
+        self.risk_mode = str(risk_mode or "contradiction").strip().lower()
+        self.unsupported_threshold = float(unsupported_threshold)
+        self.hypothesis_format = str(hypothesis_format or "answer_only").strip().lower()
         self._classifier_module = None
         self.label_to_index = {
             "entailment": self.LABEL_ENTAILMENT,
@@ -172,6 +178,15 @@ class HallucinationDetector:
         if result["confidence"] < self.artifact_verifier_confidence_threshold:
             return None
         return result
+
+    def _format_hypothesis(self, answer: str, question: Optional[str] = None) -> str:
+        if question and self.hypothesis_format in {
+            "question_and_answer",
+            "question_and_candidate_answer",
+            "finregbench",
+        }:
+            return f"Question: {question}\nCandidate answer: {answer}"
+        return answer
 
     def _resolve_classifier_module(self) -> torch.nn.Module:
         """Find classifier head across plain HF and PEFT wrapped models."""
@@ -791,9 +806,15 @@ class HallucinationDetector:
 
         # Check if hallucination (contradiction)
         is_hallucination = (predicted_class == self.label_to_index["contradiction"])
+        unsupported_risk = (
+            probs[self.label_to_index["neutral"]].item()
+            + probs[self.label_to_index["contradiction"]].item()
+        )
 
         result = {
             'is_hallucination': is_hallucination,
+            'is_unsupported': unsupported_risk >= self.unsupported_threshold,
+            'unsupported_risk': float(unsupported_risk),
             'label': label,
             'confidence': confidence
         }
@@ -917,9 +938,15 @@ class HallucinationDetector:
                 confidence = probs[j][predicted_class].item()
 
                 is_hallucination = (predicted_class == self.label_to_index["contradiction"])
+                unsupported_risk = (
+                    probs[j][self.label_to_index["neutral"]].item()
+                    + probs[j][self.label_to_index["contradiction"]].item()
+                )
 
                 result = {
                     'is_hallucination': is_hallucination,
+                    'is_unsupported': unsupported_risk >= self.unsupported_threshold,
+                    'unsupported_risk': float(unsupported_risk),
                     'label': label,
                     'confidence': confidence
                 }
@@ -970,7 +997,8 @@ class HallucinationDetector:
         self,
         answer: str,
         contexts: List[str],
-        aggregation: str = 'any'
+        aggregation: str = 'any',
+        question: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Verify if answer is supported by retrieved contexts.
@@ -1000,15 +1028,20 @@ class HallucinationDetector:
 
         # Check each context
         premises = contexts
-        hypotheses = [answer] * len(contexts)
+        hypothesis = self._format_hypothesis(answer, question=question)
+        hypotheses = [hypothesis] * len(contexts)
 
         individual_results = self.detect_batch(premises, hypotheses)
 
         # Count contradictions
         num_contradictions = sum(
-            1 for r in individual_results if r['is_hallucination']
+            1 for r in individual_results if r.get('label') == 'contradiction'
+        )
+        num_unsupported = sum(
+            1 for r in individual_results if r.get('label') in {'neutral', 'contradiction'}
         )
         hard_contradiction_rate = num_contradictions / len(contexts)
+        hard_unsupported_rate = num_unsupported / len(contexts)
         contradiction_probs = [
             float((r.get("scores") or {}).get("contradiction", 0.0))
             for r in individual_results
@@ -1020,6 +1053,10 @@ class HallucinationDetector:
         neutral_probs = [
             float((r.get("scores") or {}).get("neutral", 0.0))
             for r in individual_results
+        ]
+        unsupported_probs = [
+            neutral + contradiction
+            for neutral, contradiction in zip(neutral_probs, contradiction_probs)
         ]
 
         if contradiction_probs:
@@ -1034,11 +1071,30 @@ class HallucinationDetector:
             contradiction_neutral_gap_mean = float(sum(
                 cp - np_ for cp, np_ in zip(contradiction_probs, neutral_probs)
             ) / len(contradiction_probs))
+            support_score = float(max(entailment_probs)) if entailment_probs else 0.0
+            best_context_index = int(max(
+                range(len(entailment_probs)),
+                key=lambda idx: entailment_probs[idx]
+            )) if entailment_probs else None
+            unsupported_risk = float(1.0 - support_score)
+            unsupported_prob_mean = float(sum(unsupported_probs) / len(unsupported_probs))
+            top_k_unsupported = max(1, math.ceil(len(unsupported_probs) / 2))
+            unsupported_prob_topk = float(
+                sum(sorted(unsupported_probs, reverse=True)[:top_k_unsupported])
+                / top_k_unsupported
+            )
         else:
             hallucination_prob_mean = 0.0
             hallucination_prob_topk = 0.0
             contradiction_margin_mean = 0.0
             contradiction_neutral_gap_mean = 0.0
+            support_score = 0.0
+            best_context_index = None
+            unsupported_risk = 1.0
+            unsupported_prob_mean = 1.0
+            unsupported_prob_topk = 1.0
+
+        is_unsupported = unsupported_risk >= self.unsupported_threshold
 
         # Aggregate decision / score
         agg = (aggregation or "any").strip().lower()
@@ -1066,19 +1122,45 @@ class HallucinationDetector:
                 0.75 * hallucination_prob_mean + 0.25 * min(1.0, contradiction_margin_mean * 4.0)
             ))
             is_hallucination = (hallucination_score >= 0.40)
+        elif agg in {'unsupported', 'unsupported_best', 'unsupported_risk'}:
+            hallucination_score = unsupported_risk
+            is_hallucination = is_unsupported
+        elif agg == 'unsupported_mean':
+            hallucination_score = unsupported_prob_mean
+            is_hallucination = (hallucination_score >= self.unsupported_threshold)
+        elif agg == 'unsupported_topk':
+            hallucination_score = unsupported_prob_topk
+            is_hallucination = (hallucination_score >= self.unsupported_threshold)
         else:
             raise ValueError(f"Unknown aggregation: {aggregation}")
 
+        best_context = (
+            individual_results[best_context_index]
+            if best_context_index is not None and individual_results
+            else None
+        )
+
         return {
             'is_hallucination': is_hallucination,
+            'is_unsupported': is_unsupported,
             'individual_results': individual_results,
             'hallucination_score': hallucination_score,
             'hard_contradiction_rate': hard_contradiction_rate,
+            'hard_unsupported_rate': hard_unsupported_rate,
             'hallucination_prob_mean': hallucination_prob_mean,
             'hallucination_prob_topk': hallucination_prob_topk,
+            'unsupported_risk': unsupported_risk,
+            'unsupported_prob_mean': unsupported_prob_mean,
+            'unsupported_prob_topk': unsupported_prob_topk,
+            'unsupported_threshold': self.unsupported_threshold,
+            'support_score': support_score,
+            'best_context_index': best_context_index,
+            'best_context_label': best_context.get('label') if best_context else None,
+            'best_context_scores': best_context.get('scores') if best_context else None,
             'contradiction_margin_mean': contradiction_margin_mean,
             'contradiction_neutral_gap_mean': contradiction_neutral_gap_mean,
             'num_contexts': len(contexts),
             'num_contradictions': num_contradictions,
+            'num_unsupported': num_unsupported,
             'aggregation': aggregation
         }

@@ -123,3 +123,4 @@ FinRegBench/data/*_detector_predictions*.jsonl
 FinRegBench/data/finreg_3000_draft.jsonl
 FinRegBench/data/finreg_3000_artifact_easy.jsonl
 FinRegBench/data/finreg_3000_hard_candidate.jsonl
+reports/

@@ -356,7 +356,10 @@ class HallucinationTrainer(BaseTrainer):
         output_path.mkdir(parents=True, exist_ok=True)
 
         # Calculate total training steps
-        num_train_steps = len(self.train_loader) * num_epochs // self.gradient_accumulation_steps
+        steps_per_epoch = (
+            len(self.train_loader) + self.gradient_accumulation_steps - 1
+        ) // self.gradient_accumulation_steps
+        num_train_steps = steps_per_epoch * num_epochs
 
         # Setup scheduler
         self.scheduler = get_scheduler(
@@ -567,8 +570,13 @@ class HallucinationTrainer(BaseTrainer):
 
         # Calculate total steps for this epoch (for progress bar)
         total_batches = len(self.train_loader)
-        total_steps = total_batches // self.gradient_accumulation_steps
+        total_steps = (
+            total_batches + self.gradient_accumulation_steps - 1
+        ) // self.gradient_accumulation_steps
         epoch_step = 0  # Track steps within this epoch
+        last_group_size = total_batches % self.gradient_accumulation_steps
+        if last_group_size == 0:
+            last_group_size = self.gradient_accumulation_steps
 
         progress_bar = tqdm(
             self.train_loader,
@@ -584,6 +592,11 @@ class HallucinationTrainer(BaseTrainer):
             attention_mask = batch['attention_mask'].to(self.device)
             labels = batch['labels'].to(self.device)
 
+            in_last_group = batch_idx >= total_batches - last_group_size
+            effective_accum_steps = (
+                last_group_size if in_last_group else self.gradient_accumulation_steps
+            )
+
             # Forward pass with mixed precision
             if self.scaler:
                 with torch.cuda.amp.autocast():
@@ -591,13 +604,15 @@ class HallucinationTrainer(BaseTrainer):
                         input_ids=input_ids,
                         attention_mask=attention_mask
                     )
-                    loss = self._compute_loss(outputs.logits, labels, batch=batch) / self.gradient_accumulation_steps
+                    raw_loss = self._compute_loss(outputs.logits, labels, batch=batch)
+                    loss = raw_loss / effective_accum_steps
             else:
                 outputs = self.model(
                     input_ids=input_ids,
                     attention_mask=attention_mask
                 )
-                loss = self._compute_loss(outputs.logits, labels, batch=batch) / self.gradient_accumulation_steps
+                raw_loss = self._compute_loss(outputs.logits, labels, batch=batch)
+                loss = raw_loss / effective_accum_steps
 
             # Backward pass
             if self.scaler:
@@ -606,7 +621,11 @@ class HallucinationTrainer(BaseTrainer):
                 loss.backward()
 
             # Gradient accumulation
-            if (batch_idx + 1) % self.gradient_accumulation_steps == 0:
+            should_step = (
+                (batch_idx + 1) % self.gradient_accumulation_steps == 0
+                or (batch_idx + 1) == total_batches
+            )
+            if should_step:
                 if self.scaler:
                     self.scaler.unscale_(self.optimizer)
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
@@ -622,7 +641,7 @@ class HallucinationTrainer(BaseTrainer):
                 # Increment global step and save batch checkpoint
                 self.global_step += 1
                 epoch_step += 1
-                current_loss = loss.item() * self.gradient_accumulation_steps
+                current_loss = raw_loss.item()
 
                 # Update progress bar description to show optimizer steps
                 progress_bar.set_description(
@@ -647,12 +666,12 @@ class HallucinationTrainer(BaseTrainer):
                         }
                     )
 
-            total_loss += loss.item() * self.gradient_accumulation_steps
+            total_loss += raw_loss.item()
             num_batches += 1
 
             # Update progress bar
             progress_bar.set_postfix({
-                'loss': loss.item() * self.gradient_accumulation_steps,
+                'loss': raw_loss.item(),
                 'step': self.global_step
             })
 

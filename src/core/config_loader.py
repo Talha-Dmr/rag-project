@@ -32,7 +32,7 @@ class ConfigLoader:
         Load a YAML configuration file
 
         Args:
-            config_name: Name of config file (without .yaml extension)
+            config_name: Name of config file (without .yaml extension) or path
 
         Returns:
             Configuration dictionary
@@ -40,7 +40,13 @@ class ConfigLoader:
         Raises:
             FileNotFoundError: If config file doesn't exist
         """
-        config_path = self.config_dir / f"{config_name}.yaml"
+        requested_path = Path(config_name)
+        if requested_path.exists():
+            config_path = requested_path
+        elif requested_path.suffix in {".yaml", ".yml"}:
+            config_path = self.config_dir / requested_path
+        else:
+            config_path = self.config_dir / f"{config_name}.yaml"
 
         if not config_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_path}")

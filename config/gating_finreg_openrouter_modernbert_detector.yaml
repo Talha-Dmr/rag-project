@@ -1,0 +1,58 @@
+# Full financial-regulation RAG config with OpenRouter generation and ModernBERT detector.
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cuda
+  cache_folder: ./models/embeddings
+  batch_size: 32
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg
+    collection_name: rag_finreg
+
+llm:
+  type: openrouter
+  model_name: qwen/qwen3-4b:free
+  base_url: https://openrouter.ai/api/v1/chat/completions
+  api_key_env: OPENROUTER_API_KEY
+  site_url: https://localhost/rag-project
+  app_name: rag-project-local
+  timeout_sec: 120
+  max_tokens: 128
+  temperature: 0.2
+  top_p: 0.9
+
+retrieval:
+  k: 5
+  score_threshold: 0.0
+
+hallucination_detector:
+  enabled: true
+  model_path: models/checkpoints/finregbench_modernbert_detector/best_model
+  base_model: tasksource/ModernBERT-base-nli
+  device: cuda
+  max_length: 1024
+  batch_size: 4
+  hypothesis_format: question_and_candidate_answer
+  risk_mode: unsupported
+  aggregation: unsupported_best
+  unsupported_threshold: 0.50
+
+hallucination_aggregation: unsupported_best
+
+gating:
+  enabled: true
+  strategy: abstain
+  contradiction_prob_metric: unsupported_risk
+  contradiction_prob_threshold: 0.50
+  contradiction_rate_metric: hard_unsupported_rate
+  contradiction_rate_threshold: 0.80
+  uncertainty_threshold: 1.0
+  abstain_message: "I don't have enough reliable evidence to support that answer."
+
+sources:
+  max_sources: 5
+  include_scores: true

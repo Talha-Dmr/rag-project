@@ -15,7 +15,7 @@ from src.vector_stores.base_store import VectorStoreFactory
 from src.rag.llm_wrapper import HuggingFaceLLM
 from src.rag.openrouter_llm import OpenRouterLLM
 from src.rag.retriever import Retriever
-from src.core.base_classes import BaseReranker
+from src.core.base_classes import BaseLLM, BaseReranker
 from src.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -44,6 +44,27 @@ SOURCE_BALANCE_STOPWORDS = {
     "and", "are", "body", "data", "do", "for", "frame", "how", "its",
     "materials", "quality", "responsibility", "senior", "the", "their", "when",
 }
+
+
+class _NoopLLM(BaseLLM):
+    """LLM placeholder for retrieval/detector-only workflows."""
+
+    def generate(
+        self,
+        prompt: str,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None
+    ) -> str:
+        raise RuntimeError("LLM is disabled for this pipeline config.")
+
+    def generate_with_context(
+        self,
+        query: str,
+        context: List[str],
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None
+    ) -> str:
+        raise RuntimeError("LLM is disabled for this pipeline config.")
 
 
 class RAGPipeline:
@@ -321,6 +342,11 @@ class RAGPipeline:
         return {
             "contradiction_rate": detection_result.get("hallucination_score", 0.0),
             "hard_contradiction_rate": detection_result.get("hard_contradiction_rate", 0.0),
+            "hard_unsupported_rate": detection_result.get("hard_unsupported_rate", 0.0),
+            "unsupported_risk": detection_result.get("unsupported_risk", 0.0),
+            "unsupported_prob_mean": detection_result.get("unsupported_prob_mean", 0.0),
+            "unsupported_prob_topk": detection_result.get("unsupported_prob_topk", 0.0),
+            "support_score": detection_result.get("support_score", 0.0),
             "contradiction_prob_mean": contradiction_prob_mean,
             "hallucination_prob_mean": detection_result.get("hallucination_prob_mean", contradiction_prob_mean),
             "hallucination_prob_topk": detection_result.get("hallucination_prob_topk", contradiction_prob_mean),
@@ -811,17 +837,31 @@ class RAGPipeline:
                     detection_result = self.hallucination_detector.verify_answer_with_contexts(
                         answer=answer,
                         contexts=context_texts,
-                        aggregation=aggregation_mode
+                        aggregation=aggregation_mode,
+                        question=query_text,
                     )
 
                     result['hallucination_detected'] = detection_result['is_hallucination']
+                    result['unsupported_answer_detected'] = detection_result.get('is_unsupported')
+                    result['unsupported_risk'] = detection_result.get('unsupported_risk')
+                    result['support_score'] = detection_result.get('support_score')
                     result['hallucination_score'] = detection_result['hallucination_score']
                     result['hallucination_details'] = {
                         'num_contexts': detection_result['num_contexts'],
                         'num_contradictions': detection_result['num_contradictions'],
+                        'num_unsupported': detection_result.get('num_unsupported'),
                         'aggregation': detection_result['aggregation']
                     }
                     for key in (
+                        "unsupported_risk",
+                        "unsupported_prob_mean",
+                        "unsupported_prob_topk",
+                        "unsupported_threshold",
+                        "support_score",
+                        "best_context_index",
+                        "best_context_label",
+                        "best_context_scores",
+                        "hard_unsupported_rate",
                         "hard_contradiction_rate",
                         "hallucination_prob_mean",
                         "hallucination_prob_topk",
@@ -966,6 +1006,78 @@ class RAGPipeline:
                         result['answer'] = f"{result['answer']}\n\n{sources_text}"
 
         logger.info("Query complete")
+        return result
+
+    def verify_candidate_answer(
+        self,
+        query_text: str,
+        candidate_answer: str,
+        k: Optional[int] = None,
+        return_context: bool = False,
+        return_sources: bool = False,
+        hallucination_aggregation: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Verify a candidate answer against retrieved evidence without generating.
+
+        This is the detector-first path used for RAG gating and real-life smoke
+        tests where an answer already exists and the system must decide whether
+        the retrieved corpus supports it.
+        """
+        if not self.hallucination_detector:
+            raise RuntimeError("Hallucination detector is not available.")
+
+        current_k = k if k is not None else self.retriever.k
+        aggregation_mode = hallucination_aggregation or self.hallucination_aggregation or "any"
+
+        logger.info(f"Retrieving top {current_k} documents for candidate verification...")
+        retrieved_docs = self.retriever.retrieve(query_text, k=current_k)
+
+        if self.reranker and retrieved_docs:
+            rerank_top_k = self.reranker_top_k or current_k
+            retrieved_docs = self.reranker.rerank(query_text, retrieved_docs, top_k=rerank_top_k)
+
+        context_texts = [doc["content"] for doc in retrieved_docs]
+        detection_result = self.hallucination_detector.verify_answer_with_contexts(
+            answer=candidate_answer,
+            contexts=context_texts,
+            aggregation=aggregation_mode,
+            question=query_text,
+        )
+
+        result = {
+            "query": query_text,
+            "candidate_answer": candidate_answer,
+            "num_docs_retrieved": len(retrieved_docs),
+            "hallucination_detected": detection_result.get("is_hallucination"),
+            "unsupported_answer_detected": detection_result.get("is_unsupported"),
+            "hallucination_score": detection_result.get("hallucination_score"),
+            "unsupported_risk": detection_result.get("unsupported_risk"),
+            "support_score": detection_result.get("support_score"),
+            "hallucination_details": {
+                "aggregation": detection_result.get("aggregation"),
+                "num_contexts": detection_result.get("num_contexts"),
+                "num_contradictions": detection_result.get("num_contradictions"),
+                "num_unsupported": detection_result.get("num_unsupported"),
+                "unsupported_threshold": detection_result.get("unsupported_threshold"),
+                "hard_unsupported_rate": detection_result.get("hard_unsupported_rate"),
+                "hard_contradiction_rate": detection_result.get("hard_contradiction_rate"),
+                "best_context_index": detection_result.get("best_context_index"),
+                "best_context_label": detection_result.get("best_context_label"),
+                "best_context_scores": detection_result.get("best_context_scores"),
+                "unsupported_prob_mean": detection_result.get("unsupported_prob_mean"),
+                "unsupported_prob_topk": detection_result.get("unsupported_prob_topk"),
+                "hallucination_prob_mean": detection_result.get("hallucination_prob_mean"),
+                "hallucination_prob_topk": detection_result.get("hallucination_prob_topk"),
+            },
+            "individual_results": detection_result.get("individual_results", []),
+        }
+
+        if return_context:
+            result["context"] = retrieved_docs
+        if return_sources:
+            result["sources"] = self._build_source_entries(retrieved_docs)
+
         return result
 
     def _build_source_entries(
@@ -1181,7 +1293,9 @@ class RAGPipeline:
         # LLM
         llm_config = config.get('llm', {})
         llm_type = str(llm_config.get("type", "huggingface")).strip().lower()
-        if llm_type in {"openrouter", "api", "openai_compatible"}:
+        if llm_type in {"none", "disabled", "noop", "detector_only"}:
+            llm = _NoopLLM(llm_config)
+        elif llm_type in {"openrouter", "api", "openai_compatible"}:
             llm = OpenRouterLLM(llm_config)
         else:
             llm = HuggingFaceLLM(llm_config)
@@ -1237,13 +1351,17 @@ class RAGPipeline:
                             training_config.get('data', {}).get('max_seq_length', 256)
                         ),
                         device=detector_config.get('device'),
+                        batch_size=detector_config.get('batch_size', 8),
                         base_model=detector_config.get('base_model'),
                         lora_config=detector_config.get('lora') or detector_config.get('lora_config'),
                         mc_dropout_samples=detector_config.get('mc_dropout_samples', 1),
                         swag_config=detector_config.get('swag'),
                         logit_sampling_config=detector_config.get('logit_sampling'),
                         representation_sampling_config=detector_config.get('representation_sampling'),
-                        artifact_verifier_config=detector_config.get('artifact_verifier')
+                        artifact_verifier_config=detector_config.get('artifact_verifier'),
+                        risk_mode=detector_config.get('risk_mode', 'contradiction'),
+                        unsupported_threshold=detector_config.get('unsupported_threshold', 0.5),
+                        hypothesis_format=detector_config.get('hypothesis_format', 'answer_only'),
                     )
                 logger.info("Hallucination detector loaded successfully")
 

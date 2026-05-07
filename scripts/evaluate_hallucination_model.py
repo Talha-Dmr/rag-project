@@ -120,7 +120,7 @@ def evaluate_model(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     data_dir = Path(args.data_dir)
-    test_data = data_dir / 'test.jsonl'
+    test_data = Path(args.test_file) if args.test_file else data_dir / 'test.jsonl'
 
     if not test_data.exists():
         logger.error(f"Test data not found: {test_data}")
@@ -163,6 +163,9 @@ def evaluate_model(args: argparse.Namespace) -> None:
         logger.info(f"  ECE:              {metrics['ece']:.4f}")
     if 'brier' in metrics:
         logger.info(f"  Brier:            {metrics['brier']:.4f}")
+    logger.info(f"  Unsupported F1:   {metrics.get('unsupported_f1', 0):.4f}")
+    logger.info(f"  Unsupported Recall: {metrics.get('unsupported_recall', 0):.4f}")
+    logger.info(f"  False Accept Rate: {metrics.get('false_accept_rate', 0):.4f}")
 
     logger.info("\nPer-Class Metrics:")
     for label in ['entailment', 'neutral', 'contradiction']:
@@ -261,6 +264,12 @@ def main():
         type=str,
         required=True,
         help='Directory containing test.jsonl'
+    )
+    parser.add_argument(
+        '--test-file',
+        type=str,
+        default=None,
+        help='Optional explicit JSONL test file. Overrides --data-dir/test.jsonl.'
     )
 
     parser.add_argument(

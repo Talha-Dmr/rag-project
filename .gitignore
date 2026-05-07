@@ -110,6 +110,7 @@ temp/
 # Local artifacts
 detector-assets-phase2.2/
 checkpoints_step6000.tar.gz
+models.zip
 Gemini_Generated_Image_*.png
 electra_deberta/
 evaluation_results/

@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.core.config_loader import load_config
-from src.rag.rag_pipeline import RAGPipeline
+from src.rag.rag_pipeline import MODEL_ABSTAIN_PHRASES, RAGPipeline
 
 
 DEFAULT_CONTROLLED_CASES = Path("benchmarks/finreg/controlled_candidate_cases.jsonl")
@@ -65,6 +65,14 @@ def short(text: Any, max_chars: int = 220) -> str:
 
 def safe_name(value: str) -> str:
     return "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in value)
+
+
+def is_abstain_answer(answer: str, configured_message: str = "") -> bool:
+    cleaned = (answer or "").strip()
+    lower = cleaned.lower()
+    if configured_message and cleaned == configured_message:
+        return True
+    return any(phrase in lower for phrase in MODEL_ABSTAIN_PHRASES)
 
 
 def average_individual_metric(result: dict[str, Any], key: str) -> float | None:
@@ -345,7 +353,7 @@ def run_full_rag(args: argparse.Namespace) -> None:
         row = {
             **item,
             "answer": answer,
-            "abstained": bool(abstain_message and answer == abstain_message),
+            "abstained": is_abstain_answer(answer, abstain_message),
             "gating_action": gating.get("action", "none"),
             "gating_stats": gating.get("stats"),
             "latency_sec": latency,

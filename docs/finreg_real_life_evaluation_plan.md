@@ -144,6 +144,38 @@ $env:OPENROUTER_API_KEY='your_key_here'
   --config gating_finreg_openrouter_modernbert_detector_stochastic
 ```
 
+Local Qwen 1.5B variant:
+
+```powershell
+$env:PYTHONUTF8='1'
+.\.venv\Scripts\python.exe scripts\run_finreg_real_life_benchmark.py `
+  --mode full-rag `
+  --config gating_finreg_local_qwen15_modernbert_detector `
+  --run-name fullrag_local_qwen15_modernbert
+```
+
+Local Qwen 3B variant:
+
+```powershell
+$env:PYTHONUTF8='1'
+.\.venv\Scripts\python.exe scripts\run_finreg_real_life_benchmark.py `
+  --mode full-rag `
+  --config gating_finreg_local_qwen3_modernbert_detector `
+  --run-name fullrag_local_qwen3_modernbert
+```
+
+Local Qwen 3B no-detector baseline:
+
+```powershell
+$env:PYTHONUTF8='1'
+.\.venv\Scripts\python.exe scripts\run_finreg_real_life_benchmark.py `
+  --mode full-rag `
+  --config gating_finreg_local_qwen3_modernbert_detector `
+  --disable-detector `
+  --disable-gating `
+  --run-name fullrag_local_qwen3_no_detector_baseline
+```
+
 ## Deterministic vs Stochastic Comparison
 
 Deterministic detector:
@@ -187,6 +219,15 @@ Method                 Answer Rate  Abstain Rate  Unsupported Risk  Manual Error
 No detector baseline   ...
 Detector gating        ...
 Stochastic gating      ...
+```
+
+Local model comparison table:
+
+```text
+Method                         Answer Rate  Abstain Rate  Mean Risk  Mean Latency
+Local Qwen 1.5B + detector      ...
+Local Qwen 3B + detector        ...
+Local Qwen 3B no detector       ...
 ```
 
 Qualitative table:

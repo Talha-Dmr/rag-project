@@ -181,7 +181,9 @@ class RAGPipeline:
             return {
                 "contradiction_rate": 0.0,
                 "contradiction_prob_mean": 0.0,
-                "uncertainty_mean": 0.0
+                "uncertainty_mean": 0.0,
+                "answer_include_risk": detection_result.get("answer_include_risk", 0.0),
+                "answer_include_score": detection_result.get("answer_include_score", 0.0),
             }
 
         contradiction_probs = []
@@ -342,6 +344,27 @@ class RAGPipeline:
         return {
             "contradiction_rate": detection_result.get("hallucination_score", 0.0),
             "hard_contradiction_rate": detection_result.get("hard_contradiction_rate", 0.0),
+            "hard_answer_not_included_rate": detection_result.get(
+                "hard_answer_not_included_rate",
+                detection_result.get("hard_unsupported_rate", 0.0),
+            ),
+            "answer_include_risk": detection_result.get(
+                "answer_include_risk",
+                detection_result.get("unsupported_risk", 0.0),
+            ),
+            "answer_include_prob_mean": detection_result.get(
+                "answer_include_prob_mean",
+                detection_result.get("unsupported_prob_mean", 0.0),
+            ),
+            "answer_include_prob_topk": detection_result.get(
+                "answer_include_prob_topk",
+                detection_result.get("unsupported_prob_topk", 0.0),
+            ),
+            "answer_include_score": detection_result.get(
+                "answer_include_score",
+                detection_result.get("support_score", 0.0),
+            ),
+            # Backward-compatible aliases.
             "hard_unsupported_rate": detection_result.get("hard_unsupported_rate", 0.0),
             "unsupported_risk": detection_result.get("unsupported_risk", 0.0),
             "unsupported_prob_mean": detection_result.get("unsupported_prob_mean", 0.0),
@@ -842,6 +865,16 @@ class RAGPipeline:
                     )
 
                     result['hallucination_detected'] = detection_result['is_hallucination']
+                    result['answer_include_detected'] = detection_result.get('answer_include_detected')
+                    result['answer_include_risk'] = detection_result.get(
+                        'answer_include_risk',
+                        detection_result.get('unsupported_risk'),
+                    )
+                    result['answer_include_score'] = detection_result.get(
+                        'answer_include_score',
+                        detection_result.get('support_score'),
+                    )
+                    # Backward-compatible aliases.
                     result['unsupported_answer_detected'] = detection_result.get('is_unsupported')
                     result['unsupported_risk'] = detection_result.get('unsupported_risk')
                     result['support_score'] = detection_result.get('support_score')
@@ -849,10 +882,17 @@ class RAGPipeline:
                     result['hallucination_details'] = {
                         'num_contexts': detection_result['num_contexts'],
                         'num_contradictions': detection_result['num_contradictions'],
+                        'num_answer_not_included': detection_result.get('num_answer_not_included'),
                         'num_unsupported': detection_result.get('num_unsupported'),
                         'aggregation': detection_result['aggregation']
                     }
                     for key in (
+                        "answer_include_risk",
+                        "answer_include_prob_mean",
+                        "answer_include_prob_topk",
+                        "answer_include_threshold",
+                        "answer_include_score",
+                        "hard_answer_not_included_rate",
                         "unsupported_risk",
                         "unsupported_prob_mean",
                         "unsupported_prob_topk",
@@ -1050,6 +1090,16 @@ class RAGPipeline:
             "candidate_answer": candidate_answer,
             "num_docs_retrieved": len(retrieved_docs),
             "hallucination_detected": detection_result.get("is_hallucination"),
+            "answer_include_detected": detection_result.get("answer_include_detected"),
+            "answer_include_risk": detection_result.get(
+                "answer_include_risk",
+                detection_result.get("unsupported_risk"),
+            ),
+            "answer_include_score": detection_result.get(
+                "answer_include_score",
+                detection_result.get("support_score"),
+            ),
+            # Backward-compatible aliases.
             "unsupported_answer_detected": detection_result.get("is_unsupported"),
             "hallucination_score": detection_result.get("hallucination_score"),
             "unsupported_risk": detection_result.get("unsupported_risk"),
@@ -1058,7 +1108,15 @@ class RAGPipeline:
                 "aggregation": detection_result.get("aggregation"),
                 "num_contexts": detection_result.get("num_contexts"),
                 "num_contradictions": detection_result.get("num_contradictions"),
+                "num_answer_not_included": detection_result.get("num_answer_not_included"),
                 "num_unsupported": detection_result.get("num_unsupported"),
+                "answer_include_threshold": detection_result.get("answer_include_threshold"),
+                "hard_answer_not_included_rate": detection_result.get("hard_answer_not_included_rate"),
+                "answer_include_risk": detection_result.get("answer_include_risk"),
+                "answer_include_score": detection_result.get("answer_include_score"),
+                "answer_include_prob_mean": detection_result.get("answer_include_prob_mean"),
+                "answer_include_prob_topk": detection_result.get("answer_include_prob_topk"),
+                # Backward-compatible aliases.
                 "unsupported_threshold": detection_result.get("unsupported_threshold"),
                 "hard_unsupported_rate": detection_result.get("hard_unsupported_rate"),
                 "hard_contradiction_rate": detection_result.get("hard_contradiction_rate"),
@@ -1360,7 +1418,11 @@ class RAGPipeline:
                         representation_sampling_config=detector_config.get('representation_sampling'),
                         artifact_verifier_config=detector_config.get('artifact_verifier'),
                         risk_mode=detector_config.get('risk_mode', 'contradiction'),
-                        unsupported_threshold=detector_config.get('unsupported_threshold', 0.5),
+                        unsupported_threshold=detector_config.get(
+                            'unsupported_threshold',
+                            detector_config.get('answer_include_threshold', 0.5),
+                        ),
+                        answer_include_threshold=detector_config.get('answer_include_threshold'),
                         hypothesis_format=detector_config.get('hypothesis_format', 'answer_only'),
                     )
                 logger.info("Hallucination detector loaded successfully")

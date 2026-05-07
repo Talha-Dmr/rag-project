@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Run retrieval-backed real-life smoke tests for the FinReg detector."""
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from src.rag.rag_pipeline import RAGPipeline
 DEFAULT_CASES = [
     {
         "id": "supported_model_risk",
-        "expected": "supported",
+        "expected": "included",
         "query": "What is model risk management in the context of banking regulation?",
         "candidate_answer": (
             "Model risk management requires independent validation, use constraints, "
@@ -27,8 +27,8 @@ DEFAULT_CASES = [
         ),
     },
     {
-        "id": "partial_unsupported_model_risk",
-        "expected": "unsupported",
+        "id": "partial_not_included_model_risk",
+        "expected": "not_included",
         "query": "What is model risk management in the context of banking regulation?",
         "candidate_answer": (
             "Model risk management requires independent validation, use constraints, "
@@ -37,7 +37,7 @@ DEFAULT_CASES = [
     },
     {
         "id": "contradiction_model_risk",
-        "expected": "unsupported",
+        "expected": "not_included",
         "query": "What is model risk management in the context of banking regulation?",
         "candidate_answer": (
             "Model risk management does not require independent validation or "
@@ -46,7 +46,7 @@ DEFAULT_CASES = [
     },
     {
         "id": "supported_bcbs239",
-        "expected": "supported",
+        "expected": "included",
         "query": "What is the core objective of BCBS 239?",
         "candidate_answer": (
             "BCBS 239 targets accurate and timely risk data aggregation through "
@@ -55,8 +55,8 @@ DEFAULT_CASES = [
         ),
     },
     {
-        "id": "unsupported_bcbs239_portal",
-        "expected": "unsupported",
+        "id": "not_included_bcbs239_portal",
+        "expected": "not_included",
         "query": "What is the core objective of BCBS 239?",
         "candidate_answer": (
             "BCBS 239 requires banks to submit daily XML risk reports through a "
@@ -88,6 +88,15 @@ def short(text: str, max_chars: int = 180) -> str:
     return text if len(text) <= max_chars else text[: max_chars - 3] + "..."
 
 
+def normalize_include_label(value: Any) -> str:
+    label = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if label in {"supported", "included", "answer_include", "answer_included"}:
+        return "included"
+    if label in {"unsupported", "not_supported", "not_included", "answer_not_included"}:
+        return "not_included"
+    return label
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="gating_finreg_modernbert_detector")
@@ -117,17 +126,15 @@ def main() -> None:
                 return_sources=True,
             )
 
-            predicted = (
-                "unsupported"
-                if result.get("unsupported_answer_detected")
-                else "supported"
-            )
-            expected = case.get("expected")
+            predicted = "included" if result.get("answer_include_detected") else "not_included"
+            expected = normalize_include_label(case.get("expected"))
             is_correct = expected is None or predicted == expected
             correct += int(is_correct)
 
             details = result.get("hallucination_details") or {}
             top_context = (result.get("context") or [{}])[0]
+            answer_include_risk = result.get("answer_include_risk", result.get("unsupported_risk"))
+            answer_include_score = result.get("answer_include_score", result.get("support_score"))
             row = {
                 "id": case.get("id"),
                 "expected": expected,
@@ -135,6 +142,10 @@ def main() -> None:
                 "correct": is_correct,
                 "query": case["query"],
                 "candidate_answer": case["candidate_answer"],
+                "answer_include_detected": result.get("answer_include_detected"),
+                "answer_include_risk": answer_include_risk,
+                "answer_include_score": answer_include_score,
+                # Backward-compatible aliases.
                 "unsupported_risk": result.get("unsupported_risk"),
                 "support_score": result.get("support_score"),
                 "best_context_label": details.get("best_context_label"),
@@ -149,8 +160,8 @@ def main() -> None:
             status = "OK" if is_correct else "MISS"
             print(
                 f"{case.get('id')} [{status}] expected={expected} predicted={predicted} "
-                f"risk={result.get('unsupported_risk'):.3f} "
-                f"support={result.get('support_score'):.3f} "
+                f"include_risk={answer_include_risk:.3f} "
+                f"include_score={answer_include_score:.3f} "
                 f"best={details.get('best_context_label')}"
             )
             print(f"  Q: {short(case['query'])}")

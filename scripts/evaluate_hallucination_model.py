@@ -163,8 +163,8 @@ def evaluate_model(args: argparse.Namespace) -> None:
         logger.info(f"  ECE:              {metrics['ece']:.4f}")
     if 'brier' in metrics:
         logger.info(f"  Brier:            {metrics['brier']:.4f}")
-    logger.info(f"  Unsupported F1:   {metrics.get('unsupported_f1', 0):.4f}")
-    logger.info(f"  Unsupported Recall: {metrics.get('unsupported_recall', 0):.4f}")
+    logger.info(f"  Not-included F1:   {metrics.get('not_included_f1', 0):.4f}")
+    logger.info(f"  Not-included Recall: {metrics.get('not_included_recall', 0):.4f}")
     logger.info(f"  False Accept Rate: {metrics.get('false_accept_rate', 0):.4f}")
 
     logger.info("\nPer-Class Metrics:")

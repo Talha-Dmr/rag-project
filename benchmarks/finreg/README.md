@@ -9,11 +9,11 @@ detector project.
 
 - `query`
 - `candidate_answer`
-- `expected`: `supported` or `unsupported`
-- `label_detail`: `supported`, `unsupported`, `contradicted`, or `partial`
+- `expected`: `included` or `not_included`
+- `label_detail`: `included`, `not_included`, `contradicted`, or `partial`
 
 The evaluation retrieves evidence, checks the fixed candidate answer, and
-computes detector metrics such as unsupported recall and false accept rate.
+computes detector metrics such as not-included recall and false include rate.
 
 ## Full RAG Benchmark
 

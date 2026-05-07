@@ -1,4 +1,4 @@
-# Full FinReg RAG config with local Qwen2.5-1.5B generation and ModernBERT detector.
+﻿# Full FinReg RAG config with local Qwen2.5-1.5B generation and ModernBERT detector.
 
 embeddings:
   type: huggingface
@@ -34,18 +34,18 @@ hallucination_detector:
   max_length: 1024
   batch_size: 4
   hypothesis_format: question_and_candidate_answer
-  risk_mode: unsupported
-  aggregation: unsupported_best
-  unsupported_threshold: 0.50
+  risk_mode: answer_include
+  aggregation: answer_include_best
+  answer_include_threshold: 0.50
 
-hallucination_aggregation: unsupported_best
+hallucination_aggregation: answer_include_best
 
 gating:
   enabled: true
   strategy: abstain
-  contradiction_prob_metric: unsupported_risk
+  contradiction_prob_metric: answer_include_risk
   contradiction_prob_threshold: 0.50
-  contradiction_rate_metric: hard_unsupported_rate
+  contradiction_rate_metric: hard_answer_not_included_rate
   contradiction_rate_threshold: 0.80
   uncertainty_threshold: 1.0
   abstain_message: "I don't have enough reliable evidence to support that answer."

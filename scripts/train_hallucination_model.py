@@ -174,7 +174,7 @@ def train_model(args: argparse.Namespace) -> None:
             if 'brier' in final_metrics:
                 logger.info(f"  Brier: {final_metrics.get('brier', 0):.4f}")
             logger.info(
-                f"  Unsupported Recall: {final_metrics.get('unsupported_recall', 0):.4f}"
+                f"  Not-included Recall: {final_metrics.get('not_included_recall', 0):.4f}"
             )
             logger.info(
                 f"  False Accept Rate: {final_metrics.get('false_accept_rate', 0):.4f}"
@@ -196,7 +196,7 @@ def train_model(args: argparse.Namespace) -> None:
             logger.info(f"  Accuracy: {test_metrics.get('accuracy', 0):.4f}")
             logger.info(f"  F1 (macro): {test_metrics.get('f1_macro', 0):.4f}")
             logger.info(
-                f"  Unsupported Recall: {test_metrics.get('unsupported_recall', 0):.4f}"
+                f"  Not-included Recall: {test_metrics.get('not_included_recall', 0):.4f}"
             )
             logger.info(
                 f"  False Accept Rate: {test_metrics.get('false_accept_rate', 0):.4f}"
@@ -210,7 +210,7 @@ def train_model(args: argparse.Namespace) -> None:
             logger.info(f"  Accuracy: {heldout_metrics.get('accuracy', 0):.4f}")
             logger.info(f"  F1 (macro): {heldout_metrics.get('f1_macro', 0):.4f}")
             logger.info(
-                f"  Unsupported Recall: {heldout_metrics.get('unsupported_recall', 0):.4f}"
+                f"  Not-included Recall: {heldout_metrics.get('not_included_recall', 0):.4f}"
             )
             logger.info(
                 f"  False Accept Rate: {heldout_metrics.get('false_accept_rate', 0):.4f}"

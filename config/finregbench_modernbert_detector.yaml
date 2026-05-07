@@ -1,7 +1,7 @@
-# FinRegBench unsupported-answer detector.
+# FinRegBench answer-include detector.
 # Trains a 3-way verifier:
 # 0=entailment, 1=neutral, 2=contradiction.
-# At inference time, use unsupported_risk = P(neutral) + P(contradiction).
+# At inference time, use answer_include_risk = P(neutral) + P(contradiction).
 
 training:
   model:

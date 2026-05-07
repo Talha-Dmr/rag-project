@@ -1,6 +1,6 @@
-# FinReg Unsupported-Answer Detector
+# FinReg Answer-Include Detector
 
-This project can run a retrieval-backed unsupported-answer detector trained on
+This project can run a retrieval-backed answer-include detector trained on
 FinRegBench-style examples. The detector is integrated into the RAG pipeline and
 can also be tested without an LLM.
 
@@ -9,7 +9,7 @@ can also be tested without an LLM.
 - FinReg detector training and evaluation configuration.
 - Data preparation support for FinRegBench detector examples.
 - ModernBERT-based detector training and evaluation updates.
-- RAG pipeline integration for `unsupported_risk` and `support_score`.
+- RAG pipeline integration for `answer_include_risk` and `answer_include_score`.
 - Detector-only real-life smoke test script.
 - OpenRouter and detector-only runtime configs.
 
@@ -79,8 +79,11 @@ Candidate answer: <answer being checked>
 ```
 
 Each retrieved context is scored separately. The pipeline then aggregates support
-with `unsupported_best`:
+with `answer_include_best`:
 
-- `support_score` is the best entailment score found across retrieved contexts.
-- `unsupported_risk` is `1 - support_score`.
-- Answers above the configured unsupported threshold are treated as unsupported.
+- `answer_include_score` is the best entailment score found across retrieved contexts.
+- `answer_include_risk` is `1 - answer_include_score`.
+- Answers below the configured answer-include threshold are treated as not included by the evidence.
+
+Older `unsupported_*` result keys are still emitted as backward-compatible aliases
+for previous reports and notebooks. New reports should use `answer_include_*`.

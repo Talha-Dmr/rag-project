@@ -1,11 +1,11 @@
-# FinReg Real-Life Evaluation Plan
+﻿# FinReg Real-Life Evaluation Plan
 
 This plan defines the report-facing evaluation protocol for the FinReg RAG
 project.
 
 ## Evaluation Questions
 
-1. Does the detector identify answers that are not supported by retrieved
+1. Does the detector identify answers that are not included by retrieved
    financial-regulation evidence?
 2. Does detector-based gating reduce unsafe answer acceptance in an end-to-end
    RAG setting?
@@ -20,13 +20,13 @@ Input:
 
 - user question
 - fixed candidate answer
-- expected label: `supported` or `unsupported`
-- detailed label: `supported`, `unsupported`, `contradicted`, or `partial`
+- expected label: `included` or `not_included`
+- detailed label: `included`, `not_included`, `contradicted`, or `partial`
 
 Pipeline:
 
 ```text
-question -> retrieval -> fixed candidate answer -> detector -> supported/unsupported
+question -> retrieval -> fixed candidate answer -> detector -> included/not_included
 ```
 
 Why this is useful:
@@ -38,13 +38,13 @@ Why this is useful:
 Main metrics:
 
 - accuracy
-- unsupported precision
-- unsupported recall
-- unsupported F1
-- false accept rate: unsupported answer predicted as supported
-- false reject rate: supported answer predicted as unsupported
-- mean `unsupported_risk`
-- mean `support_score`
+- not-included precision
+- not-included recall
+- not-included F1
+- false include rate: not-included answer predicted as included
+- false exclude rate: included answer predicted as not_included
+- mean `answer_include_risk`
+- mean `answer_include_score`
 
 Command:
 
@@ -89,14 +89,14 @@ Automatic metrics:
 
 - gating action counts
 - abstain rate
-- mean `unsupported_risk`
-- mean `support_score`
+- mean `answer_include_risk`
+- mean `answer_include_score`
 - mean latency
 
 Manual labels to add after generation:
 
-- `supported`
-- `unsupported`
+- `included`
+- `not_included`
 - `contradicted`
 - `partial`
 - `ambiguous`
@@ -182,8 +182,8 @@ Deterministic detector:
 
 ```text
 p = softmax(f_theta(context, answer))
-unsupported_risk = p(neutral) + p(contradiction)
-support_score = max_context p(entailment)
+answer_include_risk = p(neutral) + p(contradiction)
+answer_include_score = max_context p(entailment)
 ```
 
 Stochastic detector:
@@ -196,7 +196,7 @@ uncertainty = MI(p_t) or variance(p_t)
 
 Interpretation:
 
-- deterministic path asks whether the answer is supported
+- deterministic path asks whether the answer is included by the evidence
 - stochastic path also asks whether the detector's decision is stable
 - if uncertainty rises on wrong or partial cases, it is useful for gating
 - if uncertainty does not separate errors from correct cases, keep it as an
@@ -207,7 +207,7 @@ Interpretation:
 Controlled benchmark table:
 
 ```text
-Method              Accuracy  Unsupported Recall  False Accept  False Reject  Runtime
+Method              Accuracy  Not-Included Recall  False Include  False Exclude  Runtime
 Deterministic       ...
 Stochastic Logit-MI ...
 ```
@@ -215,7 +215,7 @@ Stochastic Logit-MI ...
 Full RAG table:
 
 ```text
-Method                 Answer Rate  Abstain Rate  Unsupported Risk  Manual Error Rate  Runtime
+Method                 Answer Rate  Abstain Rate  Answer Include Risk  Manual Error Rate  Runtime
 No detector baseline   ...
 Detector gating        ...
 Stochastic gating      ...

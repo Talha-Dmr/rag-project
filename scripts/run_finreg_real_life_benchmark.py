@@ -54,6 +54,15 @@ def safe_div(num: float, den: float) -> float:
     return float(num / den) if den else 0.0
 
 
+def normalize_include_label(value: Any) -> str:
+    label = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if label in {"supported", "included", "answer_include", "answer_included"}:
+        return "included"
+    if label in {"unsupported", "not_supported", "not_included", "answer_not_included"}:
+        return "not_included"
+    return label
+
+
 def mean(values: list[float]) -> float | None:
     return float(statistics.mean(values)) if values else None
 
@@ -88,54 +97,68 @@ def controlled_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     tp = tn = fp = fn = 0
     by_label: dict[str, Counter[str]] = defaultdict(Counter)
     risk_by_expected: dict[str, list[float]] = defaultdict(list)
-    support_by_expected: dict[str, list[float]] = defaultdict(list)
+    score_by_expected: dict[str, list[float]] = defaultdict(list)
 
     for row in rows:
-        expected = row.get("expected")
-        predicted = row.get("predicted")
+        expected = normalize_include_label(row.get("expected"))
+        predicted = normalize_include_label(row.get("predicted"))
         label_detail = row.get("label_detail", "unknown")
         is_correct = bool(row.get("correct"))
         by_label[label_detail]["total"] += 1
         by_label[label_detail]["correct"] += int(is_correct)
 
-        if expected == "unsupported" and predicted == "unsupported":
+        if expected == "not_included" and predicted == "not_included":
             tp += 1
-        elif expected == "supported" and predicted == "supported":
+        elif expected == "included" and predicted == "included":
             tn += 1
-        elif expected == "supported" and predicted == "unsupported":
+        elif expected == "included" and predicted == "not_included":
             fp += 1
-        elif expected == "unsupported" and predicted == "supported":
+        elif expected == "not_included" and predicted == "included":
             fn += 1
 
-        if isinstance(row.get("unsupported_risk"), (int, float)):
-            risk_by_expected[str(expected)].append(float(row["unsupported_risk"]))
-        if isinstance(row.get("support_score"), (int, float)):
-            support_by_expected[str(expected)].append(float(row["support_score"]))
+        if isinstance(row.get("answer_include_risk"), (int, float)):
+            risk_by_expected[str(expected)].append(float(row["answer_include_risk"]))
+        if isinstance(row.get("answer_include_score"), (int, float)):
+            score_by_expected[str(expected)].append(float(row["answer_include_score"]))
 
     total = len(rows)
-    unsupported_precision = safe_div(tp, tp + fp)
-    unsupported_recall = safe_div(tp, tp + fn)
-    unsupported_f1 = safe_div(2 * unsupported_precision * unsupported_recall, unsupported_precision + unsupported_recall)
+    not_included_precision = safe_div(tp, tp + fp)
+    not_included_recall = safe_div(tp, tp + fn)
+    not_included_f1 = safe_div(
+        2 * not_included_precision * not_included_recall,
+        not_included_precision + not_included_recall,
+    )
 
     return {
         "total": total,
         "correct": tp + tn,
+        "answer_include_accuracy": safe_div(tp + tn, total),
         "accuracy": safe_div(tp + tn, total),
+        "not_included_true_positive": tp,
+        "included_true_negative": tn,
+        "false_exclude_included_as_not_included": fp,
+        "false_include_not_included_as_included": fn,
+        "not_included_precision": not_included_precision,
+        "not_included_recall": not_included_recall,
+        "not_included_f1": not_included_f1,
+        "false_include_rate": safe_div(fn, tp + fn),
+        "false_exclude_rate": safe_div(fp, tn + fp),
+        "mean_answer_include_risk_by_expected": {
+            key: mean(values) for key, values in risk_by_expected.items()
+        },
+        "mean_answer_include_score_by_expected": {
+            key: mean(values) for key, values in score_by_expected.items()
+        },
+        # Backward-compatible aliases for older notebooks/reports.
         "unsupported_true_positive": tp,
         "supported_true_negative": tn,
         "false_reject_supported_as_unsupported": fp,
         "false_accept_unsupported_as_supported": fn,
-        "unsupported_precision": unsupported_precision,
-        "unsupported_recall": unsupported_recall,
-        "unsupported_f1": unsupported_f1,
+        "unsupported_precision": not_included_precision,
+        "unsupported_recall": not_included_recall,
+        "unsupported_f1": not_included_f1,
         "false_accept_rate": safe_div(fn, tp + fn),
         "false_reject_rate": safe_div(fp, tn + fp),
-        "mean_unsupported_risk_by_expected": {
-            key: mean(values) for key, values in risk_by_expected.items()
-        },
-        "mean_support_score_by_expected": {
-            key: mean(values) for key, values in support_by_expected.items()
-        },
         "by_label_detail": {
             label: {
                 "total": counts["total"],
@@ -152,14 +175,14 @@ def full_rag_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     type_counts = Counter(str(row.get("question_type", "unknown")) for row in rows)
     abstain_count = sum(1 for row in rows if row.get("abstained"))
     risk_values = [
-        float(row["unsupported_risk"])
+        float(row["answer_include_risk"])
         for row in rows
-        if isinstance(row.get("unsupported_risk"), (int, float))
+        if isinstance(row.get("answer_include_risk"), (int, float))
     ]
-    support_values = [
-        float(row["support_score"])
+    score_values = [
+        float(row["answer_include_score"])
         for row in rows
-        if isinstance(row.get("support_score"), (int, float))
+        if isinstance(row.get("answer_include_score"), (int, float))
     ]
     latency_values = [
         float(row["latency_sec"])
@@ -172,8 +195,11 @@ def full_rag_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "question_type_counts": dict(type_counts),
         "abstain_count": abstain_count,
         "abstain_rate": safe_div(abstain_count, len(rows)),
+        "mean_answer_include_risk": mean(risk_values),
+        "mean_answer_include_score": mean(score_values),
+        # Backward-compatible aliases.
         "mean_unsupported_risk": mean(risk_values),
-        "mean_support_score": mean(support_values),
+        "mean_support_score": mean(score_values),
         "mean_latency_sec": mean(latency_values),
         "manual_scoring_required": True,
     }
@@ -191,21 +217,21 @@ def write_controlled_markdown(path: Path, config_name: str, cases_path: Path, su
         "",
         "| Metric | Value |",
         "| --- | ---: |",
-        f"| Accuracy | {summary['accuracy']:.3f} |",
-        f"| Unsupported precision | {summary['unsupported_precision']:.3f} |",
-        f"| Unsupported recall | {summary['unsupported_recall']:.3f} |",
-        f"| Unsupported F1 | {summary['unsupported_f1']:.3f} |",
-        f"| False accept rate | {summary['false_accept_rate']:.3f} |",
-        f"| False reject rate | {summary['false_reject_rate']:.3f} |",
+        f"| Answer include accuracy | {summary['answer_include_accuracy']:.3f} |",
+        f"| Not-included precision | {summary['not_included_precision']:.3f} |",
+        f"| Not-included recall | {summary['not_included_recall']:.3f} |",
+        f"| Not-included F1 | {summary['not_included_f1']:.3f} |",
+        f"| False include rate | {summary['false_include_rate']:.3f} |",
+        f"| False exclude rate | {summary['false_exclude_rate']:.3f} |",
         "",
         "## Confusion Counts",
         "",
         "| Count | Value |",
         "| --- | ---: |",
-        f"| Unsupported true positive | {summary['unsupported_true_positive']} |",
-        f"| Supported true negative | {summary['supported_true_negative']} |",
-        f"| False accept unsupported as supported | {summary['false_accept_unsupported_as_supported']} |",
-        f"| False reject supported as unsupported | {summary['false_reject_supported_as_unsupported']} |",
+        f"| Not-included true positive | {summary['not_included_true_positive']} |",
+        f"| Included true negative | {summary['included_true_negative']} |",
+        f"| False include not-included as included | {summary['false_include_not_included_as_included']} |",
+        f"| False exclude included as not-included | {summary['false_exclude_included_as_not_included']} |",
         "",
         "## Label Detail Accuracy",
         "",
@@ -220,7 +246,7 @@ def write_controlled_markdown(path: Path, config_name: str, cases_path: Path, su
         "",
         "This benchmark isolates the detector: the candidate answer is fixed, so errors are",
         "primarily detector/retrieval errors rather than generation errors. The most important",
-        "safety metric is false accept rate: unsupported answers predicted as supported.",
+        "safety metric is false include rate: not-included answers predicted as included.",
         "",
     ])
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -239,8 +265,8 @@ def write_full_rag_markdown(path: Path, config_name: str, questions_path: Path, 
         "| Metric | Value |",
         "| --- | ---: |",
         f"| Abstain rate | {summary['abstain_rate']:.3f} |",
-        f"| Mean unsupported risk | {summary['mean_unsupported_risk']} |",
-        f"| Mean support score | {summary['mean_support_score']} |",
+        f"| Mean answer include risk | {summary['mean_answer_include_risk']} |",
+        f"| Mean answer include score | {summary['mean_answer_include_score']} |",
         f"| Mean latency sec | {summary['mean_latency_sec']} |",
         "",
         "## Gating Actions",
@@ -256,7 +282,7 @@ def write_full_rag_markdown(path: Path, config_name: str, questions_path: Path, 
         "",
         "Full RAG evaluation is end-to-end: retrieval, generation, detector, and gating all",
         "contribute to the final answer. The generated answers should be manually labeled",
-        "with `supported`, `unsupported`, `contradicted`, `partial`, or `ambiguous` before",
+        "with `included`, `not_included`, `contradicted`, `partial`, or `ambiguous` before",
         "claiming final answer quality metrics.",
         "",
     ])
@@ -281,22 +307,32 @@ def run_controlled(args: argparse.Namespace) -> None:
             return_sources=True,
         )
         latency = time.perf_counter() - started
-        predicted = "unsupported" if result.get("unsupported_answer_detected") else "supported"
-        expected = str(case.get("expected", "")).strip().lower()
+        predicted = "included" if result.get("answer_include_detected") else "not_included"
+        expected = normalize_include_label(case.get("expected"))
         details = result.get("hallucination_details") or {}
         top_context = (result.get("context") or [{}])[0]
+        answer_include_risk = result.get("answer_include_risk", result.get("unsupported_risk"))
+        answer_include_score = result.get("answer_include_score", result.get("support_score"))
         row = {
             **case,
+            "expected": expected,
             "predicted": predicted,
             "correct": predicted == expected,
             "latency_sec": latency,
+            "answer_include_detected": result.get("answer_include_detected"),
+            "answer_include_risk": answer_include_risk,
+            "answer_include_score": answer_include_score,
+            # Backward-compatible aliases.
             "unsupported_risk": result.get("unsupported_risk"),
             "support_score": result.get("support_score"),
             "hallucination_score": result.get("hallucination_score"),
             "best_context_label": details.get("best_context_label"),
             "best_context_scores": details.get("best_context_scores"),
+            "hard_answer_not_included_rate": details.get("hard_answer_not_included_rate"),
             "hard_unsupported_rate": details.get("hard_unsupported_rate"),
             "hard_contradiction_rate": details.get("hard_contradiction_rate"),
+            "answer_include_prob_mean": details.get("answer_include_prob_mean"),
+            "answer_include_prob_topk": details.get("answer_include_prob_topk"),
             "unsupported_prob_mean": details.get("unsupported_prob_mean"),
             "unsupported_prob_topk": details.get("unsupported_prob_topk"),
             "uncertainty_logit_mi_mean": average_individual_metric(result, "uncertainty_logit_mi"),
@@ -311,7 +347,7 @@ def run_controlled(args: argparse.Namespace) -> None:
         status = "OK" if row["correct"] else "MISS"
         print(
             f"{case.get('id')} [{status}] expected={expected} predicted={predicted} "
-            f"risk={row['unsupported_risk']:.3f} support={row['support_score']:.3f}"
+            f"include_risk={answer_include_risk:.3f} include_score={answer_include_score:.3f}"
         )
 
     run_name = safe_name(args.run_name or f"controlled_{args.config}")
@@ -321,9 +357,9 @@ def run_controlled(args: argparse.Namespace) -> None:
     write_json(out_dir / "summary.json", summary)
     write_controlled_markdown(out_dir / "report.md", args.config, args.cases, summary)
     print(f"\nWrote: {out_dir}")
-    print(f"Accuracy: {summary['accuracy']:.3f}")
-    print(f"Unsupported recall: {summary['unsupported_recall']:.3f}")
-    print(f"False accept rate: {summary['false_accept_rate']:.3f}")
+    print(f"Answer include accuracy: {summary['answer_include_accuracy']:.3f}")
+    print(f"Not-included recall: {summary['not_included_recall']:.3f}")
+    print(f"False include rate: {summary['false_include_rate']:.3f}")
 
 
 def run_full_rag(args: argparse.Namespace) -> None:
@@ -358,6 +394,10 @@ def run_full_rag(args: argparse.Namespace) -> None:
             "gating_stats": gating.get("stats"),
             "latency_sec": latency,
             "hallucination_detected": result.get("hallucination_detected"),
+            "answer_include_detected": result.get("answer_include_detected"),
+            "answer_include_risk": result.get("answer_include_risk"),
+            "answer_include_score": result.get("answer_include_score"),
+            # Backward-compatible aliases.
             "unsupported_answer_detected": result.get("unsupported_answer_detected"),
             "unsupported_risk": result.get("unsupported_risk"),
             "support_score": result.get("support_score"),
@@ -371,7 +411,7 @@ def run_full_rag(args: argparse.Namespace) -> None:
         rows.append(row)
         print(
             f"{item.get('id')} action={row['gating_action']} "
-            f"abstain={row['abstained']} risk={row.get('unsupported_risk')}"
+            f"abstain={row['abstained']} include_risk={row.get('answer_include_risk')}"
         )
         print(f"  A: {short(answer)}")
 
@@ -393,6 +433,8 @@ def run_full_rag(args: argparse.Namespace) -> None:
         "answer",
         "gating_action",
         "abstained",
+        "answer_include_risk",
+        "answer_include_score",
         "unsupported_risk",
         "support_score",
         "manual_label",

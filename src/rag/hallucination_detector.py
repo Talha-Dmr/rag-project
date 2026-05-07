@@ -69,6 +69,7 @@ class HallucinationDetector:
         artifact_verifier_config: Optional[Dict[str, Any]] = None,
         risk_mode: str = "contradiction",
         unsupported_threshold: float = 0.5,
+        answer_include_threshold: Optional[float] = None,
         hypothesis_format: str = "answer_only",
     ):
         """
@@ -106,7 +107,11 @@ class HallucinationDetector:
             self.artifact_verifier_config.get("confidence_threshold", 0.42)
         )
         self.risk_mode = str(risk_mode or "contradiction").strip().lower()
-        self.unsupported_threshold = float(unsupported_threshold)
+        self.answer_include_threshold = float(
+            unsupported_threshold if answer_include_threshold is None else answer_include_threshold
+        )
+        # Backward-compatible alias for older configs and scripts.
+        self.unsupported_threshold = self.answer_include_threshold
         self.hypothesis_format = str(hypothesis_format or "answer_only").strip().lower()
         self._classifier_module = None
         self.label_to_index = {
@@ -806,15 +811,21 @@ class HallucinationDetector:
 
         # Check if hallucination (contradiction)
         is_hallucination = (predicted_class == self.label_to_index["contradiction"])
-        unsupported_risk = (
+        answer_include_score = probs[self.label_to_index["entailment"]].item()
+        answer_include_risk = (
             probs[self.label_to_index["neutral"]].item()
             + probs[self.label_to_index["contradiction"]].item()
         )
+        answer_include_detected = answer_include_risk < self.answer_include_threshold
 
         result = {
             'is_hallucination': is_hallucination,
-            'is_unsupported': unsupported_risk >= self.unsupported_threshold,
-            'unsupported_risk': float(unsupported_risk),
+            'answer_include_detected': answer_include_detected,
+            'answer_include_risk': float(answer_include_risk),
+            'answer_include_score': float(answer_include_score),
+            # Backward-compatible aliases.
+            'is_unsupported': not answer_include_detected,
+            'unsupported_risk': float(answer_include_risk),
             'label': label,
             'confidence': confidence
         }
@@ -938,15 +949,21 @@ class HallucinationDetector:
                 confidence = probs[j][predicted_class].item()
 
                 is_hallucination = (predicted_class == self.label_to_index["contradiction"])
-                unsupported_risk = (
+                answer_include_score = probs[j][self.label_to_index["entailment"]].item()
+                answer_include_risk = (
                     probs[j][self.label_to_index["neutral"]].item()
                     + probs[j][self.label_to_index["contradiction"]].item()
                 )
+                answer_include_detected = answer_include_risk < self.answer_include_threshold
 
                 result = {
                     'is_hallucination': is_hallucination,
-                    'is_unsupported': unsupported_risk >= self.unsupported_threshold,
-                    'unsupported_risk': float(unsupported_risk),
+                    'answer_include_detected': answer_include_detected,
+                    'answer_include_risk': float(answer_include_risk),
+                    'answer_include_score': float(answer_include_score),
+                    # Backward-compatible aliases.
+                    'is_unsupported': not answer_include_detected,
+                    'unsupported_risk': float(answer_include_risk),
                     'label': label,
                     'confidence': confidence
                 }
@@ -1021,6 +1038,11 @@ class HallucinationDetector:
             logger.warning("No contexts provided for verification")
             return {
                 'is_hallucination': False,
+                'answer_include_detected': False,
+                'answer_include_risk': 1.0,
+                'answer_include_score': 0.0,
+                'is_unsupported': True,
+                'unsupported_risk': 1.0,
                 'individual_results': [],
                 'hallucination_score': 0.0,
                 'note': 'No contexts available'
@@ -1058,6 +1080,7 @@ class HallucinationDetector:
             neutral + contradiction
             for neutral, contradiction in zip(neutral_probs, contradiction_probs)
         ]
+        answer_include_probs = unsupported_probs
 
         if contradiction_probs:
             hallucination_prob_mean = float(sum(contradiction_probs) / len(contradiction_probs))
@@ -1076,12 +1099,12 @@ class HallucinationDetector:
                 range(len(entailment_probs)),
                 key=lambda idx: entailment_probs[idx]
             )) if entailment_probs else None
-            unsupported_risk = float(1.0 - support_score)
-            unsupported_prob_mean = float(sum(unsupported_probs) / len(unsupported_probs))
-            top_k_unsupported = max(1, math.ceil(len(unsupported_probs) / 2))
-            unsupported_prob_topk = float(
-                sum(sorted(unsupported_probs, reverse=True)[:top_k_unsupported])
-                / top_k_unsupported
+            answer_include_risk = float(1.0 - support_score)
+            answer_include_prob_mean = float(sum(answer_include_probs) / len(answer_include_probs))
+            top_k_answer_include = max(1, math.ceil(len(answer_include_probs) / 2))
+            answer_include_prob_topk = float(
+                sum(sorted(answer_include_probs, reverse=True)[:top_k_answer_include])
+                / top_k_answer_include
             )
         else:
             hallucination_prob_mean = 0.0
@@ -1090,11 +1113,15 @@ class HallucinationDetector:
             contradiction_neutral_gap_mean = 0.0
             support_score = 0.0
             best_context_index = None
-            unsupported_risk = 1.0
-            unsupported_prob_mean = 1.0
-            unsupported_prob_topk = 1.0
+            answer_include_risk = 1.0
+            answer_include_prob_mean = 1.0
+            answer_include_prob_topk = 1.0
 
-        is_unsupported = unsupported_risk >= self.unsupported_threshold
+        answer_include_detected = answer_include_risk < self.answer_include_threshold
+        is_unsupported = not answer_include_detected
+        unsupported_risk = answer_include_risk
+        unsupported_prob_mean = answer_include_prob_mean
+        unsupported_prob_topk = answer_include_prob_topk
 
         # Aggregate decision / score
         agg = (aggregation or "any").strip().lower()
@@ -1122,15 +1149,22 @@ class HallucinationDetector:
                 0.75 * hallucination_prob_mean + 0.25 * min(1.0, contradiction_margin_mean * 4.0)
             ))
             is_hallucination = (hallucination_score >= 0.40)
-        elif agg in {'unsupported', 'unsupported_best', 'unsupported_risk'}:
-            hallucination_score = unsupported_risk
+        elif agg in {
+            'answer_include',
+            'answer_include_best',
+            'answer_include_risk',
+            'unsupported',
+            'unsupported_best',
+            'unsupported_risk',
+        }:
+            hallucination_score = answer_include_risk
             is_hallucination = is_unsupported
-        elif agg == 'unsupported_mean':
-            hallucination_score = unsupported_prob_mean
-            is_hallucination = (hallucination_score >= self.unsupported_threshold)
-        elif agg == 'unsupported_topk':
-            hallucination_score = unsupported_prob_topk
-            is_hallucination = (hallucination_score >= self.unsupported_threshold)
+        elif agg in {'answer_include_mean', 'unsupported_mean'}:
+            hallucination_score = answer_include_prob_mean
+            is_hallucination = (hallucination_score >= self.answer_include_threshold)
+        elif agg in {'answer_include_topk', 'unsupported_topk'}:
+            hallucination_score = answer_include_prob_topk
+            is_hallucination = (hallucination_score >= self.answer_include_threshold)
         else:
             raise ValueError(f"Unknown aggregation: {aggregation}")
 
@@ -1142,10 +1176,17 @@ class HallucinationDetector:
 
         return {
             'is_hallucination': is_hallucination,
+            'answer_include_detected': answer_include_detected,
+            'answer_include_risk': answer_include_risk,
+            'answer_include_prob_mean': answer_include_prob_mean,
+            'answer_include_prob_topk': answer_include_prob_topk,
+            'answer_include_threshold': self.answer_include_threshold,
+            'answer_include_score': support_score,
             'is_unsupported': is_unsupported,
             'individual_results': individual_results,
             'hallucination_score': hallucination_score,
             'hard_contradiction_rate': hard_contradiction_rate,
+            'hard_answer_not_included_rate': hard_unsupported_rate,
             'hard_unsupported_rate': hard_unsupported_rate,
             'hallucination_prob_mean': hallucination_prob_mean,
             'hallucination_prob_topk': hallucination_prob_topk,
@@ -1161,6 +1202,7 @@ class HallucinationDetector:
             'contradiction_neutral_gap_mean': contradiction_neutral_gap_mean,
             'num_contexts': len(contexts),
             'num_contradictions': num_contradictions,
+            'num_answer_not_included': num_unsupported,
             'num_unsupported': num_unsupported,
             'aggregation': aggregation
         }

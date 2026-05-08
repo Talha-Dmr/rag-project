@@ -1,4 +1,4 @@
-﻿# Full FinReg RAG config with local Qwen2.5-1.5B generation and ModernBERT detector.
+# Full FinReg RAG config with local Qwen2.5-3B generation and stochastic ModernBERT detector.
 
 embeddings:
   type: huggingface
@@ -14,7 +14,7 @@ vector_store:
     collection_name: rag_finreg
 
 llm:
-  model_name: Qwen/Qwen2.5-1.5B-Instruct
+  model_name: Qwen/Qwen2.5-3B-Instruct
   device: cuda
   cache_folder: ./models/llm
   max_tokens: 128
@@ -38,6 +38,14 @@ hallucination_detector:
   risk_mode: answer_include
   aggregation: answer_include_best
   answer_include_threshold: 0.50
+  logit_sampling:
+    enabled: true
+    steps: 12
+    step_size: 0.03
+    noise_std: 0.08
+    energy: hybrid
+    prior_strength: 1.0
+    entropy_weight: 0.5
 
 hallucination_aggregation: answer_include_best
 
@@ -48,7 +56,8 @@ gating:
   contradiction_prob_threshold: 0.50
   contradiction_rate_metric: hard_answer_not_included_rate
   contradiction_rate_threshold: 0.80
-  uncertainty_threshold: 1.0
+  uncertainty_source: logit_mi
+  uncertainty_threshold: 0.02
   abstain_message: "I don't have enough reliable evidence to support that answer."
 
 sources:

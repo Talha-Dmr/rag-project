@@ -1,4 +1,4 @@
-﻿# Full FinReg RAG config with local Qwen2.5-1.5B generation and ModernBERT detector.
+# Full FinReg RAG config with local Qwen3-8B generation and ModernBERT detector.
 
 embeddings:
   type: huggingface
@@ -14,14 +14,18 @@ vector_store:
     collection_name: rag_finreg
 
 llm:
-  model_name: Qwen/Qwen2.5-1.5B-Instruct
+  model_name: Qwen/Qwen3-8B
   device: cuda
   cache_folder: ./models/llm
   max_tokens: 128
   temperature: 0.0
   top_p: 0.9
+  dtype: auto
+  device_map: auto
+  low_cpu_mem_usage: true
   load_in_8bit: false
   use_chat_template: true
+  enable_thinking: false
 
 retrieval:
   k: 5

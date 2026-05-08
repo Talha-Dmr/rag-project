@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import statistics
 import sys
 import time
@@ -22,6 +23,13 @@ from src.rag.rag_pipeline import MODEL_ABSTAIN_PHRASES, RAGPipeline
 
 DEFAULT_CONTROLLED_CASES = Path("benchmarks/finreg/controlled_candidate_cases.jsonl")
 DEFAULT_FULL_RAG_QUESTIONS = Path("benchmarks/finreg/full_rag_questions.jsonl")
+CONCEPT_STOPWORDS = {
+    "about", "above", "after", "again", "against", "also", "before", "being",
+    "between", "both", "could", "does", "from", "have", "into", "main",
+    "more", "must", "only", "other", "over", "risk", "should", "than",
+    "that", "their", "there", "these", "this", "through", "under", "when",
+    "where", "which", "while", "with", "within", "would",
+}
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -70,6 +78,143 @@ def mean(values: list[float]) -> float | None:
 def short(text: Any, max_chars: int = 220) -> str:
     cleaned = " ".join(str(text or "").split())
     return cleaned if len(cleaned) <= max_chars else cleaned[: max_chars - 3] + "..."
+
+
+def as_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def text_hit(text: str, phrase: str) -> bool:
+    normalized_text = " ".join((text or "").lower().split())
+    normalized_phrase = " ".join(phrase.strip().lower().split())
+    if normalized_phrase and normalized_phrase in normalized_text:
+        return True
+
+    tokens = [
+        token
+        for token in re.findall(r"[a-z0-9]+", normalized_phrase)
+        if len(token) >= 4 and token not in CONCEPT_STOPWORDS
+    ]
+    if not tokens:
+        return False
+
+    token_hits = sum(
+        1
+        for token in tokens
+        if re.search(rf"\b{re.escape(token)}\b", normalized_text)
+    )
+    required = max(1, int(round(len(tokens) * 0.6)))
+    return token_hits >= required
+
+
+def exact_text_hit(text: str, phrase: str) -> bool:
+    return phrase.strip().lower() in (text or "").lower()
+
+
+def forbidden_claim_hit(text: str, phrase: str) -> bool:
+    answer = (text or "").lower()
+    claim = phrase.strip().lower()
+    if not claim:
+        return False
+
+    negation_markers = (
+        "no ",
+        "no explicit",
+        "not ",
+        "not explicitly",
+        "not stated",
+        "not specify",
+        "not specified",
+        "not mention",
+        "does not",
+        "do not",
+        "should not",
+        "without ",
+        "cannot",
+    )
+    for match in re.finditer(re.escape(claim), answer):
+        prefix = answer[max(0, match.start() - 90):match.start()]
+        suffix = answer[match.end():match.end() + 120]
+        local_window = f"{prefix} {suffix}"
+        if any(marker in local_window for marker in negation_markers):
+            continue
+        return True
+    return False
+
+
+def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
+    answer = row.get("answer") or ""
+    answer_lower = answer.lower()
+    expected_points = as_list(row.get("expected_answer_points"))
+    forbidden_claims = as_list(row.get("forbidden_claims"))
+    point_hits = [point for point in expected_points if text_hit(answer, point)]
+    forbidden_hits = [claim for claim in forbidden_claims if forbidden_claim_hit(answer, claim)]
+    coverage = safe_div(len(point_hits), len(expected_points))
+    abstained = bool(row.get("abstained"))
+    expected_behavior = str(row.get("expected_behavior") or "").strip().lower()
+
+    refute_markers = (
+        "no,",
+        "does not",
+        "do not",
+        "not require",
+        "not stated",
+        "no evidence",
+        "no explicit",
+        "not explicitly",
+        "not in the context",
+        "not supported",
+        "cannot conclude",
+        "should not",
+        "not encourage",
+        "i don't know based on the provided context",
+    )
+    cautious_markers = (
+        "based on the context",
+        "the context",
+        "evidence",
+        "incomplete",
+        "mixed",
+        "not established",
+        "no explicit",
+        "not explicit",
+        "not explicitly",
+        "not stated",
+        "no evidence",
+        "not enough",
+        "does not specify",
+        "cannot determine",
+        "clarify",
+        "gather more",
+        "avoid",
+        "retrieve more",
+        "i don't know based on the provided context",
+    )
+    has_refutation = any(marker in answer_lower for marker in refute_markers)
+    has_caution = any(marker in answer_lower for marker in cautious_markers)
+
+    if expected_behavior == "answer_with_source_support":
+        behavior_pass = (not abstained) and coverage >= 0.35 and not forbidden_hits
+    elif expected_behavior == "refute_or_abstain":
+        behavior_pass = abstained or (has_refutation and not forbidden_hits)
+    elif expected_behavior == "cautious_synthesis":
+        behavior_pass = (not abstained) and coverage >= 0.30 and not forbidden_hits
+    elif expected_behavior == "cautious_or_abstain":
+        behavior_pass = abstained or (has_caution and not forbidden_hits)
+    else:
+        behavior_pass = None
+
+    return {
+        "expected_point_hits": point_hits,
+        "expected_point_coverage": coverage,
+        "forbidden_claim_hits": forbidden_hits,
+        "forbidden_claim_hit_count": len(forbidden_hits),
+        "expected_behavior_match": behavior_pass,
+    }
 
 
 def safe_name(value: str) -> str:
@@ -174,6 +319,20 @@ def full_rag_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     action_counts = Counter(str(row.get("gating_action", "none")) for row in rows)
     type_counts = Counter(str(row.get("question_type", "unknown")) for row in rows)
     abstain_count = sum(1 for row in rows if row.get("abstained"))
+    detector_run_count = sum(1 for row in rows if row.get("hallucination_detector_ran"))
+    expected_behavior_values = [
+        bool(row["expected_behavior_match"])
+        for row in rows
+        if isinstance(row.get("expected_behavior_match"), bool)
+    ]
+    coverage_values = [
+        float(row["expected_point_coverage"])
+        for row in rows
+        if isinstance(row.get("expected_point_coverage"), (int, float))
+    ]
+    forbidden_hit_rows = [
+        row for row in rows if int(row.get("forbidden_claim_hit_count") or 0) > 0
+    ]
     risk_values = [
         float(row["answer_include_risk"])
         for row in rows
@@ -195,6 +354,17 @@ def full_rag_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "question_type_counts": dict(type_counts),
         "abstain_count": abstain_count,
         "abstain_rate": safe_div(abstain_count, len(rows)),
+        "answer_count": len(rows) - abstain_count,
+        "answer_rate": safe_div(len(rows) - abstain_count, len(rows)),
+        "detector_run_count": detector_run_count,
+        "detector_run_rate": safe_div(detector_run_count, len(rows)),
+        "expected_behavior_match_rate": safe_div(
+            sum(expected_behavior_values),
+            len(expected_behavior_values),
+        ),
+        "mean_expected_point_coverage": mean(coverage_values),
+        "forbidden_claim_hit_count": len(forbidden_hit_rows),
+        "forbidden_claim_hit_rate": safe_div(len(forbidden_hit_rows), len(rows)),
         "mean_answer_include_risk": mean(risk_values),
         "mean_answer_include_score": mean(score_values),
         # Backward-compatible aliases.
@@ -265,6 +435,11 @@ def write_full_rag_markdown(path: Path, config_name: str, questions_path: Path, 
         "| Metric | Value |",
         "| --- | ---: |",
         f"| Abstain rate | {summary['abstain_rate']:.3f} |",
+        f"| Answer rate | {summary['answer_rate']:.3f} |",
+        f"| Detector run rate | {summary['detector_run_rate']:.3f} |",
+        f"| Expected behavior match rate | {summary['expected_behavior_match_rate']:.3f} |",
+        f"| Mean expected point coverage | {summary['mean_expected_point_coverage']} |",
+        f"| Forbidden claim hit rate | {summary['forbidden_claim_hit_rate']:.3f} |",
         f"| Mean answer include risk | {summary['mean_answer_include_risk']} |",
         f"| Mean answer include score | {summary['mean_answer_include_score']} |",
         f"| Mean latency sec | {summary['mean_latency_sec']} |",
@@ -366,6 +541,8 @@ def run_full_rag(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     if args.disable_gating:
         config.setdefault("gating", {})["enabled"] = False
+    if args.disable_detector:
+        config.setdefault("hallucination_detector", {})["enabled"] = False
     rag = RAGPipeline.from_config(config)
     questions = read_jsonl(args.questions)
     if args.limit:
@@ -394,6 +571,7 @@ def run_full_rag(args: argparse.Namespace) -> None:
             "gating_stats": gating.get("stats"),
             "latency_sec": latency,
             "hallucination_detected": result.get("hallucination_detected"),
+            "hallucination_detector_ran": result.get("hallucination_detector_ran"),
             "answer_include_detected": result.get("answer_include_detected"),
             "answer_include_risk": result.get("answer_include_risk"),
             "answer_include_score": result.get("answer_include_score"),
@@ -408,10 +586,13 @@ def run_full_rag(args: argparse.Namespace) -> None:
             "top_context": top_context.get("content"),
             "sources": result.get("sources"),
         }
+        row.update(full_rag_expected_behavior_rubric(row))
         rows.append(row)
         print(
             f"{item.get('id')} action={row['gating_action']} "
-            f"abstain={row['abstained']} include_risk={row.get('answer_include_risk')}"
+            f"abstain={row['abstained']} "
+            f"expected_behavior={row.get('expected_behavior_match')} "
+            f"include_risk={row.get('answer_include_risk')}"
         )
         print(f"  A: {short(answer)}")
 
@@ -435,6 +616,11 @@ def run_full_rag(args: argparse.Namespace) -> None:
         "abstained",
         "answer_include_risk",
         "answer_include_score",
+        "expected_behavior_match",
+        "expected_point_coverage",
+        "forbidden_claim_hit_count",
+        "expected_point_hits",
+        "forbidden_claim_hits",
         "unsupported_risk",
         "support_score",
         "manual_label",

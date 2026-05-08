@@ -1,4 +1,19 @@
-﻿# Full FinReg RAG config with local Qwen2.5-3B generation and ModernBERT detector.
+# Full FinReg RAG config with section-aware retrieval and cross-encoder reranking.
+# Retrieval uses a wider dense candidate pool, then reranks the evidence sent to the LLM.
+
+data_loader:
+  default_loader: json
+  json:
+    content_field: content
+
+chunking:
+  strategy: section_aware
+  config:
+    max_chunk_size: 1200
+    min_chunk_size: 250
+    chunk_overlap: 120
+    max_heading_length: 120
+    allow_titlecase_headings: true
 
 embeddings:
   type: huggingface
@@ -10,8 +25,8 @@ embeddings:
 vector_store:
   type: chroma
   config:
-    persist_directory: ./data/vector_db/domain_finreg
-    collection_name: rag_finreg
+    persist_directory: ./data/vector_db/domain_finreg_real_section
+    collection_name: rag_finreg_real_section
 
 llm:
   model_name: Qwen/Qwen2.5-3B-Instruct
@@ -24,12 +39,18 @@ llm:
   use_chat_template: true
 
 retrieval:
-  k: 5
+  k: 24
   score_threshold: 0.0
+
+reranker:
+  type: cross_encoder
+  model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
+  device: cuda
+  top_k: 8
 
 hallucination_detector:
   enabled: true
-  model_path: models/checkpoints/finregbench_modernbert_detector/best_model
+  model_path: models/checkpoints/finregbench_modernbert_detector_v3_hardmix/best_model
   base_model: tasksource/ModernBERT-base-nli
   device: cuda
   max_length: 1024
@@ -37,7 +58,7 @@ hallucination_detector:
   hypothesis_format: question_and_candidate_answer
   risk_mode: answer_include
   aggregation: answer_include_best
-  answer_include_threshold: 0.50
+  answer_include_threshold: 0.97
 
 hallucination_aggregation: answer_include_best
 
@@ -45,12 +66,12 @@ gating:
   enabled: true
   strategy: abstain
   contradiction_prob_metric: answer_include_risk
-  contradiction_prob_threshold: 0.50
-  contradiction_rate_metric: hard_answer_not_included_rate
-  contradiction_rate_threshold: 0.80
+  contradiction_prob_threshold: 0.97
+  contradiction_rate_metric: hard_contradiction_rate
+  contradiction_rate_threshold: 0.40
   uncertainty_threshold: 1.0
   abstain_message: "I don't have enough reliable evidence to support that answer."
 
 sources:
-  max_sources: 5
+  max_sources: 8
   include_scores: true

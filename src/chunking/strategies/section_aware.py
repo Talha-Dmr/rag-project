@@ -233,10 +233,25 @@ class SectionAwareChunker(BaseChunker):
         if not parts or self.chunk_overlap <= 0:
             return []
 
-        tail = parts[-1]
+        tail = parts[-1].strip()
         if len(tail) <= self.chunk_overlap:
             return [tail]
-        return [tail[-self.chunk_overlap :].strip()]
+
+        window_size = min(len(tail), self.chunk_overlap * 3)
+        window = tail[-window_size:].strip()
+        sentences = [sentence.strip() for sentence in SENTENCE_BOUNDARY_RE.split(window) if sentence.strip()]
+
+        overlap = ""
+        for sentence in reversed(sentences):
+            candidate = f"{sentence} {overlap}".strip() if overlap else sentence
+            if len(candidate) > self.chunk_overlap:
+                break
+            overlap = candidate
+
+        if overlap and len(overlap) >= min(40, self.chunk_overlap):
+            return [overlap]
+
+        return []
 
     def _render_block_parts(self, heading: str, text: str) -> List[str]:
         if not text:

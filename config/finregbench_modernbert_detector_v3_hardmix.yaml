@@ -1,0 +1,60 @@
+# FinRegBench answer-include detector v3 hardmix fine-tune.
+#
+# This run starts from the existing FinRegBench ModernBERT checkpoint and
+# fine-tunes on the original training split plus reviewed real-RAG-like
+# detector examples from data/domain_finreg/manual_review/detector_v3.
+
+training:
+  model:
+    base_model: tasksource/ModernBERT-base-nli
+    num_labels: 3
+    cache_dir: ./models/training
+    lora:
+      enabled: false
+
+  hyperparameters:
+    learning_rate: 2.0e-6
+    weight_decay: 0.01
+    warmup_steps: 25
+    max_epochs: 1
+    batch_size: 2
+    gradient_accumulation_steps: 8
+    max_grad_norm: 1.0
+    mixed_precision: fp32
+    optimizer: adamw
+    scheduler: linear
+    loss:
+      type: weighted_ce
+      class_weights: [1.15, 1.0, 1.0]
+      label_smoothing: 0.03
+      neutral_boost_weight: 0.0
+      neutral_margin: 0.0
+      contradiction_boost_weight: 0.0
+      contradiction_margin: 0.0
+
+  data:
+    max_seq_length: 1024
+    train_sampling_strategy: balanced
+    train_sampling_power: 1.0
+
+  checkpointing:
+    save_dir: ./models/checkpoints/finregbench_modernbert_detector_v3_hardmix
+    save_strategy: best
+    save_every_n_epochs: 1
+    save_total_limit: 2
+    save_every_n_batches: 1000
+    metric_for_best: f1_macro
+    mode: max
+
+  early_stopping:
+    enabled: false
+    patience: 2
+    metric: f1_macro
+    mode: max
+    min_delta: 0.0001
+
+  output:
+    training_data_dir: ./data/training/finregbench_detector_v3_hardmix
+    checkpoint_dir: ./models/checkpoints/finregbench_modernbert_detector_v3_hardmix
+    final_model_dir: ./models/hallucination_detector_finregbench_modernbert_v3_hardmix
+    logs_dir: ./logs/training

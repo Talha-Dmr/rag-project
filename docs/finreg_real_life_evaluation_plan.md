@@ -85,10 +85,14 @@ Why this is useful:
 - captures retrieval, generation, detector, and gating interactions
 - produces manual review sheet for report-grade evaluation
 
-Automatic metrics:
+Pre-review metrics:
 
 - gating action counts
+- answer rate
 - abstain rate
+- expected behavior match rate
+- expected-point coverage
+- forbidden-claim hit rate
 - mean `answer_include_risk`
 - mean `answer_include_score`
 - mean latency
@@ -229,6 +233,9 @@ Local Qwen 1.5B + detector      ...
 Local Qwen 3B + detector        ...
 Local Qwen 3B no detector       ...
 ```
+
+Current run results are recorded in
+`docs/finreg_real_life_benchmark_results.md`.
 
 Qualitative table:
 

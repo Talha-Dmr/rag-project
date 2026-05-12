@@ -37,6 +37,7 @@ class HuggingFaceLLM(BaseLLM):
             'max_new_tokens',
             self.config.get('max_tokens', 512)
         )
+        self.max_prompt_tokens = int(self.config.get('max_prompt_tokens', 2048))
         self.temperature = self.config.get('temperature', 0.7)
         self.top_p = self.config.get('top_p', 0.9)
         self.load_in_8bit = self.config.get('load_in_8bit', False)
@@ -44,6 +45,11 @@ class HuggingFaceLLM(BaseLLM):
         self.enable_thinking = self.config.get('enable_thinking')
         self.device_map = self.config.get('device_map')
         self.low_cpu_mem_usage = bool(self.config.get('low_cpu_mem_usage', False))
+        self.attn_implementation = self.config.get('attn_implementation')
+        self.use_cache = bool(self.config.get('use_cache', True))
+        self.clear_cuda_cache_after_generate = bool(
+            self.config.get('clear_cuda_cache_after_generate', self.device == 'cuda')
+        )
         self.dtype = self._resolve_dtype(self.config.get('dtype'))
         self.local_files_only = bool(
             self.config.get("local_files_only", _env_truthy("HF_HUB_OFFLINE"))
@@ -73,6 +79,8 @@ class HuggingFaceLLM(BaseLLM):
                 model_kwargs['device_map'] = self.device_map
             if self.low_cpu_mem_usage:
                 model_kwargs['low_cpu_mem_usage'] = True
+            if self.attn_implementation:
+                model_kwargs['attn_implementation'] = self.attn_implementation
 
             if self.load_in_8bit and self.device == 'cuda':
                 model_kwargs['load_in_8bit'] = True
@@ -148,7 +156,7 @@ class HuggingFaceLLM(BaseLLM):
                 prompt,
                 return_tensors="pt",
                 truncation=True,
-                max_length=min(2048, max_prompt_length)
+                max_length=min(self.max_prompt_tokens, max_prompt_length)
             ).to(self.device)
 
             # Generate
@@ -158,6 +166,7 @@ class HuggingFaceLLM(BaseLLM):
                     "do_sample": temperature > 0,
                     "pad_token_id": self.tokenizer.pad_token_id,
                     "eos_token_id": self.tokenizer.eos_token_id,
+                    "use_cache": self.use_cache,
                     # Mitigates occasional invalid probs on some GPU/dtype/model combos.
                     "remove_invalid_values": True,
                     "renormalize_logits": True,
@@ -181,20 +190,29 @@ class HuggingFaceLLM(BaseLLM):
                     fallback_kwargs.pop("top_p", None)
                     outputs = self.model.generate(**inputs, **fallback_kwargs)
 
-            input_length = inputs["input_ids"].shape[-1]
-            generated_tokens = outputs[0][input_length:]
-            generated_text = self.tokenizer.decode(
-                generated_tokens,
-                skip_special_tokens=True
-            ).strip()
-
-            if not generated_text:
+            try:
+                input_length = inputs["input_ids"].shape[-1]
+                generated_tokens = outputs[0][input_length:]
                 generated_text = self.tokenizer.decode(
-                    outputs[0],
+                    generated_tokens,
                     skip_special_tokens=True
-                )
-                if generated_text.startswith(prompt):
-                    generated_text = generated_text[len(prompt):].strip()
+                ).strip()
+
+                if not generated_text:
+                    generated_text = self.tokenizer.decode(
+                        outputs[0],
+                        skip_special_tokens=True
+                    )
+                    if generated_text.startswith(prompt):
+                        generated_text = generated_text[len(prompt):].strip()
+            finally:
+                del inputs
+                if "outputs" in locals():
+                    del outputs
+                if "generated_tokens" in locals():
+                    del generated_tokens
+                if self.clear_cuda_cache_after_generate and self.device == 'cuda':
+                    torch.cuda.empty_cache()
 
             return generated_text
 
@@ -207,7 +225,8 @@ class HuggingFaceLLM(BaseLLM):
         query: str,
         context: List[str],
         max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None
+        temperature: Optional[float] = None,
+        quality_feedback: Optional[str] = None
     ) -> str:
         """
         Generate text with retrieved context
@@ -217,6 +236,7 @@ class HuggingFaceLLM(BaseLLM):
             context: Retrieved context documents
             max_tokens: Maximum tokens to generate
             temperature: Optional sampling temperature override
+            quality_feedback: Optional rewrite or completeness instruction
 
         Returns:
             Generated response
@@ -228,9 +248,17 @@ class HuggingFaceLLM(BaseLLM):
             "say: \"I don't know based on the provided context.\" "
             "If the question asks for a specific rule, deadline, threshold, portal, "
             "template, or approval requirement, state it only when the context says it explicitly. "
+            "If the question says the evidence does not establish a specific number, deadline, "
+            "approval, portal, or threshold, explicitly state that the specific item is not "
+            "established and do not replace it with a broad regulatory discussion. "
             "If the evidence is incomplete or mixed, say what is supported and what is not established. "
-            "Do not output role labels. Answer in 1-3 sentences."
+            "For broad what/how/main-elements questions, cover all distinct supported elements "
+            "that are relevant to the question instead of giving only one narrow example. "
+            "For false-premise yes/no questions, start by clearly rejecting the premise when "
+            "the context supports rejection. Do not output role labels. Answer in 2-5 concise sentences."
         )
+        if quality_feedback:
+            system_message = f"{system_message} {quality_feedback.strip()}"
         user_message = (
             "CONTEXT:\n<<<\n"
             f"{context_text}\n"

@@ -343,6 +343,17 @@ def full_rag_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         for row in rows
         if isinstance(row.get("answer_include_score"), (int, float))
     ]
+    completeness_values = [
+        float(row["answer_completeness_score"])
+        for row in rows
+        if isinstance(row.get("answer_completeness_score"), (int, float))
+    ]
+    claim_include_values = [
+        float(row["claim_include_rate"])
+        for row in rows
+        if isinstance(row.get("claim_include_rate"), (int, float))
+    ]
+    rewrite_count = sum(int(row.get("answer_quality_rewrite_count") or 0) for row in rows)
     latency_values = [
         float(row["latency_sec"])
         for row in rows
@@ -367,6 +378,10 @@ def full_rag_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "forbidden_claim_hit_rate": safe_div(len(forbidden_hit_rows), len(rows)),
         "mean_answer_include_risk": mean(risk_values),
         "mean_answer_include_score": mean(score_values),
+        "mean_answer_completeness_score": mean(completeness_values),
+        "mean_claim_include_rate": mean(claim_include_values),
+        "answer_quality_rewrite_count": rewrite_count,
+        "answer_quality_rewrite_rate": safe_div(rewrite_count, len(rows)),
         # Backward-compatible aliases.
         "mean_unsupported_risk": mean(risk_values),
         "mean_support_score": mean(score_values),
@@ -442,6 +457,9 @@ def write_full_rag_markdown(path: Path, config_name: str, questions_path: Path, 
         f"| Forbidden claim hit rate | {summary['forbidden_claim_hit_rate']:.3f} |",
         f"| Mean answer include risk | {summary['mean_answer_include_risk']} |",
         f"| Mean answer include score | {summary['mean_answer_include_score']} |",
+        f"| Mean answer completeness score | {summary.get('mean_answer_completeness_score')} |",
+        f"| Mean claim include rate | {summary.get('mean_claim_include_rate')} |",
+        f"| Answer quality rewrite rate | {summary.get('answer_quality_rewrite_rate')} |",
         f"| Mean latency sec | {summary['mean_latency_sec']} |",
         "",
         "## Gating Actions",
@@ -543,10 +561,18 @@ def run_full_rag(args: argparse.Namespace) -> None:
         config.setdefault("gating", {})["enabled"] = False
     if args.disable_detector:
         config.setdefault("hallucination_detector", {})["enabled"] = False
+    if args.disable_answer_quality:
+        config.setdefault("answer_quality", {})["enabled"] = False
     rag = RAGPipeline.from_config(config)
     questions = read_jsonl(args.questions)
     if args.limit:
         questions = questions[: args.limit]
+
+    run_name = safe_name(args.run_name or f"fullrag_{args.config}")
+    out_dir = args.output_dir / run_name
+    partial_jsonl = out_dir / "per_question.partial.jsonl"
+    partial_summary_json = out_dir / "summary.partial.json"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     abstain_message = (config.get("gating", {}).get("abstain_message", "") or "").strip()
     rows: list[dict[str, Any]] = []
@@ -575,6 +601,14 @@ def run_full_rag(args: argparse.Namespace) -> None:
             "answer_include_detected": result.get("answer_include_detected"),
             "answer_include_risk": result.get("answer_include_risk"),
             "answer_include_score": result.get("answer_include_score"),
+            "answer_quality": result.get("answer_quality"),
+            "answer_quality_rewrite_count": result.get("answer_quality_rewrite_count"),
+            "answer_completeness_score": result.get("answer_completeness_score"),
+            "answer_completeness_risk": result.get("answer_completeness_risk"),
+            "answer_quality_missing_concepts": result.get("answer_quality_missing_concepts"),
+            "claim_include_rate": result.get("claim_include_rate"),
+            "claim_unsupported_rate": result.get("claim_unsupported_rate"),
+            "claim_answer_include_risk_max": result.get("claim_answer_include_risk_max"),
             # Backward-compatible aliases.
             "unsupported_answer_detected": result.get("unsupported_answer_detected"),
             "unsupported_risk": result.get("unsupported_risk"),
@@ -592,12 +626,13 @@ def run_full_rag(args: argparse.Namespace) -> None:
             f"{item.get('id')} action={row['gating_action']} "
             f"abstain={row['abstained']} "
             f"expected_behavior={row.get('expected_behavior_match')} "
-            f"include_risk={row.get('answer_include_risk')}"
+            f"include_risk={row.get('answer_include_risk')} "
+            f"complete={row.get('answer_completeness_score')}"
         )
         print(f"  A: {short(answer)}")
+        write_jsonl(partial_jsonl, rows)
+        write_json(partial_summary_json, full_rag_summary(rows))
 
-    run_name = safe_name(args.run_name or f"fullrag_{args.config}")
-    out_dir = args.output_dir / run_name
     write_jsonl(out_dir / "per_question.jsonl", rows)
     summary = full_rag_summary(rows)
     write_json(out_dir / "summary.json", summary)
@@ -616,6 +651,10 @@ def run_full_rag(args: argparse.Namespace) -> None:
         "abstained",
         "answer_include_risk",
         "answer_include_score",
+        "answer_completeness_score",
+        "claim_include_rate",
+        "answer_quality_rewrite_count",
+        "answer_quality_missing_concepts",
         "expected_behavior_match",
         "expected_point_coverage",
         "forbidden_claim_hit_count",
@@ -652,6 +691,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("reports/finreg_real_life_benchmark"))
     parser.add_argument("--disable-detector", action="store_true")
     parser.add_argument("--disable-gating", action="store_true")
+    parser.add_argument("--disable-answer-quality", action="store_true")
     args = parser.parse_args()
 
     if args.config is None:

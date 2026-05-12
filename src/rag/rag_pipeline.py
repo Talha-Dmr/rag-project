@@ -14,6 +14,7 @@ from src.reranking.base_reranker import RerankerFactory
 from src.vector_stores.base_store import VectorStoreFactory
 from src.rag.llm_wrapper import HuggingFaceLLM
 from src.rag.openrouter_llm import OpenRouterLLM
+from src.rag.answer_quality import audit_answer_quality, build_quality_feedback, split_claims
 from src.rag.retriever import Retriever
 from src.core.base_classes import BaseLLM, BaseReranker
 from src.core.logger import get_logger
@@ -45,6 +46,41 @@ SOURCE_BALANCE_STOPWORDS = {
     "materials", "quality", "responsibility", "senior", "the", "their", "when",
 }
 
+FINREG_QUERY_EXPANSIONS = [
+    (
+        re.compile(r"\bstress(?:\s|-)?test|srep|icaap|ilaap\b", re.IGNORECASE),
+        "adverse scenarios risk concentrations capital adequacy resilience supervisory review SREP ICAAP ILAAP",
+    ),
+    (
+        re.compile(r"\bict|cyber|security risk|incident|resilience\b", re.IGNORECASE),
+        "identify protect detect respond recover testing cybersecurity incident response business continuity",
+    ),
+    (
+        re.compile(r"\boutsourc|cloud|third(?:\s|-)?party|service provider\b", re.IGNORECASE),
+        "retained responsibility governance risk assessment monitoring audit access exit planning sub-outsourcing",
+    ),
+    (
+        re.compile(r"\bclimate|esg|environmental|transition risk|physical risk\b", re.IGNORECASE),
+        "identify measure manage monitor governance transition risk physical risk risk appetite strategy",
+    ),
+    (
+        re.compile(r"\bmanual workaround|lineage|rdarr|bcbs 239|risk data\b", re.IGNORECASE),
+        "temporary transition controls ownership auditability remediation plan data lineage accuracy completeness timeliness",
+    ),
+    (
+        re.compile(r"\bintraday liquidity|payment|settlement\b", re.IGNORECASE),
+        "payment settlement obligations liquidity risk monitoring tools stress scenarios reporting",
+    ),
+    (
+        re.compile(r"\bremuneration|risk culture|board|senior management\b", re.IGNORECASE),
+        "risk appetite board oversight staff training remuneration alignment governance risk culture incentives",
+    ),
+    (
+        re.compile(r"\bmodel risk|model validation|ai[- ]based|complexity\b", re.IGNORECASE),
+        "model development validation implementation use constraints governance controls limitations model changes",
+    ),
+]
+
 
 class _NoopLLM(BaseLLM):
     """LLM placeholder for retrieval/detector-only workflows."""
@@ -62,7 +98,8 @@ class _NoopLLM(BaseLLM):
         query: str,
         context: List[str],
         max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None
+        temperature: Optional[float] = None,
+        quality_feedback: Optional[str] = None
     ) -> str:
         raise RuntimeError("LLM is disabled for this pipeline config.")
 
@@ -86,7 +123,9 @@ class RAGPipeline:
         reranker_top_k: Optional[int] = None,
         hallucination_detector=None,
         gating_config: Optional[Dict[str, Any]] = None,
+        retrieval_config: Optional[Dict[str, Any]] = None,
         source_config: Optional[Dict[str, Any]] = None,
+        answer_quality_config: Optional[Dict[str, Any]] = None,
         hallucination_aggregation: str = "any",
     ):
         """
@@ -111,7 +150,9 @@ class RAGPipeline:
         self.reranker_top_k = reranker_top_k
         self.hallucination_detector = hallucination_detector
         self.gating_config = gating_config or {}
+        self.retrieval_config = retrieval_config or {}
         self.source_config = source_config or {}
+        self.answer_quality_config = answer_quality_config or {}
         self.hallucination_aggregation = hallucination_aggregation or "any"
         self._source_embedding_cache_size = int(
             self.source_config.get("embedding_cache_size", 20000)
@@ -170,6 +211,244 @@ class RAGPipeline:
         logger.info(f"Successfully indexed {len(chunks)} chunks")
 
         return len(chunks)
+
+    def _detect_generated_answer(
+        self,
+        answer: str,
+        context_texts: List[str],
+        aggregation_mode: str,
+        query_text: str,
+        detect_hallucinations: bool,
+    ) -> tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+        """Run the detector for one generated answer and return result fields."""
+        model_requested_abstain = self._model_requested_abstain(answer)
+        result: Dict[str, Any] = {
+            "model_requested_abstain": model_requested_abstain,
+            "hallucination_detector_ran": False,
+        }
+
+        if model_requested_abstain:
+            result["hallucination_detected"] = False
+            return result, None
+
+        if detect_hallucinations and self.hallucination_detector:
+            logger.info("Checking for hallucinations...")
+            try:
+                result["hallucination_detector_ran"] = True
+                detection_result = self.hallucination_detector.verify_answer_with_contexts(
+                    answer=answer,
+                    contexts=context_texts,
+                    aggregation=aggregation_mode,
+                    question=query_text,
+                )
+
+                result["hallucination_detected"] = detection_result["is_hallucination"]
+                result["answer_include_detected"] = detection_result.get("answer_include_detected")
+                result["answer_include_risk"] = detection_result.get(
+                    "answer_include_risk",
+                    detection_result.get("unsupported_risk"),
+                )
+                result["answer_include_score"] = detection_result.get(
+                    "answer_include_score",
+                    detection_result.get("support_score"),
+                )
+                # Backward-compatible aliases.
+                result["unsupported_answer_detected"] = detection_result.get("is_unsupported")
+                result["unsupported_risk"] = detection_result.get("unsupported_risk")
+                result["support_score"] = detection_result.get("support_score")
+                result["hallucination_score"] = detection_result["hallucination_score"]
+                result["hallucination_details"] = {
+                    "num_contexts": detection_result["num_contexts"],
+                    "num_contradictions": detection_result["num_contradictions"],
+                    "num_answer_not_included": detection_result.get("num_answer_not_included"),
+                    "num_unsupported": detection_result.get("num_unsupported"),
+                    "aggregation": detection_result["aggregation"],
+                }
+                for key in (
+                    "answer_include_risk",
+                    "answer_include_prob_mean",
+                    "answer_include_prob_topk",
+                    "answer_include_threshold",
+                    "answer_include_score",
+                    "hard_answer_not_included_rate",
+                    "unsupported_risk",
+                    "unsupported_prob_mean",
+                    "unsupported_prob_topk",
+                    "unsupported_threshold",
+                    "support_score",
+                    "best_context_index",
+                    "best_context_label",
+                    "best_context_scores",
+                    "hard_unsupported_rate",
+                    "hard_contradiction_rate",
+                    "hallucination_prob_mean",
+                    "hallucination_prob_topk",
+                    "contradiction_margin_mean",
+                    "contradiction_neutral_gap_mean",
+                ):
+                    if key in detection_result:
+                        result["hallucination_details"][key] = detection_result[key]
+
+                if detection_result["is_hallucination"]:
+                    logger.warning(
+                        "Hallucination detected! Score: %.2f (%s/%s contexts)",
+                        detection_result["hallucination_score"],
+                        detection_result["num_contradictions"],
+                        detection_result["num_contexts"],
+                    )
+                else:
+                    logger.info("No hallucinations detected")
+                return result, detection_result
+
+            except Exception as e:
+                logger.error(f"Hallucination detection failed: {e}")
+                result["hallucination_detected"] = None
+                result["hallucination_error"] = str(e)
+                return result, None
+
+        if detect_hallucinations and not self.hallucination_detector:
+            logger.warning("Hallucination detection requested but detector not available")
+            result["hallucination_detected"] = None
+        else:
+            result["hallucination_detected"] = False
+        return result, None
+
+    def _claim_support_stats(
+        self,
+        answer: str,
+        context_texts: List[str],
+        aggregation_mode: str,
+        query_text: str,
+        detect_hallucinations: bool,
+    ) -> Dict[str, Any]:
+        cfg = self.answer_quality_config or {}
+        if not bool(cfg.get("claim_level", False)):
+            return {}
+        if not detect_hallucinations or not self.hallucination_detector:
+            return {}
+
+        claims = split_claims(answer, max_claims=int(cfg.get("max_claims", 6)))
+        if not claims:
+            return {
+                "claim_count": 0,
+                "claim_include_rate": 1.0,
+                "claim_unsupported_rate": 0.0,
+                "claim_answer_include_risk_max": 0.0,
+                "unsupported_claims": [],
+            }
+
+        claim_results: list[dict[str, Any]] = []
+        unsupported_claims: list[str] = []
+        risks: list[float] = []
+        included = 0
+        claim_aggregation = str(cfg.get("claim_aggregation") or aggregation_mode)
+
+        for claim in claims:
+            try:
+                claim_result = self.hallucination_detector.verify_answer_with_contexts(
+                    answer=claim,
+                    contexts=context_texts,
+                    aggregation=claim_aggregation,
+                    question=query_text,
+                )
+            except Exception as exc:
+                logger.warning("Claim-level support check failed: %s", exc)
+                continue
+
+            risk = float(claim_result.get("answer_include_risk", 1.0) or 1.0)
+            is_included = bool(claim_result.get("answer_include_detected"))
+            risks.append(risk)
+            included += int(is_included)
+            if not is_included:
+                unsupported_claims.append(claim)
+            claim_results.append(
+                {
+                    "claim": claim,
+                    "answer_include_detected": is_included,
+                    "answer_include_risk": risk,
+                    "answer_include_score": claim_result.get("answer_include_score"),
+                    "best_context_label": claim_result.get("best_context_label"),
+                }
+            )
+
+        checked = len(claim_results)
+        if checked == 0:
+            return {}
+        include_rate = included / checked
+        mean_risk = float(sum(risks) / len(risks)) if risks else 0.0
+        return {
+            "claim_count": checked,
+            "claim_include_rate": float(include_rate),
+            "claim_unsupported_rate": float(1.0 - include_rate),
+            "claim_answer_include_risk_max": float(max(risks) if risks else 0.0),
+            "claim_answer_include_risk_mean": mean_risk,
+            "unsupported_claims": unsupported_claims,
+            "claim_results": claim_results,
+        }
+
+    def _audit_answer_quality(
+        self,
+        query_text: str,
+        answer: str,
+        context_texts: List[str],
+        aggregation_mode: str,
+        detect_hallucinations: bool,
+    ) -> Dict[str, Any]:
+        if not bool((self.answer_quality_config or {}).get("enabled", False)):
+            return {}
+
+        audit = audit_answer_quality(
+            query_text,
+            answer,
+            context_texts,
+            self.answer_quality_config,
+        )
+        audit.update(
+            self._claim_support_stats(
+                answer,
+                context_texts,
+                aggregation_mode,
+                query_text,
+                detect_hallucinations,
+            )
+        )
+        return audit
+
+    def _quality_stats(self, audit: Optional[Dict[str, Any]]) -> Dict[str, float]:
+        if not audit:
+            return {
+                "answer_completeness_score": 1.0,
+                "answer_completeness_risk": 0.0,
+                "claim_include_rate": 1.0,
+                "claim_unsupported_rate": 0.0,
+                "claim_answer_include_risk_max": 0.0,
+            }
+        return {
+            "answer_completeness_score": float(audit.get("answer_completeness_score", 1.0) or 0.0),
+            "answer_completeness_risk": float(audit.get("answer_completeness_risk", 0.0) or 0.0),
+            "claim_include_rate": float(audit.get("claim_include_rate", 1.0) or 0.0),
+            "claim_unsupported_rate": float(audit.get("claim_unsupported_rate", 0.0) or 0.0),
+            "claim_answer_include_risk_max": float(
+                audit.get("claim_answer_include_risk_max", 0.0) or 0.0
+            ),
+        }
+
+    def _should_rewrite_for_quality(self, audit: Dict[str, Any]) -> bool:
+        if not audit or not bool((self.answer_quality_config or {}).get("rewrite_on_low_coverage", False)):
+            return False
+        min_coverage = float(self.answer_quality_config.get("min_concept_coverage", 0.55))
+        min_claim_rate = float(self.answer_quality_config.get("min_claim_include_rate", 0.75))
+        max_claim_risk = float(self.answer_quality_config.get("max_claim_answer_include_risk", 0.97))
+        has_required = bool(audit.get("required_concepts"))
+        if bool(audit.get("asks_specific_unsupported")) and audit.get("missing_concepts"):
+            return True
+        if has_required and float(audit.get("answer_completeness_score", 1.0)) < min_coverage:
+            return True
+        if float(audit.get("claim_include_rate", 1.0)) < min_claim_rate:
+            return True
+        if float(audit.get("claim_answer_include_risk_max", 0.0)) >= max_claim_risk:
+            return True
+        return False
 
     def _compute_uncertainty_stats(
         self,
@@ -662,6 +941,9 @@ class RAGPipeline:
         uncertainty = self._get_selected_metric(
             stats, gating_config, "uncertainty_metric", "uncertainty_mean", 0.0
         )
+        answer_completeness_score = stats.get("answer_completeness_score", 1.0)
+        claim_include_rate = stats.get("claim_include_rate", 1.0)
+        claim_answer_include_risk_max = stats.get("claim_answer_include_risk_max", 0.0)
         source_consistency = stats.get("source_consistency")
         max_retrieval_score = stats.get("retrieval_max_score", 1.0)
         mean_retrieval_score = stats.get("retrieval_mean_score", 1.0)
@@ -669,6 +951,9 @@ class RAGPipeline:
         contradiction_rate_threshold = gating_config.get("contradiction_rate_threshold", 0.34)
         contradiction_prob_threshold = gating_config.get("contradiction_prob_threshold", 0.5)
         uncertainty_threshold = gating_config.get("uncertainty_threshold", 0.3)
+        min_answer_completeness = gating_config.get("min_answer_completeness_score")
+        min_claim_include_rate = gating_config.get("min_claim_include_rate")
+        max_claim_answer_include_risk = gating_config.get("max_claim_answer_include_risk")
         min_retrieval_score = gating_config.get("min_retrieval_score")
         min_mean_retrieval_score = gating_config.get("min_mean_retrieval_score")
         source_consistency_threshold = gating_config.get("source_consistency_threshold")
@@ -690,11 +975,29 @@ class RAGPipeline:
             and source_consistency is not None
             and source_consistency < float(source_consistency_threshold)
         )
+        completeness_trigger = (
+            isinstance(min_answer_completeness, (int, float))
+            and isinstance(answer_completeness_score, (int, float))
+            and answer_completeness_score < float(min_answer_completeness)
+        )
+        claim_include_trigger = (
+            isinstance(min_claim_include_rate, (int, float))
+            and isinstance(claim_include_rate, (int, float))
+            and claim_include_rate < float(min_claim_include_rate)
+        )
+        claim_risk_trigger = (
+            isinstance(max_claim_answer_include_risk, (int, float))
+            and isinstance(claim_answer_include_risk_max, (int, float))
+            and claim_answer_include_risk_max >= float(max_claim_answer_include_risk)
+        )
         stats["gate_trigger_contradiction_rate"] = float(1.0 if contradiction_rate_trigger else 0.0)
         stats["gate_trigger_contradiction_prob"] = float(1.0 if contradiction_prob_trigger else 0.0)
         stats["gate_trigger_uncertainty"] = float(1.0 if uncertainty_trigger else 0.0)
         stats["gate_trigger_retrieval_low"] = float(1.0 if retrieval_low else 0.0)
         stats["gate_trigger_source_consistency"] = float(1.0 if source_consistency_trigger else 0.0)
+        stats["gate_trigger_answer_completeness"] = float(1.0 if completeness_trigger else 0.0)
+        stats["gate_trigger_claim_include"] = float(1.0 if claim_include_trigger else 0.0)
+        stats["gate_trigger_claim_risk"] = float(1.0 if claim_risk_trigger else 0.0)
 
         strategy = gating_config.get("strategy", "abstain")
         if strategy == "risk_budgeted":
@@ -705,7 +1008,10 @@ class RAGPipeline:
             contradiction_rate >= contradiction_rate_threshold or
             contradiction_prob >= contradiction_prob_threshold or
             uncertainty >= uncertainty_threshold or
-            retrieval_low
+            retrieval_low or
+            completeness_trigger or
+            claim_include_trigger or
+            claim_risk_trigger
         )
 
         if not should_gate:
@@ -731,6 +1037,69 @@ class RAGPipeline:
     def _model_requested_abstain(self, answer: str) -> bool:
         lower = (answer or "").strip().lower()
         return any(phrase in lower for phrase in MODEL_ABSTAIN_PHRASES)
+
+    def _expanded_retrieval_queries(self, query_text: str) -> List[str]:
+        retrieval_cfg = getattr(self.retriever, "config", {}) or {}
+        # Most call sites construct Retriever directly, so read the original
+        # config from the pipeline when available.
+        retrieval_cfg = getattr(self, "retrieval_config", retrieval_cfg)
+        expansion_cfg = retrieval_cfg.get("query_expansion", {})
+        if not bool(expansion_cfg.get("enabled", False)):
+            return [query_text]
+
+        queries = [query_text]
+        max_queries = int(expansion_cfg.get("max_queries", 3) or 3)
+        query_norm = query_text.strip()
+        for pattern, expansion in FINREG_QUERY_EXPANSIONS:
+            if pattern.search(query_norm):
+                queries.append(f"{query_text} {expansion}")
+                if len(queries) >= max_queries:
+                    break
+
+        fallback_terms = str(expansion_cfg.get("fallback_terms", "") or "").strip()
+        if fallback_terms and len(queries) < max_queries:
+            queries.append(f"{query_text} {fallback_terms}")
+
+        deduped: List[str] = []
+        seen = set()
+        for query in queries:
+            key = " ".join(query.lower().split())
+            if key not in seen:
+                seen.add(key)
+                deduped.append(query)
+        return deduped[:max_queries]
+
+    def _retrieve_documents(self, query_text: str, k: int) -> List[Dict[str, Any]]:
+        retrieval_cfg = getattr(self, "retrieval_config", {})
+        expansion_cfg = retrieval_cfg.get("query_expansion", {})
+        queries = self._expanded_retrieval_queries(query_text)
+        if len(queries) == 1:
+            return self.retriever.retrieve(query_text, k=k)
+
+        per_query_k = int(expansion_cfg.get("per_query_k", k) or k)
+        merged: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+        for expanded_query in queries:
+            for doc in self.retriever.retrieve(expanded_query, k=per_query_k):
+                content = str(doc.get("content", ""))
+                metadata = doc.get("metadata") or {}
+                source_key = metadata.get("source") or metadata.get("file_path") or metadata.get("title") or ""
+                key = f"{source_key}|{content[:500]}"
+                existing = merged.get(key)
+                if existing is None or float(doc.get("score", 0.0) or 0.0) > float(existing.get("score", 0.0) or 0.0):
+                    merged[key] = doc
+
+        docs = sorted(
+            merged.values(),
+            key=lambda item: float(item.get("score", 0.0) or 0.0),
+            reverse=True,
+        )
+        max_candidates = int(expansion_cfg.get("max_candidates", max(k, per_query_k)) or max(k, per_query_k))
+        logger.info(
+            "Query expansion retrieved %d unique candidates from %d queries",
+            len(docs),
+            len(queries),
+        )
+        return docs[:max_candidates]
 
     def query(
         self,
@@ -784,7 +1153,7 @@ class RAGPipeline:
         while True:
             # Retrieve relevant documents
             logger.info(f"Retrieving top {current_k} documents...")
-            retrieved_docs = self.retriever.retrieve(query_text, k=current_k)
+            retrieved_docs = self._retrieve_documents(query_text, current_k)
 
             if self.reranker:
                 logger.info("Applying reranker...")
@@ -839,99 +1208,82 @@ class RAGPipeline:
             context_texts = [doc['content'] for doc in retrieved_docs]
             answer = self.llm.generate_with_context(query_text, context_texts)
             answer = self._normalize_generated_answer(answer)
-            model_requested_abstain = self._model_requested_abstain(answer)
 
             result = {
                 'answer': answer,
                 'num_docs_retrieved': len(retrieved_docs),
-                'model_requested_abstain': model_requested_abstain,
-                'hallucination_detector_ran': False,
             }
 
-            # Hallucination detection
-            if model_requested_abstain:
-                result['hallucination_detected'] = False
-                detection_result = None
-            elif detect_hallucinations and self.hallucination_detector:
-                logger.info("Checking for hallucinations...")
-
-                try:
-                    result['hallucination_detector_ran'] = True
-                    detection_result = self.hallucination_detector.verify_answer_with_contexts(
-                        answer=answer,
-                        contexts=context_texts,
-                        aggregation=aggregation_mode,
-                        question=query_text,
+            answer_quality = self._audit_answer_quality(
+                query_text,
+                answer,
+                context_texts,
+                aggregation_mode,
+                False,
+            )
+            rewrite_count = 0
+            max_quality_rewrites = int(self.answer_quality_config.get("max_rewrites", 0) or 0)
+            if (
+                answer_quality
+                and not self._model_requested_abstain(answer)
+                and self._should_rewrite_for_quality(answer_quality)
+                and max_quality_rewrites > 0
+            ):
+                feedback = build_quality_feedback(
+                    answer_quality,
+                    max_missing=int(self.answer_quality_config.get("max_feedback_concepts", 5)),
+                )
+                if feedback:
+                    rewrite_count = 1
+                    logger.info("Rewriting answer for low completeness/claim support")
+                    answer = self.llm.generate_with_context(
+                        query_text,
+                        context_texts,
+                        max_tokens=self.answer_quality_config.get("rewrite_max_tokens"),
+                        quality_feedback=feedback,
                     )
-
-                    result['hallucination_detected'] = detection_result['is_hallucination']
-                    result['answer_include_detected'] = detection_result.get('answer_include_detected')
-                    result['answer_include_risk'] = detection_result.get(
-                        'answer_include_risk',
-                        detection_result.get('unsupported_risk'),
-                    )
-                    result['answer_include_score'] = detection_result.get(
-                        'answer_include_score',
-                        detection_result.get('support_score'),
-                    )
-                    # Backward-compatible aliases.
-                    result['unsupported_answer_detected'] = detection_result.get('is_unsupported')
-                    result['unsupported_risk'] = detection_result.get('unsupported_risk')
-                    result['support_score'] = detection_result.get('support_score')
-                    result['hallucination_score'] = detection_result['hallucination_score']
-                    result['hallucination_details'] = {
-                        'num_contexts': detection_result['num_contexts'],
-                        'num_contradictions': detection_result['num_contradictions'],
-                        'num_answer_not_included': detection_result.get('num_answer_not_included'),
-                        'num_unsupported': detection_result.get('num_unsupported'),
-                        'aggregation': detection_result['aggregation']
+                    answer = self._normalize_generated_answer(answer)
+                    result = {
+                        "answer": answer,
+                        "num_docs_retrieved": len(retrieved_docs),
+                        "answer_quality_rewrite_attempted": True,
                     }
-                    for key in (
-                        "answer_include_risk",
-                        "answer_include_prob_mean",
-                        "answer_include_prob_topk",
-                        "answer_include_threshold",
-                        "answer_include_score",
-                        "hard_answer_not_included_rate",
-                        "unsupported_risk",
-                        "unsupported_prob_mean",
-                        "unsupported_prob_topk",
-                        "unsupported_threshold",
-                        "support_score",
-                        "best_context_index",
-                        "best_context_label",
-                        "best_context_scores",
-                        "hard_unsupported_rate",
-                        "hard_contradiction_rate",
-                        "hallucination_prob_mean",
-                        "hallucination_prob_topk",
-                        "contradiction_margin_mean",
-                        "contradiction_neutral_gap_mean",
-                    ):
-                        if key in detection_result:
-                            result['hallucination_details'][key] = detection_result[key]
+                    answer_quality = self._audit_answer_quality(
+                        query_text,
+                        answer,
+                        context_texts,
+                        aggregation_mode,
+                        False,
+                    )
 
-                    if detection_result['is_hallucination']:
-                        logger.warning(
-                            f"Hallucination detected! Score: {detection_result['hallucination_score']:.2f} "
-                            f"({detection_result['num_contradictions']}/{detection_result['num_contexts']} contexts)"
-                        )
-                    else:
-                        logger.info("No hallucinations detected")
+            detection_updates, detection_result = self._detect_generated_answer(
+                answer,
+                context_texts,
+                aggregation_mode,
+                query_text,
+                detect_hallucinations,
+            )
+            result.update(detection_updates)
+            if bool((self.answer_quality_config or {}).get("claim_level", False)):
+                answer_quality = self._audit_answer_quality(
+                    query_text,
+                    answer,
+                    context_texts,
+                    aggregation_mode,
+                    detect_hallucinations,
+                )
 
-                except Exception as e:
-                    logger.error(f"Hallucination detection failed: {e}")
-                    result['hallucination_detected'] = None
-                    result['hallucination_error'] = str(e)
-                    detection_result = None
-
-            elif detect_hallucinations and not self.hallucination_detector:
-                logger.warning("Hallucination detection requested but detector not available")
-                result['hallucination_detected'] = None
-                detection_result = None
-            else:
-                result['hallucination_detected'] = False
-                detection_result = None
+            if answer_quality:
+                result["answer_quality"] = answer_quality
+                result["answer_quality_rewrite_count"] = rewrite_count
+                result["answer_completeness_score"] = answer_quality.get("answer_completeness_score")
+                result["answer_completeness_risk"] = answer_quality.get("answer_completeness_risk")
+                result["answer_quality_missing_concepts"] = answer_quality.get("missing_concepts")
+                result["claim_include_rate"] = answer_quality.get("claim_include_rate")
+                result["claim_unsupported_rate"] = answer_quality.get("claim_unsupported_rate")
+                result["claim_answer_include_risk_max"] = answer_quality.get(
+                    "claim_answer_include_risk_max"
+                )
 
             # Adaptive gating
             if gating_enabled:
@@ -958,7 +1310,9 @@ class RAGPipeline:
                         "contradiction_prob_mean": 0.0,
                         "uncertainty_mean": 0.0
                     })
+                gating_stats.update(self._quality_stats(answer_quality))
 
+                model_requested_abstain = bool(result.get("model_requested_abstain"))
                 if model_requested_abstain:
                     gating_action = "abstain"
                     result['answer'] = abstain_message
@@ -1018,6 +1372,9 @@ class RAGPipeline:
                     'contradiction_rate': gating_config.get("contradiction_rate_threshold"),
                     'contradiction_prob': gating_config.get("contradiction_prob_threshold"),
                     'uncertainty': gating_config.get("uncertainty_threshold"),
+                    'min_answer_completeness_score': gating_config.get("min_answer_completeness_score"),
+                    'min_claim_include_rate': gating_config.get("min_claim_include_rate"),
+                    'max_claim_answer_include_risk': gating_config.get("max_claim_answer_include_risk"),
                     'source_consistency': gating_config.get("source_consistency_threshold"),
                     'min_retrieval_score': gating_config.get("min_retrieval_score"),
                     'min_mean_retrieval_score': gating_config.get("min_mean_retrieval_score"),
@@ -1444,7 +1801,9 @@ class RAGPipeline:
             reranker_top_k=reranker_top_k,
             hallucination_detector=hallucination_detector,
             gating_config=config.get('gating', {}),
+            retrieval_config=config.get('retrieval', {}),
             source_config=config.get('sources', {}),
+            answer_quality_config=config.get('answer_quality', {}),
             hallucination_aggregation=(
                 config.get("hallucination_aggregation")
                 or detector_config.get("aggregation")

@@ -5,6 +5,7 @@ LLM wrapper for HuggingFace models.
 from typing import List, Dict, Any, Optional
 import re
 import os
+from pathlib import Path
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from src.core.base_classes import BaseLLM
@@ -28,9 +29,11 @@ class HuggingFaceLLM(BaseLLM):
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         super().__init__(config)
 
-        self.model_name = self.config.get('model_name', 'meta-llama/Llama-2-7b-chat-hf')
         self.device = self.config.get('device', 'cpu')
         self.cache_folder = self.config.get('cache_folder', None)
+        self.model_name = self._resolve_local_model(
+            self.config.get('model_name', 'meta-llama/Llama-2-7b-chat-hf')
+        )
         # Backward-compatible alias:
         # many configs use `max_tokens`; prefer explicit `max_new_tokens` when present.
         self.max_new_tokens = self.config.get(
@@ -101,6 +104,36 @@ class HuggingFaceLLM(BaseLLM):
         except Exception as e:
             logger.error(f"Failed to load LLM {self.model_name}: {e}")
             raise
+
+    def _resolve_local_model(self, model_name: str) -> str:
+        """Resolve a Hugging Face repo id to a bundled local snapshot when present."""
+        raw_name = str(model_name)
+        model_path = Path(raw_name)
+        if model_path.exists():
+            return str(model_path)
+
+        if "/" not in raw_name:
+            return raw_name
+
+        cache_root = Path(self.cache_folder or "./models/llm")
+        snapshots_dir = cache_root / f"models--{raw_name.replace('/', '--')}" / "snapshots"
+        if not snapshots_dir.is_dir():
+            return raw_name
+
+        snapshots = sorted(
+            (
+                path for path in snapshots_dir.iterdir()
+                if path.is_dir() and (path / "config.json").exists()
+            ),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        if not snapshots:
+            return raw_name
+
+        resolved = str(snapshots[0])
+        logger.info("Resolved LLM %s to local snapshot: %s", raw_name, resolved)
+        return resolved
 
     def _resolve_dtype(self, raw_dtype: Any) -> Any:
         if raw_dtype is None:
@@ -260,10 +293,11 @@ class HuggingFaceLLM(BaseLLM):
         if quality_feedback:
             system_message = f"{system_message} {quality_feedback.strip()}"
         user_message = (
+            f"QUESTION: {query}\n\n"
             "CONTEXT:\n<<<\n"
             f"{context_text}\n"
             ">>>\n\n"
-            f"QUESTION: {query}"
+            "Answer the question using only the context above."
         )
 
         prompt = None

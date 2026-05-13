@@ -48,10 +48,12 @@ def main() -> None:
     index_only = args.index_only or os.getenv("INDEX_ONLY", "1") == "1"
     if index_only:
         llm_cfg = dict(config.get("llm", {}) or {})
+        llm_cfg["type"] = "none"
         llm_cfg["model_name"] = os.getenv("INDEX_LLM_MODEL", "sshleifer/tiny-gpt2")
         llm_cfg["device"] = os.getenv("INDEX_LLM_DEVICE", "cpu")
         llm_cfg["max_tokens"] = int(os.getenv("INDEX_LLM_MAX_TOKENS", "16"))
         config["llm"] = llm_cfg
+        config["reranker"] = {}
 
         detector_cfg = dict(config.get("hallucination_detector", {}) or {})
         detector_cfg["enabled"] = False

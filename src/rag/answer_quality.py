@@ -42,6 +42,20 @@ BROAD_QUESTION_MARKERS = (
 )
 
 SPECIFIC_UNSUPPORTED_MARKERS = (
+    "not establish",
+    "not established",
+    "does not establish",
+    "not specify",
+    "not specified",
+    "does not specify",
+    "no evidence",
+    "not stated",
+    "not explicitly",
+    "unsupported",
+    "missing evidence",
+)
+
+SPECIFIC_UNSUPPORTED_SUBJECT_MARKERS = (
     "deadline",
     "threshold",
     "template",
@@ -95,12 +109,14 @@ CONCEPT_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
     ("source systems", (r"\bsource systems?\b",)),
     ("remediation", (r"\bremediation\b", r"\bremediate\b", r"\bremedial\b")),
     ("temporary manual controls", (r"\btemporary\b", r"\bmanual workaround", r"\bmanual controls?\b")),
+    ("transition", (r"\btransition\b", r"\btransitional\b")),
     ("ownership", (r"\bownership\b", r"\bowner\b", r"\baccountability\b")),
     ("climate risk", (r"\bclimate risk\b", r"\bclimate-related\b")),
     ("ESG risk", (r"\besg\b", r"\benvironmental, social and governance\b")),
-    ("identify risks", (r"\bidentify\b", r"\bidentification\b")),
-    ("measure risks", (r"\bmeasure\b", r"\bmeasurement\b")),
-    ("manage risks", (r"\bmanage\b", r"\bmanagement\b")),
+    ("identify risks", (r"\bidentif(?:y|ies|ied|ying|ication)\b",)),
+    ("measure risks", (r"\bmeasur(?:e|es|ed|ing|ement)\b",)),
+    ("manage risks", (r"\bmanag(?:e|es|ed|ing|ement)\b",)),
+    ("monitor risks", (r"\bmonitor\b", r"\bmonitoring\b", r"\bongoing basis\b")),
     ("transition risk", (r"\btransition risk\b",)),
     ("materiality", (r"\bmateriality\b", r"\bmaterial\b")),
     ("capital planning", (r"\bcapital planning\b", r"\bcapital plan\b")),
@@ -112,10 +128,23 @@ CONCEPT_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
     ("cloud configuration", (r"\bcloud\b", r"\bconfiguration\b", r"\bconfigure\b")),
     ("security", (r"\bsecurity\b", r"\binformation security\b")),
     ("ICT risk management", (r"\bict\b", r"\bict risk\b")),
-    ("incident management", (r"\bincident management\b", r"\bincident response\b")),
+    ("protect", (r"\bprotect(?:s|ed|ing|ion)?\b", r"\bprevent(?:s|ed|ing|ion)?\b", r"\bsafeguards?\b")),
+    ("detect", (r"\bdetect(?:s|ed|ing|ion)?\b", r"\bidentify potential vulnerabilities\b", r"\bmonitor(?:s|ed|ing)?\b")),
+    ("respond", (r"\brespond(?:s|ed|ing)?\b", r"\bresponse\b", r"\bincident response\b", r"\bproblem management\b")),
+    ("recover", (r"\brecover(?:s|ed|ing|y)?\b", r"\bbackup\b", r"\bbackups\b", r"\bbusiness continuity\b")),
+    ("incident management", (r"\bincident management\b", r"\bincident response\b", r"\bproblem management\b")),
     ("business continuity", (r"\bbusiness continuity\b", r"\bcontinuity\b")),
     ("access control", (r"\baccess control\b", r"\baccess rights?\b")),
-    ("vulnerability and testing", (r"\bvulnerabilit", r"\btesting\b", r"\bpenetration\b")),
+    ("vulnerability and testing", (r"\bvulnerabilit", r"\btest(?:s|ed|ing)?\b", r"\bpenetration\b", r"\bassess(?:ed|ment|ing)?\b")),
+    ("operational resilience", (r"\boperational resilience\b",)),
+    ("important business services", (r"\bimportant business services?\b",)),
+    ("impact tolerance", (r"\bimpact tolerance\b", r"\bimpact tolerances\b")),
+    ("maximum tolerable disruption", (r"\bmaximum tolerable disruption\b", r"\bmaximum tolerable level\b", r"\btolerable disruption\b")),
+    ("risk culture", (r"\brisk culture\b",)),
+    ("staff training", (r"\bstaff training\b", r"\btraining\b")),
+    ("board oversight", (r"\bboard oversight\b", r"\bboard\b", r"\bmanagement body\b")),
+    ("remuneration", (r"\bremuneration\b", r"\bincentives?\b")),
+    ("risk profile", (r"\brisk profile\b", r"\brisk appetite\b")),
     (
         "no exact requirement",
         (
@@ -183,13 +212,64 @@ def infer_required_concepts(
     query_norm = _normalize(query)
     evidence_norm = _normalize("\n\n".join(contexts[:4]))
     broad_question = any(marker in query_norm for marker in BROAD_QUESTION_MARKERS)
-    specific_unsupported = any(marker in query_norm for marker in SPECIFIC_UNSUPPORTED_MARKERS)
+    specific_unsupported = (
+        any(marker in query_norm for marker in SPECIFIC_UNSUPPORTED_MARKERS)
+        and any(marker in query_norm for marker in SPECIFIC_UNSUPPORTED_SUBJECT_MARKERS)
+    )
 
     scored: list[tuple[int, int, str]] = []
     if specific_unsupported:
         forced = {"no exact requirement", "avoid overclaiming", "evidence limits"}
     else:
         forced = set()
+    if "manual workaround" in query_norm or "manual workarounds" in query_norm:
+        forced.update({
+            "temporary manual controls",
+            "transition",
+            "controls",
+            "ownership",
+            "auditability",
+            "remediation",
+            "data lineage",
+        })
+    if "climate" in query_norm or "esg" in query_norm or "environmental" in query_norm:
+        forced.update({
+            "identify risks",
+            "measure risks",
+            "manage risks",
+            "monitor risks",
+            "governance",
+            "transition risk",
+            "climate risk",
+            "ESG risk",
+        })
+    if "ict" in query_norm or "security risk management" in query_norm:
+        forced.update({
+            "governance",
+            "identify risks",
+            "protect",
+            "detect",
+            "respond",
+            "recover",
+            "vulnerability and testing",
+            "incident management",
+        })
+    if "impact tolerance" in query_norm or "operational resilience" in query_norm:
+        forced.update({
+            "important business services",
+            "maximum tolerable disruption",
+            "impact tolerance",
+            "operational resilience",
+        })
+    if "risk culture" in query_norm or "remuneration" in query_norm or "staff training" in query_norm:
+        forced.update({
+            "risk culture",
+            "staff training",
+            "board oversight",
+            "risk profile",
+            "remuneration",
+            "governance",
+        })
 
     for idx, (concept, patterns) in enumerate(CONCEPT_PATTERNS):
         query_hit = _pattern_hit(query_norm, patterns)
@@ -249,7 +329,10 @@ def audit_answer_quality(
     claims = split_claims(answer, max_claims=int(cfg.get("max_claims", 6)))
     query_norm = _normalize(query)
     answer_has_refutation = any(marker in answer_norm for marker in REFUTATION_MARKERS)
-    asks_specific_unsupported = any(marker in query_norm for marker in SPECIFIC_UNSUPPORTED_MARKERS)
+    asks_specific_unsupported = (
+        any(marker in query_norm for marker in SPECIFIC_UNSUPPORTED_MARKERS)
+        and any(marker in query_norm for marker in SPECIFIC_UNSUPPORTED_SUBJECT_MARKERS)
+    )
 
     return {
         "required_concepts": concepts,

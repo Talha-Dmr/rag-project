@@ -3,7 +3,7 @@ Model utilities for loading and initializing models.
 """
 
 import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer
 from typing import Optional, Tuple, Dict, Any
 from pathlib import Path
 import logging
@@ -46,11 +46,20 @@ def load_model_and_tokenizer(
         local_files_only=local_files_only
     )
 
+    model_config = AutoConfig.from_pretrained(
+        model_name,
+        cache_dir=cache_dir,
+        local_files_only=local_files_only,
+    )
+    if hasattr(model_config, "reference_compile"):
+        model_config.reference_compile = False
+    model_config.num_labels = num_labels
+
     # Load model
     # Force fp32 weights so AMP + GradScaler work reliably.
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
-        num_labels=num_labels,
+        config=model_config,
         cache_dir=cache_dir,
         torch_dtype=torch.float32,
         local_files_only=local_files_only

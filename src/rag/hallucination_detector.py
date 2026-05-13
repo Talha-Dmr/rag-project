@@ -229,6 +229,38 @@ class HallucinationDetector:
             )
             return torch.load(state_path, map_location="cpu", weights_only=False)
 
+    def _resolve_local_base_model(self, base_model: Optional[str]) -> Optional[str]:
+        """Resolve a Hugging Face repo id to a bundled local snapshot when present."""
+        if not base_model:
+            return base_model
+
+        base_path = Path(base_model)
+        if base_path.exists():
+            return str(base_path)
+
+        if "/" not in base_model:
+            return base_model
+
+        cache_root = Path("models") / "training" / f"models--{base_model.replace('/', '--')}"
+        snapshots_dir = cache_root / "snapshots"
+        if not snapshots_dir.is_dir():
+            return base_model
+
+        snapshots = sorted(
+            (
+                path for path in snapshots_dir.iterdir()
+                if path.is_dir() and (path / "config.json").exists()
+            ),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        if not snapshots:
+            return base_model
+
+        resolved = str(snapshots[0])
+        logger.info("Resolved base model %s to local snapshot: %s", base_model, resolved)
+        return resolved
+
     def _load_model(self) -> None:
         """Load model and tokenizer."""
         model_pt = self.model_path / "model.pt"
@@ -239,14 +271,16 @@ class HallucinationDetector:
         # root pytorch_model.bin when both exist; some exports keep a PEFT state
         # dict at the root that is not directly loadable as a plain HF model.
         if (model_dir / "adapter_config.json").exists():
-            base_model = self.base_model
+            base_model = self._resolve_local_base_model(self.base_model)
             if not base_model:
                 adapter_config_path = model_dir / "adapter_config.json"
                 try:
                     import json
 
                     adapter_config = json.loads(adapter_config_path.read_text(encoding="utf-8"))
-                    base_model = adapter_config.get("base_model_name_or_path")
+                    base_model = self._resolve_local_base_model(
+                        adapter_config.get("base_model_name_or_path")
+                    )
                 except Exception:
                     base_model = None
             if not base_model:
@@ -296,7 +330,7 @@ class HallucinationDetector:
 
         # Case 1: training checkpoint (model.pt)
         if model_pt.exists():
-            base_model = self.base_model
+            base_model = self._resolve_local_base_model(self.base_model)
             lora_config = self.lora_config
             checkpoint_state = None
             checkpoint_weights = torch.load(model_pt, map_location=self.device, weights_only=False)
@@ -307,7 +341,9 @@ class HallucinationDetector:
                 try:
                     checkpoint_state = self._load_checkpoint_metadata(state_path)
                     cfg = checkpoint_state.get("config", {})
-                    base_model = base_model or cfg.get("model", {}).get("base_model")
+                    base_model = base_model or self._resolve_local_base_model(
+                        cfg.get("model", {}).get("base_model")
+                    )
                     lora_config = lora_config or cfg.get("model", {}).get("lora")
                 except Exception as exc:
                     logger.warning(
@@ -1040,12 +1076,34 @@ class HallucinationDetector:
                 'is_hallucination': False,
                 'answer_include_detected': False,
                 'answer_include_risk': 1.0,
+                'answer_include_prob_mean': 1.0,
+                'answer_include_prob_topk': 1.0,
+                'answer_include_threshold': self.answer_include_threshold,
                 'answer_include_score': 0.0,
                 'is_unsupported': True,
                 'unsupported_risk': 1.0,
+                'unsupported_prob_mean': 1.0,
+                'unsupported_prob_topk': 1.0,
+                'unsupported_threshold': self.unsupported_threshold,
+                'support_score': 0.0,
+                'best_context_index': None,
+                'best_context_label': None,
+                'best_context_scores': None,
                 'individual_results': [],
                 'hallucination_score': 0.0,
-                'note': 'No contexts available'
+                'hard_contradiction_rate': 0.0,
+                'hard_answer_not_included_rate': 1.0,
+                'hard_unsupported_rate': 1.0,
+                'hallucination_prob_mean': 0.0,
+                'hallucination_prob_topk': 0.0,
+                'contradiction_margin_mean': 0.0,
+                'contradiction_neutral_gap_mean': 0.0,
+                'num_contexts': 0,
+                'num_contradictions': 0,
+                'num_answer_not_included': 0,
+                'num_unsupported': 0,
+                'aggregation': aggregation,
+                'note': 'No contexts available',
             }
 
         # Check each context

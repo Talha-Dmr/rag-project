@@ -1128,8 +1128,13 @@ class RAGPipeline:
             return self._run_cuda_stage("retrieval", self.retriever.retrieve, query_text, k=k)
 
         per_query_k = int(expansion_cfg.get("per_query_k", k) or k)
+        max_candidates = int(expansion_cfg.get("max_candidates", max(k, per_query_k)) or max(k, per_query_k))
+        merge_strategy = str(expansion_cfg.get("merge_strategy", "score") or "score").strip().lower()
         merged: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+        buckets: list[list[Dict[str, Any]]] = []
+        round_robin_seen_keys: set[str] = set()
         for expanded_query in queries:
+            bucket: list[Dict[str, Any]] = []
             retrieved = self._run_cuda_stage(
                 "retrieval",
                 self.retriever.retrieve,
@@ -1144,13 +1149,27 @@ class RAGPipeline:
                 existing = merged.get(key)
                 if existing is None or float(doc.get("score", 0.0) or 0.0) > float(existing.get("score", 0.0) or 0.0):
                     merged[key] = doc
+                if key not in round_robin_seen_keys:
+                    round_robin_seen_keys.add(key)
+                    bucket.append(doc)
+            buckets.append(bucket)
 
-        docs = sorted(
-            merged.values(),
-            key=lambda item: float(item.get("score", 0.0) or 0.0),
-            reverse=True,
-        )
-        max_candidates = int(expansion_cfg.get("max_candidates", max(k, per_query_k)) or max(k, per_query_k))
+        if merge_strategy == "round_robin":
+            docs = []
+            for rank in range(per_query_k):
+                for bucket in buckets:
+                    if rank < len(bucket):
+                        docs.append(bucket[rank])
+                    if len(docs) >= max_candidates:
+                        break
+                if len(docs) >= max_candidates:
+                    break
+        else:
+            docs = sorted(
+                merged.values(),
+                key=lambda item: float(item.get("score", 0.0) or 0.0),
+                reverse=True,
+            )
         logger.info(
             "Query expansion retrieved %d unique candidates from %d queries",
             len(docs),
@@ -1494,11 +1513,17 @@ class RAGPipeline:
         aggregation_mode = hallucination_aggregation or self.hallucination_aggregation or "any"
 
         logger.info(f"Retrieving top {current_k} documents for candidate verification...")
-        retrieved_docs = self.retriever.retrieve(query_text, k=current_k)
+        retrieved_docs = self._retrieve_documents(query_text, current_k)
 
         if self.reranker and retrieved_docs:
             rerank_top_k = self.reranker_top_k or current_k
-            retrieved_docs = self.reranker.rerank(query_text, retrieved_docs, top_k=rerank_top_k)
+            retrieved_docs = self._run_cuda_stage(
+                "reranker",
+                self.reranker.rerank,
+                query_text,
+                retrieved_docs,
+                top_k=rerank_top_k,
+            )
 
         context_texts = [doc["content"] for doc in retrieved_docs]
         detection_result = self.hallucination_detector.verify_answer_with_contexts(

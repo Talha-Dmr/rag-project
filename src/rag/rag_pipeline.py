@@ -7,6 +7,12 @@ from pathlib import Path
 from collections import OrderedDict
 import re
 import numpy as np
+
+try:
+    import torch
+except Exception:  # pragma: no cover - torch is optional for some tooling paths.
+    torch = None
+
 from src.dataset.data_manager import DataManager
 from src.chunking.base_chunker import ChunkerFactory
 from src.embeddings.base_embedder import EmbedderFactory
@@ -124,6 +130,7 @@ class RAGPipeline:
         hallucination_detector=None,
         gating_config: Optional[Dict[str, Any]] = None,
         retrieval_config: Optional[Dict[str, Any]] = None,
+        runtime_config: Optional[Dict[str, Any]] = None,
         source_config: Optional[Dict[str, Any]] = None,
         answer_quality_config: Optional[Dict[str, Any]] = None,
         hallucination_aggregation: str = "any",
@@ -151,6 +158,7 @@ class RAGPipeline:
         self.hallucination_detector = hallucination_detector
         self.gating_config = gating_config or {}
         self.retrieval_config = retrieval_config or {}
+        self.runtime_config = runtime_config or {}
         self.source_config = source_config or {}
         self.answer_quality_config = answer_quality_config or {}
         self.hallucination_aggregation = hallucination_aggregation or "any"
@@ -163,6 +171,45 @@ class RAGPipeline:
             logger.info("RAG Pipeline initialized with hallucination detection")
         else:
             logger.info("RAG Pipeline initialized")
+
+    def _sequential_cuda_config(self) -> Dict[str, Any]:
+        cfg = self.runtime_config.get("sequential_cuda", {})
+        return cfg if isinstance(cfg, dict) else {}
+
+    def _sequential_cuda_enabled(self) -> bool:
+        cfg = self._sequential_cuda_config()
+        return bool(cfg.get("enabled", False)) and torch is not None and torch.cuda.is_available()
+
+    def _cuda_barrier(self, stage: str, when: str) -> None:
+        if not self._sequential_cuda_enabled():
+            return
+
+        cfg = self._sequential_cuda_config()
+        try:
+            if bool(cfg.get("synchronize", True)):
+                torch.cuda.synchronize()
+            empty_before = bool(cfg.get("empty_cache_before", False)) and when == "before"
+            empty_after = bool(cfg.get("empty_cache_after", False)) and when == "after"
+            if empty_before or empty_after:
+                torch.cuda.empty_cache()
+            if bool(cfg.get("log_memory", False)) and when == "after":
+                allocated = torch.cuda.memory_allocated() / (1024 ** 3)
+                reserved = torch.cuda.memory_reserved() / (1024 ** 3)
+                logger.info(
+                    "CUDA stage %s complete: allocated=%.2fGiB reserved=%.2fGiB",
+                    stage,
+                    allocated,
+                    reserved,
+                )
+        except Exception as exc:
+            logger.warning("CUDA barrier failed around %s/%s: %s", stage, when, exc)
+
+    def _run_cuda_stage(self, stage: str, fn, *args, **kwargs):
+        self._cuda_barrier(stage, "before")
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            self._cuda_barrier(stage, "after")
 
     def index_documents(
         self,
@@ -235,7 +282,9 @@ class RAGPipeline:
             logger.info("Checking for hallucinations...")
             try:
                 result["hallucination_detector_ran"] = True
-                detection_result = self.hallucination_detector.verify_answer_with_contexts(
+                detection_result = self._run_cuda_stage(
+                    "detector",
+                    self.hallucination_detector.verify_answer_with_contexts,
                     answer=answer,
                     contexts=context_texts,
                     aggregation=aggregation_mode,
@@ -345,7 +394,9 @@ class RAGPipeline:
 
         for claim in claims:
             try:
-                claim_result = self.hallucination_detector.verify_answer_with_contexts(
+                claim_result = self._run_cuda_stage(
+                    "claim_detector",
+                    self.hallucination_detector.verify_answer_with_contexts,
                     answer=claim,
                     contexts=context_texts,
                     aggregation=claim_aggregation,
@@ -1074,12 +1125,18 @@ class RAGPipeline:
         expansion_cfg = retrieval_cfg.get("query_expansion", {})
         queries = self._expanded_retrieval_queries(query_text)
         if len(queries) == 1:
-            return self.retriever.retrieve(query_text, k=k)
+            return self._run_cuda_stage("retrieval", self.retriever.retrieve, query_text, k=k)
 
         per_query_k = int(expansion_cfg.get("per_query_k", k) or k)
         merged: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
         for expanded_query in queries:
-            for doc in self.retriever.retrieve(expanded_query, k=per_query_k):
+            retrieved = self._run_cuda_stage(
+                "retrieval",
+                self.retriever.retrieve,
+                expanded_query,
+                k=per_query_k,
+            )
+            for doc in retrieved:
                 content = str(doc.get("content", ""))
                 metadata = doc.get("metadata") or {}
                 source_key = metadata.get("source") or metadata.get("file_path") or metadata.get("title") or ""
@@ -1158,7 +1215,9 @@ class RAGPipeline:
             if self.reranker:
                 logger.info("Applying reranker...")
                 rerank_top_k = self.reranker_top_k or current_k
-                reranked_docs = self.reranker.rerank(
+                reranked_docs = self._run_cuda_stage(
+                    "reranker",
+                    self.reranker.rerank,
                     query_text,
                     retrieved_docs,
                     top_k=rerank_top_k,
@@ -1206,7 +1265,12 @@ class RAGPipeline:
             # Generate answer
             logger.info("Generating answer...")
             context_texts = [doc['content'] for doc in retrieved_docs]
-            answer = self.llm.generate_with_context(query_text, context_texts)
+            answer = self._run_cuda_stage(
+                "llm_generate",
+                self.llm.generate_with_context,
+                query_text,
+                context_texts,
+            )
             answer = self._normalize_generated_answer(answer)
 
             result = {
@@ -1236,7 +1300,9 @@ class RAGPipeline:
                 if feedback:
                     rewrite_count = 1
                     logger.info("Rewriting answer for low completeness/claim support")
-                    answer = self.llm.generate_with_context(
+                    answer = self._run_cuda_stage(
+                        "llm_rewrite",
+                        self.llm.generate_with_context,
                         query_text,
                         context_texts,
                         max_tokens=self.answer_quality_config.get("rewrite_max_tokens"),
@@ -1802,6 +1868,7 @@ class RAGPipeline:
             hallucination_detector=hallucination_detector,
             gating_config=config.get('gating', {}),
             retrieval_config=config.get('retrieval', {}),
+            runtime_config=config.get('runtime', {}),
             source_config=config.get('sources', {}),
             answer_quality_config=config.get('answer_quality', {}),
             hallucination_aggregation=(

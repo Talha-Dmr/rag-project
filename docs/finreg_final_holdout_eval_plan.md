@@ -62,6 +62,46 @@ The stable local configuration is slow because:
 
 So the runtime is dominated by full RAG orchestration, not by Qwen alone.
 
+## Faster GPU-Sequential Option
+
+The CPU-stable quality config is conservative. For the RTX 3090 machine, use the GPU-sequential config when speed matters:
+
+```text
+config/gating_finreg_local_qwen3_modernbert_detector_v3_hardmix_calibrated_real_corpus_section_rerank_quality_gpu_sequential.yaml
+```
+
+This config keeps all major models on CUDA:
+
+- Qwen LLM on CUDA
+- embedding model on CUDA
+- cross-encoder reranker on CUDA
+- ModernBERT detector on CUDA
+
+It also enables:
+
+```yaml
+runtime:
+  sequential_cuda:
+    enabled: true
+    synchronize: true
+    empty_cache_after: true
+```
+
+That means the pipeline runs GPU stages sequentially and inserts CUDA synchronization barriers between retrieval, reranking, generation, rewrite, and detection. This is intended to use the 24GB VRAM more efficiently while reducing the long-run CUDA context errors that appeared when multiple model components shared CUDA without explicit barriers.
+
+Example:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_finreg_real_life_benchmark.py `
+  --mode full-rag `
+  --questions benchmarks\finreg\final_holdout_80_questions.jsonl `
+  --config gating_finreg_local_qwen3_modernbert_detector_v3_hardmix_calibrated_real_corpus_section_rerank_quality_gpu_sequential `
+  --k 24 `
+  --run-name final_holdout80_quality_gpu_sequential
+```
+
+If this config still hits CUDA instability on a long run, fall back to the CPU-stable quality config for the final benchmark.
+
 ## Practical Run Strategy
 
 For a report-ready comparison, run fewer expensive variants first:

@@ -1,0 +1,116 @@
+# Full FinReg RAG config with section-aware retrieval, cross-encoder reranking,
+# V3 hardmix detector, answer-quality rewrite/audit, and sequential CUDA runtime.
+
+runtime:
+  sequential_cuda:
+    enabled: true
+    # CUDA kernels are asynchronous. Synchronizing between retrieval, reranking,
+    # generation, and detection prevents one component's queued kernels from
+    # colliding with the next component during long local benchmark runs.
+    synchronize: true
+    # Keep models resident on VRAM; clear only allocator cache after stages.
+    empty_cache_before: false
+    empty_cache_after: true
+    log_memory: false
+
+data_loader:
+  default_loader: json
+  json:
+    content_field: content
+
+chunking:
+  strategy: section_aware
+  config:
+    max_chunk_size: 1200
+    min_chunk_size: 250
+    chunk_overlap: 120
+    max_heading_length: 120
+    allow_titlecase_headings: true
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cuda
+  cache_folder: ./models/embeddings
+  batch_size: 32
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg_real_section
+    collection_name: rag_finreg_real_section
+
+llm:
+  model_name: Qwen/Qwen2.5-3B-Instruct
+  device: cuda
+  cache_folder: ./models/llm
+  max_tokens: 192
+  max_prompt_tokens: 3072
+  temperature: 0.0
+  top_p: 0.9
+  load_in_8bit: false
+  use_chat_template: true
+  # The GPU-sequential config prioritizes throughput: use the model cache and
+  # let Transformers pick the CUDA attention implementation.
+  use_cache: true
+  clear_cuda_cache_after_generate: true
+
+retrieval:
+  k: 24
+  score_threshold: 0.0
+  query_expansion:
+    enabled: true
+    max_queries: 3
+    per_query_k: 24
+    max_candidates: 48
+    fallback_terms: "governance controls monitoring evidence limitations"
+
+reranker:
+  type: cross_encoder
+  model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
+  device: cuda
+  top_k: 10
+
+hallucination_detector:
+  enabled: true
+  model_path: models/checkpoints/finregbench_modernbert_detector_v3_hardmix/best_model
+  base_model: tasksource/ModernBERT-base-nli
+  device: cuda
+  max_length: 1024
+  batch_size: 4
+  hypothesis_format: question_and_candidate_answer
+  risk_mode: answer_include
+  aggregation: answer_include_best
+  answer_include_threshold: 0.97
+
+hallucination_aggregation: answer_include_best
+
+answer_quality:
+  enabled: true
+  min_concept_coverage: 0.45
+  rewrite_on_low_coverage: true
+  max_rewrites: 1
+  rewrite_max_tokens: 220
+  max_required_concepts: 7
+  max_feedback_concepts: 5
+  # Claim-level checking is implemented but kept off by default because repeated
+  # ModernBERT calls caused CUDA instability on the RTX 3090 test machine.
+  claim_level: false
+  max_claims: 5
+  claim_aggregation: answer_include_best
+  min_claim_include_rate: 0.75
+  max_claim_answer_include_risk: 0.97
+
+gating:
+  enabled: true
+  strategy: abstain
+  contradiction_prob_metric: answer_include_risk
+  contradiction_prob_threshold: 0.97
+  contradiction_rate_metric: hard_contradiction_rate
+  contradiction_rate_threshold: 0.40
+  uncertainty_threshold: 1.0
+  abstain_message: "I don't have enough reliable evidence to support that answer."
+
+sources:
+  max_sources: 8
+  include_scores: true

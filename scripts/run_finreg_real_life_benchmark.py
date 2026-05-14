@@ -166,6 +166,8 @@ def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
         "no evidence",
         "no explicit",
         "not explicitly",
+        "not used",
+        "not related",
         "not in the context",
         "not supported",
         "cannot conclude",
@@ -348,6 +350,11 @@ def full_rag_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         for row in rows
         if isinstance(row.get("answer_completeness_score"), (int, float))
     ]
+    context_coverage_values = [
+        float(row["context_coverage"])
+        for row in rows
+        if isinstance(row.get("context_coverage"), (int, float))
+    ]
     claim_include_values = [
         float(row["claim_include_rate"])
         for row in rows
@@ -379,6 +386,7 @@ def full_rag_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "mean_answer_include_risk": mean(risk_values),
         "mean_answer_include_score": mean(score_values),
         "mean_answer_completeness_score": mean(completeness_values),
+        "mean_context_coverage": mean(context_coverage_values),
         "mean_claim_include_rate": mean(claim_include_values),
         "answer_quality_rewrite_count": rewrite_count,
         "answer_quality_rewrite_rate": safe_div(rewrite_count, len(rows)),
@@ -458,6 +466,7 @@ def write_full_rag_markdown(path: Path, config_name: str, questions_path: Path, 
         f"| Mean answer include risk | {summary['mean_answer_include_risk']} |",
         f"| Mean answer include score | {summary['mean_answer_include_score']} |",
         f"| Mean answer completeness score | {summary.get('mean_answer_completeness_score')} |",
+        f"| Mean context coverage | {summary.get('mean_context_coverage')} |",
         f"| Mean claim include rate | {summary.get('mean_claim_include_rate')} |",
         f"| Answer quality rewrite rate | {summary.get('answer_quality_rewrite_rate')} |",
         f"| Mean latency sec | {summary['mean_latency_sec']} |",
@@ -605,7 +614,9 @@ def run_full_rag(args: argparse.Namespace) -> None:
             "answer_quality_rewrite_count": result.get("answer_quality_rewrite_count"),
             "answer_completeness_score": result.get("answer_completeness_score"),
             "answer_completeness_risk": result.get("answer_completeness_risk"),
+            "context_coverage": result.get("context_coverage"),
             "answer_quality_missing_concepts": result.get("answer_quality_missing_concepts"),
+            "answer_quality_missing_context_concepts": result.get("answer_quality_missing_context_concepts"),
             "claim_include_rate": result.get("claim_include_rate"),
             "claim_unsupported_rate": result.get("claim_unsupported_rate"),
             "claim_answer_include_risk_max": result.get("claim_answer_include_risk_max"),
@@ -627,7 +638,8 @@ def run_full_rag(args: argparse.Namespace) -> None:
             f"abstain={row['abstained']} "
             f"expected_behavior={row.get('expected_behavior_match')} "
             f"include_risk={row.get('answer_include_risk')} "
-            f"complete={row.get('answer_completeness_score')}"
+            f"complete={row.get('answer_completeness_score')} "
+            f"context={row.get('context_coverage')}"
         )
         print(f"  A: {short(answer)}")
         write_jsonl(partial_jsonl, rows)
@@ -652,9 +664,11 @@ def run_full_rag(args: argparse.Namespace) -> None:
         "answer_include_risk",
         "answer_include_score",
         "answer_completeness_score",
+        "context_coverage",
         "claim_include_rate",
         "answer_quality_rewrite_count",
         "answer_quality_missing_concepts",
+        "answer_quality_missing_context_concepts",
         "expected_behavior_match",
         "expected_point_coverage",
         "forbidden_claim_hit_count",

@@ -470,6 +470,7 @@ class RAGPipeline:
             return {
                 "answer_completeness_score": 1.0,
                 "answer_completeness_risk": 0.0,
+                "context_coverage": 1.0,
                 "claim_include_rate": 1.0,
                 "claim_unsupported_rate": 0.0,
                 "claim_answer_include_risk_max": 0.0,
@@ -477,6 +478,7 @@ class RAGPipeline:
         return {
             "answer_completeness_score": float(audit.get("answer_completeness_score", 1.0) or 0.0),
             "answer_completeness_risk": float(audit.get("answer_completeness_risk", 0.0) or 0.0),
+            "context_coverage": float(audit.get("context_coverage", 1.0) or 0.0),
             "claim_include_rate": float(audit.get("claim_include_rate", 1.0) or 0.0),
             "claim_unsupported_rate": float(audit.get("claim_unsupported_rate", 0.0) or 0.0),
             "claim_answer_include_risk_max": float(
@@ -488,12 +490,15 @@ class RAGPipeline:
         if not audit or not bool((self.answer_quality_config or {}).get("rewrite_on_low_coverage", False)):
             return False
         min_coverage = float(self.answer_quality_config.get("min_concept_coverage", 0.55))
+        min_context_coverage = float(self.answer_quality_config.get("min_context_coverage", min_coverage))
         min_claim_rate = float(self.answer_quality_config.get("min_claim_include_rate", 0.75))
         max_claim_risk = float(self.answer_quality_config.get("max_claim_answer_include_risk", 0.97))
         has_required = bool(audit.get("required_concepts"))
         if bool(audit.get("asks_specific_unsupported")) and audit.get("missing_concepts"):
             return True
         if has_required and float(audit.get("answer_completeness_score", 1.0)) < min_coverage:
+            return True
+        if has_required and float(audit.get("context_coverage", 1.0)) < min_context_coverage:
             return True
         if float(audit.get("claim_include_rate", 1.0)) < min_claim_rate:
             return True
@@ -993,6 +998,7 @@ class RAGPipeline:
             stats, gating_config, "uncertainty_metric", "uncertainty_mean", 0.0
         )
         answer_completeness_score = stats.get("answer_completeness_score", 1.0)
+        context_coverage = stats.get("context_coverage", 1.0)
         claim_include_rate = stats.get("claim_include_rate", 1.0)
         claim_answer_include_risk_max = stats.get("claim_answer_include_risk_max", 0.0)
         source_consistency = stats.get("source_consistency")
@@ -1003,6 +1009,7 @@ class RAGPipeline:
         contradiction_prob_threshold = gating_config.get("contradiction_prob_threshold", 0.5)
         uncertainty_threshold = gating_config.get("uncertainty_threshold", 0.3)
         min_answer_completeness = gating_config.get("min_answer_completeness_score")
+        min_context_coverage = gating_config.get("min_context_coverage")
         min_claim_include_rate = gating_config.get("min_claim_include_rate")
         max_claim_answer_include_risk = gating_config.get("max_claim_answer_include_risk")
         min_retrieval_score = gating_config.get("min_retrieval_score")
@@ -1031,6 +1038,11 @@ class RAGPipeline:
             and isinstance(answer_completeness_score, (int, float))
             and answer_completeness_score < float(min_answer_completeness)
         )
+        context_coverage_trigger = (
+            isinstance(min_context_coverage, (int, float))
+            and isinstance(context_coverage, (int, float))
+            and context_coverage < float(min_context_coverage)
+        )
         claim_include_trigger = (
             isinstance(min_claim_include_rate, (int, float))
             and isinstance(claim_include_rate, (int, float))
@@ -1047,6 +1059,7 @@ class RAGPipeline:
         stats["gate_trigger_retrieval_low"] = float(1.0 if retrieval_low else 0.0)
         stats["gate_trigger_source_consistency"] = float(1.0 if source_consistency_trigger else 0.0)
         stats["gate_trigger_answer_completeness"] = float(1.0 if completeness_trigger else 0.0)
+        stats["gate_trigger_context_coverage"] = float(1.0 if context_coverage_trigger else 0.0)
         stats["gate_trigger_claim_include"] = float(1.0 if claim_include_trigger else 0.0)
         stats["gate_trigger_claim_risk"] = float(1.0 if claim_risk_trigger else 0.0)
 
@@ -1061,6 +1074,7 @@ class RAGPipeline:
             uncertainty >= uncertainty_threshold or
             retrieval_low or
             completeness_trigger or
+            context_coverage_trigger or
             claim_include_trigger or
             claim_risk_trigger
         )
@@ -1363,6 +1377,8 @@ class RAGPipeline:
                 result["answer_quality_rewrite_count"] = rewrite_count
                 result["answer_completeness_score"] = answer_quality.get("answer_completeness_score")
                 result["answer_completeness_risk"] = answer_quality.get("answer_completeness_risk")
+                result["context_coverage"] = answer_quality.get("context_coverage")
+                result["answer_quality_missing_context_concepts"] = answer_quality.get("missing_context_concepts")
                 result["answer_quality_missing_concepts"] = answer_quality.get("missing_concepts")
                 result["claim_include_rate"] = answer_quality.get("claim_include_rate")
                 result["claim_unsupported_rate"] = answer_quality.get("claim_unsupported_rate")
@@ -1458,6 +1474,7 @@ class RAGPipeline:
                     'contradiction_prob': gating_config.get("contradiction_prob_threshold"),
                     'uncertainty': gating_config.get("uncertainty_threshold"),
                     'min_answer_completeness_score': gating_config.get("min_answer_completeness_score"),
+                    'min_context_coverage': gating_config.get("min_context_coverage"),
                     'min_claim_include_rate': gating_config.get("min_claim_include_rate"),
                     'max_claim_answer_include_risk': gating_config.get("max_claim_answer_include_risk"),
                     'source_consistency': gating_config.get("source_consistency_threshold"),

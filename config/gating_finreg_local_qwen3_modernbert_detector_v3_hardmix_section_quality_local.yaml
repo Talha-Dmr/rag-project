@@ -72,6 +72,9 @@ hallucination_aggregation: answer_include_best
 answer_quality:
   enabled: true
   min_concept_coverage: 0.70
+  min_context_coverage: 0.70
+  allow_context_concept_expansion: true
+  context_expansion_min_query_concepts: 3
   rewrite_on_low_coverage: true
   max_rewrites: 1
   rewrite_max_tokens: 160
@@ -92,6 +95,7 @@ gating:
   contradiction_rate_threshold: 0.40
   uncertainty_threshold: 1.0
   min_answer_completeness_score: 0.40
+  min_context_coverage: 0.40
   abstain_message: "I don't have enough reliable evidence to support that answer."
 
 sources:

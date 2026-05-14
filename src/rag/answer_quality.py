@@ -9,7 +9,8 @@ answers.
 from __future__ import annotations
 
 import re
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 
 SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
@@ -39,6 +40,13 @@ BROAD_QUESTION_MARKERS = (
     "responsibilities",
     "connect",
     "fit",
+)
+
+NARROW_CONTEXT_EXPANSION_MARKERS = (
+    "mainly used",
+    "if evidence supports",
+    "not public",
+    "but not",
 )
 
 SPECIFIC_UNSUPPORTED_MARKERS = (
@@ -139,7 +147,18 @@ CONCEPT_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
     ("operational resilience", (r"\boperational resilience\b",)),
     ("important business services", (r"\bimportant business services?\b",)),
     ("impact tolerance", (r"\bimpact tolerance\b", r"\bimpact tolerances\b")),
-    ("maximum tolerable disruption", (r"\bmaximum tolerable disruption\b", r"\bmaximum tolerable level\b", r"\btolerable disruption\b")),
+    (
+        "maximum tolerable disruption",
+        (
+            r"\bmaximum tolerable disruption\b",
+            r"\bmaximum tolerable level\b",
+            r"\btolerable disruption\b",
+            r"\bacceptable level of disruption\b",
+        ),
+    ),
+    ("intraday liquidity", (r"\bintraday liquidity\b",)),
+    ("payment and settlement behaviour", (r"\bpayment\b", r"\bsettlement\b", r"\bclearing systems?\b")),
+    ("cash flow monitoring", (r"\bcash flows?\b", r"\bcash flow monitoring\b", r"\bliquid resources\b")),
     ("risk culture", (r"\brisk culture\b",)),
     ("staff training", (r"\bstaff training\b", r"\btraining\b")),
     ("board oversight", (r"\bboard oversight\b", r"\bboard\b", r"\bmanagement body\b")),
@@ -163,6 +182,82 @@ CONCEPT_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
     ("evidence limits", (r"\bevidence limit", r"\bincomplete evidence\b", r"\bevidence is incomplete\b", r"\bnot enough evidence\b")),
 ]
 
+FORCED_CONCEPT_RULES: list[tuple[tuple[str, ...], tuple[str, ...]]] = [
+    (
+        ("manual workaround", "manual workarounds"),
+        (
+            "temporary manual controls",
+            "transition",
+            "controls",
+            "ownership",
+            "auditability",
+            "remediation",
+            "data lineage",
+        ),
+    ),
+    (
+        ("climate", "esg", "environmental"),
+        (
+            "identify risks",
+            "measure risks",
+            "manage risks",
+            "monitor risks",
+            "governance",
+            "transition risk",
+            "climate risk",
+            "ESG risk",
+        ),
+    ),
+    (
+        ("ict", "security risk management"),
+        (
+            "governance",
+            "identify risks",
+            "protect",
+            "detect",
+            "respond",
+            "recover",
+            "vulnerability and testing",
+            "incident management",
+        ),
+    ),
+    (
+        ("impact tolerance", "operational resilience"),
+        (
+            "important business services",
+            "maximum tolerable disruption",
+            "impact tolerance",
+            "operational resilience",
+        ),
+    ),
+    (
+        ("intraday liquidity",),
+        (
+            "intraday liquidity",
+            "cash flow monitoring",
+            "monitoring",
+            "stress or crisis situations",
+        ),
+    ),
+    (
+        ("payment, settlement", "payment and settlement", "payment behaviour", "settlement behaviour"),
+        (
+            "payment and settlement behaviour",
+        ),
+    ),
+    (
+        ("risk culture", "remuneration", "staff training"),
+        (
+            "risk culture",
+            "staff training",
+            "board oversight",
+            "risk profile",
+            "remuneration",
+            "governance",
+        ),
+    ),
+]
+
 
 def _normalize(text: str) -> str:
     return " ".join((text or "").lower().split())
@@ -171,6 +266,58 @@ def _normalize(text: str) -> str:
 def _pattern_hit(text: str, patterns: Iterable[str]) -> bool:
     normalized = _normalize(text)
     return any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def _concept_patterns(config: dict[str, Any] | None = None) -> list[tuple[str, tuple[str, ...]]]:
+    """Return built-in concept patterns plus optional config-defined concepts."""
+    cfg = config or {}
+    patterns: list[tuple[str, tuple[str, ...]]] = list(CONCEPT_PATTERNS)
+    for concept, raw_patterns in (cfg.get("concept_patterns") or {}).items():
+        if isinstance(raw_patterns, str):
+            patterns.append((str(concept), (raw_patterns,)))
+        elif isinstance(raw_patterns, Iterable):
+            compiled = tuple(str(pattern) for pattern in raw_patterns if str(pattern).strip())
+            if compiled:
+                patterns.append((str(concept), compiled))
+    return patterns
+
+
+def _matching_concepts(
+    text: str,
+    concept_patterns: list[tuple[str, tuple[str, ...]]],
+) -> list[str]:
+    concepts: list[str] = []
+    for concept, patterns in concept_patterns:
+        if concept not in concepts and _pattern_hit(text, patterns):
+            concepts.append(concept)
+    return concepts
+
+
+def _forced_concepts(query_norm: str, config: dict[str, Any] | None = None) -> list[str]:
+    cfg = config or {}
+    concepts: list[str] = []
+    rules: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
+    if bool(cfg.get("use_builtin_forced_rules", True)):
+        rules.extend(FORCED_CONCEPT_RULES)
+
+    for rule in cfg.get("forced_concept_rules") or []:
+        markers = rule.get("when_any") if isinstance(rule, dict) else None
+        rule_concepts = rule.get("concepts") if isinstance(rule, dict) else None
+        if not markers or not rule_concepts:
+            continue
+        rules.append(
+            (
+                tuple(str(marker).lower() for marker in markers),
+                tuple(str(concept) for concept in rule_concepts),
+            )
+        )
+
+    for markers, rule_concepts in rules:
+        if any(marker in query_norm for marker in markers):
+            for concept in rule_concepts:
+                if concept not in concepts:
+                    concepts.append(concept)
+    return concepts
 
 
 def split_claims(answer: str, max_claims: int = 6) -> list[str]:
@@ -207,11 +354,17 @@ def infer_required_concepts(
     contexts: list[str],
     *,
     max_concepts: int = 7,
+    config: dict[str, Any] | None = None,
 ) -> list[str]:
     """Infer reportable concepts that a complete answer should try to cover."""
+    cfg = config or {}
     query_norm = _normalize(query)
     evidence_norm = _normalize("\n\n".join(contexts[:4]))
     broad_question = any(marker in query_norm for marker in BROAD_QUESTION_MARKERS)
+    narrow_context_expansion = (
+        query_norm.startswith(("is ", "should "))
+        or any(marker in query_norm for marker in NARROW_CONTEXT_EXPANSION_MARKERS)
+    )
     specific_unsupported = (
         any(marker in query_norm for marker in SPECIFIC_UNSUPPORTED_MARKERS)
         and any(marker in query_norm for marker in SPECIFIC_UNSUPPORTED_SUBJECT_MARKERS)
@@ -222,62 +375,29 @@ def infer_required_concepts(
         forced = {"no exact requirement", "avoid overclaiming", "evidence limits"}
     else:
         forced = set()
-    if "manual workaround" in query_norm or "manual workarounds" in query_norm:
-        forced.update({
-            "temporary manual controls",
-            "transition",
-            "controls",
-            "ownership",
-            "auditability",
-            "remediation",
-            "data lineage",
-        })
-    if "climate" in query_norm or "esg" in query_norm or "environmental" in query_norm:
-        forced.update({
-            "identify risks",
-            "measure risks",
-            "manage risks",
-            "monitor risks",
-            "governance",
-            "transition risk",
-            "climate risk",
-            "ESG risk",
-        })
-    if "ict" in query_norm or "security risk management" in query_norm:
-        forced.update({
-            "governance",
-            "identify risks",
-            "protect",
-            "detect",
-            "respond",
-            "recover",
-            "vulnerability and testing",
-            "incident management",
-        })
-    if "impact tolerance" in query_norm or "operational resilience" in query_norm:
-        forced.update({
-            "important business services",
-            "maximum tolerable disruption",
-            "impact tolerance",
-            "operational resilience",
-        })
-    if "risk culture" in query_norm or "remuneration" in query_norm or "staff training" in query_norm:
-        forced.update({
-            "risk culture",
-            "staff training",
-            "board oversight",
-            "risk profile",
-            "remuneration",
-            "governance",
-        })
+    forced.update(_forced_concepts(query_norm, cfg))
+    patterns = _concept_patterns(cfg)
+    query_or_forced = {
+        concept
+        for concept, concept_patterns in patterns
+        if concept in forced or _pattern_hit(query_norm, concept_patterns)
+    }
+    min_query_concepts = int(cfg.get("context_expansion_min_query_concepts", 3))
+    allow_context_expansion = (
+        bool(cfg.get("allow_context_concept_expansion", True))
+        and broad_question
+        and not narrow_context_expansion
+        and not specific_unsupported
+        and len(query_or_forced) < min_query_concepts
+    )
 
-    for idx, (concept, patterns) in enumerate(CONCEPT_PATTERNS):
-        query_hit = _pattern_hit(query_norm, patterns)
-        evidence_hit = _pattern_hit(evidence_norm, patterns)
+    for idx, (concept, concept_patterns) in enumerate(patterns):
+        query_hit = _pattern_hit(query_norm, concept_patterns)
+        evidence_hit = _pattern_hit(evidence_norm, concept_patterns)
         if concept in forced:
             scored.append((-6, idx, concept))
             continue
-        if not query_hit and not (broad_question and evidence_hit):
+        if not query_hit and not (allow_context_expansion and evidence_hit):
             continue
         score = 3 if query_hit else 1
         if evidence_hit:
@@ -308,11 +428,17 @@ def audit_answer_quality(
         query,
         contexts,
         max_concepts=int(cfg.get("max_required_concepts", 7)),
+        config=cfg,
     )
     answer_norm = _normalize(answer)
     hit_concepts: list[str] = []
     missing_concepts: list[str] = []
-    concept_lookup = dict(CONCEPT_PATTERNS)
+    patterns = _concept_patterns(cfg)
+    concept_lookup = dict(patterns)
+    context_norm = _normalize("\n\n".join(contexts[:4]))
+    query_concepts = _matching_concepts(query, patterns)
+    context_concepts = _matching_concepts(context_norm, patterns)
+    forced_concepts = _forced_concepts(_normalize(query), cfg)
 
     for concept in concepts:
         patterns = concept_lookup.get(concept, (re.escape(concept),))
@@ -326,6 +452,19 @@ def audit_answer_quality(
     else:
         concept_coverage = 1.0
 
+    required_context_concepts = [
+        concept for concept in concepts if concept in context_concepts or concept in forced_concepts
+    ]
+    missing_context_concepts = [
+        concept for concept in required_context_concepts if concept not in hit_concepts
+    ]
+    if required_context_concepts:
+        context_coverage = (
+            len(required_context_concepts) - len(missing_context_concepts)
+        ) / len(required_context_concepts)
+    else:
+        context_coverage = 1.0
+
     claims = split_claims(answer, max_claims=int(cfg.get("max_claims", 6)))
     query_norm = _normalize(query)
     answer_has_refutation = any(marker in answer_norm for marker in REFUTATION_MARKERS)
@@ -336,9 +475,15 @@ def audit_answer_quality(
 
     return {
         "required_concepts": concepts,
+        "query_concepts": query_concepts,
+        "context_concepts": context_concepts,
+        "forced_concepts": forced_concepts,
         "hit_concepts": hit_concepts,
         "missing_concepts": missing_concepts,
+        "required_context_concepts": required_context_concepts,
+        "missing_context_concepts": missing_context_concepts,
         "concept_coverage": float(concept_coverage),
+        "context_coverage": float(context_coverage),
         "answer_completeness_score": float(concept_coverage),
         "answer_completeness_risk": float(1.0 - concept_coverage),
         "claim_count": len(claims),

@@ -240,8 +240,20 @@ def to_detector_result(prediction: dict[str, Any]) -> dict[str, Any]:
     support_status = prediction["support_status"]
     support_scores = prediction["support_status_scores"]
     label = SUPPORT_TO_NLI[support_status]
+    answer_include_score = float(support_scores.get("supported", 0.0))
+    answer_include_risk = float(
+        support_scores.get("unsupported", 0.0)
+        + support_scores.get("contradicted", 0.0)
+    )
+    answer_include_detected = support_status == "supported"
     return {
         "is_hallucination": support_status == "contradicted",
+        "answer_include_detected": answer_include_detected,
+        "answer_include_risk": answer_include_risk,
+        "answer_include_score": answer_include_score,
+        # Backward-compatible aliases.
+        "is_unsupported": not answer_include_detected,
+        "unsupported_risk": answer_include_risk,
         "label": label,
         "confidence": max(float(value) for value in support_scores.values()),
         "scores": {

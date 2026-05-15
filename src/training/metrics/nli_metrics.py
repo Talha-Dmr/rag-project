@@ -124,6 +124,25 @@ class NLIMetrics:
         precision_per_class = precision_score(labels, predictions, average=None, labels=class_labels, zero_division=0)
         recall_per_class = recall_score(labels, predictions, average=None, labels=class_labels, zero_division=0)
 
+        # Answer-include risk view:
+        # 0=entailment is the only included/safe class; 1/2 are risk classes.
+        gold_risk = labels != 0
+        pred_risk = predictions != 0
+        risk_tp = int(np.sum(gold_risk & pred_risk))
+        risk_fp = int(np.sum(~gold_risk & pred_risk))
+        risk_fn = int(np.sum(gold_risk & ~pred_risk))
+        risk_tn = int(np.sum(~gold_risk & ~pred_risk))
+        not_included_precision = risk_tp / (risk_tp + risk_fp) if (risk_tp + risk_fp) else 0.0
+        not_included_recall = risk_tp / (risk_tp + risk_fn) if (risk_tp + risk_fn) else 0.0
+        not_included_f1 = (
+            2 * not_included_precision * not_included_recall
+            / (not_included_precision + not_included_recall)
+            if (not_included_precision + not_included_recall)
+            else 0.0
+        )
+        false_include_rate = risk_fn / (risk_tp + risk_fn) if (risk_tp + risk_fn) else 0.0
+        false_exclude_rate = risk_fp / (risk_fp + risk_tn) if (risk_fp + risk_tn) else 0.0
+
         metrics = {
             'accuracy': accuracy,
             'f1_macro': f1_macro,
@@ -132,6 +151,17 @@ class NLIMetrics:
             'f1_weighted': f1_weighted,
             'precision_weighted': precision_weighted,
             'recall_weighted': recall_weighted,
+            'not_included_precision': not_included_precision,
+            'not_included_recall': not_included_recall,
+            'not_included_f1': not_included_f1,
+            'false_include_rate': false_include_rate,
+            'false_exclude_rate': false_exclude_rate,
+            # Backward-compatible aliases for older training scripts.
+            'unsupported_precision': not_included_precision,
+            'unsupported_recall': not_included_recall,
+            'unsupported_f1': not_included_f1,
+            'false_accept_rate': false_include_rate,
+            'false_abstain_rate': false_exclude_rate,
         }
 
         # Add per-class metrics
@@ -216,6 +246,13 @@ class NLIMetrics:
             logger.info(f"  ECE: {metrics['ece']:.4f}")
         if 'brier' in metrics:
             logger.info(f"  Brier: {metrics['brier']:.4f}")
+        logger.info(
+            f"  Answer include risk: "
+            f"not_included_P={metrics['not_included_precision']:.4f}, "
+            f"not_included_R={metrics['not_included_recall']:.4f}, "
+            f"not_included_F1={metrics['not_included_f1']:.4f}, "
+            f"false_include={metrics['false_include_rate']:.4f}"
+        )
 
         logger.info(f"\n{prefix}Per-class metrics:")
         for label_name in self.LABEL_NAMES:

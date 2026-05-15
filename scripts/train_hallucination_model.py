@@ -173,6 +173,12 @@ def train_model(args: argparse.Namespace) -> None:
                 logger.info(f"  ECE: {final_metrics.get('ece', 0):.4f}")
             if 'brier' in final_metrics:
                 logger.info(f"  Brier: {final_metrics.get('brier', 0):.4f}")
+            logger.info(
+                f"  Not-included Recall: {final_metrics.get('not_included_recall', 0):.4f}"
+            )
+            logger.info(
+                f"  False Accept Rate: {final_metrics.get('false_accept_rate', 0):.4f}"
+            )
 
             logger.info("\nPer-class F1 scores:")
             for label in ['entailment', 'neutral', 'contradiction']:
@@ -181,6 +187,34 @@ def train_model(args: argparse.Namespace) -> None:
                     logger.info(f"  {label}: {final_metrics[f1_key]:.4f}")
         else:
             logger.warning("No validation metrics recorded (no epochs ran).")
+
+        test_data = data_dir / 'test.jsonl'
+        if test_data.exists():
+            logger.info("\nEvaluating current model on test split...")
+            test_metrics = trainer.evaluate(str(test_data))
+            logger.info("\nFinal Test Metrics:")
+            logger.info(f"  Accuracy: {test_metrics.get('accuracy', 0):.4f}")
+            logger.info(f"  F1 (macro): {test_metrics.get('f1_macro', 0):.4f}")
+            logger.info(
+                f"  Not-included Recall: {test_metrics.get('not_included_recall', 0):.4f}"
+            )
+            logger.info(
+                f"  False Accept Rate: {test_metrics.get('false_accept_rate', 0):.4f}"
+            )
+
+        heldout_data = data_dir / 'test_heldout_doc.jsonl'
+        if heldout_data.exists():
+            logger.info("\nEvaluating current model on heldout document test...")
+            heldout_metrics = trainer.evaluate(str(heldout_data))
+            logger.info("\nFinal Heldout Document Metrics:")
+            logger.info(f"  Accuracy: {heldout_metrics.get('accuracy', 0):.4f}")
+            logger.info(f"  F1 (macro): {heldout_metrics.get('f1_macro', 0):.4f}")
+            logger.info(
+                f"  Not-included Recall: {heldout_metrics.get('not_included_recall', 0):.4f}"
+            )
+            logger.info(
+                f"  False Accept Rate: {heldout_metrics.get('false_accept_rate', 0):.4f}"
+            )
 
     except Exception as e:
         logger.error(f"Training failed: {e}", exc_info=True)

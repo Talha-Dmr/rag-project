@@ -265,7 +265,8 @@ class BaseLLM(ABC):
         self,
         query: str,
         context: List[str],
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        quality_feedback: Optional[str] = None
     ) -> str:
         """
         Generate text with retrieved context
@@ -274,6 +275,7 @@ class BaseLLM(ABC):
             query: User query
             context: Retrieved context documents
             max_tokens: Maximum tokens to generate
+            quality_feedback: Optional rewrite or completeness instruction
 
         Returns:
             Generated response

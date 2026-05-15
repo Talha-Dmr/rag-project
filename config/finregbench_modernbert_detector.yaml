@@ -1,0 +1,59 @@
+# FinRegBench answer-include detector.
+# Trains a 3-way verifier:
+# 0=entailment, 1=neutral, 2=contradiction.
+# At inference time, use answer_include_risk = P(neutral) + P(contradiction).
+
+training:
+  model:
+    base_model: tasksource/ModernBERT-base-nli
+    num_labels: 3
+    cache_dir: ./models/training
+    lora:
+      enabled: false
+
+  hyperparameters:
+    learning_rate: 1.0e-5
+    weight_decay: 0.01
+    warmup_steps: 0
+    max_epochs: 4
+    batch_size: 4
+    gradient_accumulation_steps: 4
+    max_grad_norm: 1.0
+    mixed_precision: fp16
+    optimizer: adamw
+    scheduler: linear
+    loss:
+      type: weighted_ce
+      class_weights: [1.0, 1.15, 1.15]
+      label_smoothing: 0.02
+      neutral_boost_weight: 0.05
+      neutral_margin: 0.15
+      contradiction_boost_weight: 0.05
+      contradiction_margin: 0.15
+
+  data:
+    max_seq_length: 1024
+    train_sampling_strategy: balanced
+    train_sampling_power: 1.0
+
+  checkpointing:
+    save_dir: ./models/checkpoints/finregbench_modernbert_detector
+    save_strategy: best
+    save_every_n_epochs: 1
+    save_total_limit: 2
+    save_every_n_batches: 100
+    metric_for_best: f1_macro
+    mode: max
+
+  early_stopping:
+    enabled: true
+    patience: 2
+    metric: f1_macro
+    mode: max
+    min_delta: 0.0001
+
+  output:
+    training_data_dir: ./data/training/finregbench_detector
+    checkpoint_dir: ./models/checkpoints/finregbench_modernbert_detector
+    final_model_dir: ./models/hallucination_detector_finregbench_modernbert
+    logs_dir: ./logs/training

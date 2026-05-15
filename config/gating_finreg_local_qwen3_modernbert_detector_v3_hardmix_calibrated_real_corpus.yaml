@@ -1,0 +1,68 @@
+# Full FinReg RAG config with local Qwen2.5-3B, V3 hardmix detector,
+# and a real official-document FinReg vector index.
+
+data_loader:
+  default_loader: json
+  json:
+    content_field: content
+
+chunking:
+  strategy: fixed_size
+  config:
+    chunk_size: 1200
+    chunk_overlap: 180
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cuda
+  cache_folder: ./models/embeddings
+  batch_size: 32
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg_real
+    collection_name: rag_finreg_real
+
+llm:
+  model_name: Qwen/Qwen2.5-3B-Instruct
+  device: cuda
+  cache_folder: ./models/llm
+  max_tokens: 128
+  temperature: 0.0
+  top_p: 0.9
+  load_in_8bit: false
+  use_chat_template: true
+
+retrieval:
+  k: 8
+  score_threshold: 0.0
+
+hallucination_detector:
+  enabled: true
+  model_path: models/checkpoints/finregbench_modernbert_detector_v3_hardmix/best_model
+  base_model: tasksource/ModernBERT-base-nli
+  device: cuda
+  max_length: 1024
+  batch_size: 4
+  hypothesis_format: question_and_candidate_answer
+  risk_mode: answer_include
+  aggregation: answer_include_best
+  answer_include_threshold: 0.97
+
+hallucination_aggregation: answer_include_best
+
+gating:
+  enabled: true
+  strategy: abstain
+  contradiction_prob_metric: answer_include_risk
+  contradiction_prob_threshold: 0.97
+  contradiction_rate_metric: hard_contradiction_rate
+  contradiction_rate_threshold: 0.40
+  uncertainty_threshold: 1.0
+  abstain_message: "I don't have enough reliable evidence to support that answer."
+
+sources:
+  max_sources: 8
+  include_scores: true

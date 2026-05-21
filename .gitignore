@@ -52,6 +52,7 @@ models/
 
 # Data
 data/*
+!data/README.md
 *.csv
 *.json
 !artifact_manifest_phase2_2.json
@@ -109,6 +110,8 @@ temp/
 
 # Local artifacts
 detector-assets-phase2.2/
+detector-assets/
+corpus-*/
 checkpoints_step6000.tar.gz
 models.zip
 Gemini_Generated_Image_*.png

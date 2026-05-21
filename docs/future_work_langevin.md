@@ -102,13 +102,13 @@ Guardrail (to avoid "we keep rerunning the same thing"):
 Use these when rerunning core checks:
 
 - High-stakes trio seed eval (active path, 50Q each):
-  - `cd /home/talha/projects/rag-project && ./scripts/run_high_stakes_seed_eval.sh all 50 7`
+  - `./scripts/run_high_stakes_seed_eval.sh all 50 7`
 - Rep vs Logit ablation (legacy Energy/Macro, 50Q):
-  - `cd /home/talha/projects/rag-project && ./scripts/run_rep_vs_logit_ablation.sh 50 7`
+  - `./scripts/run_rep_vs_logit_ablation.sh 50 7`
 - Energy logit-MI with stricter contradiction gate (legacy stress test):
-  - `cd /home/talha/projects/rag-project && env PYTHONPATH=. HF_HOME=./models/llm TRANSFORMERS_CACHE=./models/llm venv312/bin/python -u scripts/eval_grounding_proxy.py --config gating_energy_ebcar_logit_mi_sc009 --questions data/domain_energy/questions_energy_conflict_50.jsonl --limit 50 --seed 7 --contradiction-rate-threshold 0.90 --output evaluation_results/auto_eval/energy_logit_mi_50_thr090.json`
+  - `env PYTHONPATH=. HF_HOME=./models/llm TRANSFORMERS_CACHE=./models/llm venv312/bin/python -u scripts/eval_grounding_proxy.py --config gating_energy_ebcar_logit_mi_sc009 --questions data/domain_energy/questions_energy_conflict_50.jsonl --limit 50 --seed 7 --contradiction-rate-threshold 0.90 --output evaluation_results/auto_eval/energy_logit_mi_50_thr090.json`
 - Macro logit-MI with stricter contradiction gate (legacy stress test):
-  - `cd /home/talha/projects/rag-project && env PYTHONPATH=. HF_HOME=./models/llm TRANSFORMERS_CACHE=./models/llm venv312/bin/python -u scripts/eval_grounding_proxy.py --config gating_macro_ebcar_logit_mi_sc009 --questions data/domain_macro/questions_macro_conflict_50.jsonl --limit 50 --seed 7 --contradiction-rate-threshold 0.80 --output evaluation_results/auto_eval/macro_logit_mi_50_thr080.json`
+  - `env PYTHONPATH=. HF_HOME=./models/llm TRANSFORMERS_CACHE=./models/llm venv312/bin/python -u scripts/eval_grounding_proxy.py --config gating_macro_ebcar_logit_mi_sc009 --questions data/domain_macro/questions_macro_conflict_50.jsonl --limit 50 --seed 7 --contradiction-rate-threshold 0.80 --output evaluation_results/auto_eval/macro_logit_mi_50_thr080.json`
 
 ### Detector Rebalance Pilot (Feb 7, 2026)
 - Added balanced-sampling training config:

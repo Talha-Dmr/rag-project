@@ -397,6 +397,12 @@ class HuggingFaceLLM(BaseLLM):
             answer,
             flags=re.IGNORECASE,
         )
+        cleaned = re.sub(
+            r"^\s*following using the above context:\s*",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
 
         tail_patterns = [
             r"\bQuestion:\s",

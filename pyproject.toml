@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "modular-rag"
 version = "0.1.0"
-description = "Modular RAG system with LangChain and HuggingFace"
+description = "FinReg RAG pipeline with retrieval, hallucination detection, and abstain gating"
 authors = ["Talha"]
 readme = "README.md"
 packages = [{include = "src"}]

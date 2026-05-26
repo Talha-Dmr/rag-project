@@ -18,12 +18,16 @@ computes detector metrics such as not-included recall and false include rate.
 
 ## Full RAG Benchmark
 
-`full_rag_questions.jsonl` evaluates the end-to-end system. It contains 40
-questions: 10 topics x 4 question types (`factual_supported`, `false_premise`,
+`full_rag_questions.jsonl` evaluates the end-to-end system. It contains 80
+questions: 20 topics x 4 question types (`factual_supported`, `false_premise`,
 `multi_source_nuanced`, and `low_evidence_policy`). Each row contains a question,
 manual review guidance, expected answer points, and forbidden claims. The system
 retrieves evidence, generates an answer, runs detector/gating, and exports a
 manual review sheet.
+
+The second set of 40 questions extends the original benchmark in the same file,
+rather than creating a replacement file. It adds detector-relevant false-premise
+and low-evidence cases while preserving the original IDs and evaluation format.
 
 The benchmark script reports pre-review metrics such as answer rate, abstain
 rate, answer-include risk, expected-point coverage, forbidden-claim hit rate,

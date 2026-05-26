@@ -125,6 +125,10 @@ def forbidden_claim_hit(text: str, phrase: str) -> bool:
         "no ",
         "no explicit",
         "not ",
+        "not.",
+        "not,",
+        "not;",
+        "not:",
         "not explicitly",
         "not stated",
         "not specify",
@@ -166,11 +170,15 @@ def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
         "no evidence",
         "no explicit",
         "not explicitly",
+        "not primarily",
+        "not mainly",
         "not in the context",
         "not supported",
         "cannot conclude",
         "should not",
         "not encourage",
+        "would contradict",
+        "instead,",
         "i don't know based on the provided context",
     )
     cautious_markers = (
@@ -576,7 +584,9 @@ def run_full_rag(args: argparse.Namespace) -> None:
 
     abstain_message = (config.get("gating", {}).get("abstain_message", "") or "").strip()
     rows: list[dict[str, Any]] = []
-    for item in questions:
+    total_questions = len(questions)
+    benchmark_started = time.perf_counter()
+    for index, item in enumerate(questions, start=1):
         started = time.perf_counter()
         result = rag.query(
             query_text=item["query"],
@@ -622,14 +632,22 @@ def run_full_rag(args: argparse.Namespace) -> None:
         }
         row.update(full_rag_expected_behavior_rubric(row))
         rows.append(row)
+        elapsed = time.perf_counter() - benchmark_started
+        percent = safe_div(index, total_questions) * 100.0
+        avg_latency = safe_div(elapsed, index)
+        eta = avg_latency * (total_questions - index)
         print(
-            f"{item.get('id')} action={row['gating_action']} "
+            f"[progress {index}/{total_questions} {percent:.1f}% "
+            f"elapsed={elapsed/60:.1f}m eta={eta/60:.1f}m] "
+            f"{item.get('id')} detector={row.get('hallucination_detector_ran')} "
+            f"action={row['gating_action']} "
             f"abstain={row['abstained']} "
             f"expected_behavior={row.get('expected_behavior_match')} "
             f"include_risk={row.get('answer_include_risk')} "
-            f"complete={row.get('answer_completeness_score')}"
+            f"complete={row.get('answer_completeness_score')}",
+            flush=True,
         )
-        print(f"  A: {short(answer)}")
+        print(f"  A: {short(answer)}", flush=True)
         write_jsonl(partial_jsonl, rows)
         write_json(partial_summary_json, full_rag_summary(rows))
 

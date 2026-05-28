@@ -1,0 +1,94 @@
+# Stable CPU fallback for IBM Granite 3.3 2B Instruct with domain query expansion.
+# Use this to validate retrieval changes without the RTX 2070 long-process CUDA
+# failures seen in the query-expansion and wider-retrieval experiments.
+
+data_loader:
+  default_loader: json
+  json:
+    content_field: content
+
+chunking:
+  strategy: section_aware
+  config:
+    max_chunk_size: 1200
+    min_chunk_size: 250
+    chunk_overlap: 120
+    max_heading_length: 120
+    allow_titlecase_headings: true
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cpu
+  cache_folder: ./models/embeddings
+  batch_size: 32
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg_real_section
+    collection_name: rag_finreg_real_section
+
+llm:
+  model_name: ibm-granite/granite-3.3-2b-instruct
+  device: cpu
+  cache_folder: ./models/llm
+  dtype: float32
+  max_tokens: 96
+  max_prompt_tokens: 1024
+  truncation_side: left
+  temperature: 0.0
+  top_p: 1.0
+  use_chat_template: true
+  attn_implementation: eager
+  use_cache: true
+  clear_cuda_cache_after_generate: false
+
+retrieval:
+  k: 8
+  score_threshold: 0.0
+  query_expansion:
+    enabled: true
+    max_queries: 2
+    per_query_k: 5
+    max_candidates: 8
+    merge_strategy: score
+
+reranker:
+  type: cross_encoder
+  model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
+  device: cpu
+  top_k: 4
+
+hallucination_detector:
+  enabled: true
+  model_path: models/checkpoints/finregbench_modernbert_detector_v3_hardmix/best_model
+  base_model: tasksource/ModernBERT-base-nli
+  device: cpu
+  max_length: 768
+  batch_size: 1
+  hypothesis_format: question_and_candidate_answer
+  risk_mode: answer_include
+  aggregation: answer_include_best
+  answer_include_threshold: 0.97
+
+hallucination_aggregation: answer_include_best
+
+answer_quality:
+  enabled: false
+  rewrite_on_low_coverage: false
+  max_rewrites: 0
+
+gating:
+  enabled: true
+  strategy: abstain
+  contradiction_prob_metric: answer_include_risk
+  contradiction_prob_threshold: 0.97
+  contradiction_rate_metric: hard_contradiction_rate
+  contradiction_rate_threshold: 0.40
+  uncertainty_threshold: 1.0
+  abstain_message: "I don't have enough reliable evidence to support that answer."
+
+sources:
+  max_sources: 4
+  include_scores: true

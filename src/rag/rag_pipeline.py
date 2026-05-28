@@ -4,8 +4,9 @@ Main RAG Pipeline orchestrator.
 
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 import re
+import random
 import numpy as np
 
 try:
@@ -21,6 +22,7 @@ from src.vector_stores.base_store import VectorStoreFactory
 from src.rag.llm_wrapper import HuggingFaceLLM
 from src.rag.openrouter_llm import OpenRouterLLM
 from src.rag.answer_quality import audit_answer_quality, build_quality_feedback, split_claims
+from src.rag.evidence_sampling_policy import decide_policy as decide_evidence_sampling_policy
 from src.rag.retriever import Retriever
 from src.core.base_classes import BaseLLM, BaseReranker
 from src.core.logger import get_logger
@@ -506,6 +508,28 @@ class RAGPipeline:
             return True
         return False
 
+    def _answer_quality_acceptance_score(self, audit: Optional[Dict[str, Any]]) -> float:
+        if not audit:
+            return 0.0
+        completeness = float(audit.get("answer_completeness_score", 0.0) or 0.0)
+        context_coverage = float(audit.get("context_coverage", 0.0) or 0.0)
+        claim_rate = audit.get("claim_include_rate")
+        if isinstance(claim_rate, (int, float)):
+            return min(completeness, context_coverage, float(claim_rate))
+        return min(completeness, context_coverage)
+
+    def _should_accept_quality_rewrite(
+        self,
+        before: Optional[Dict[str, Any]],
+        after: Optional[Dict[str, Any]],
+    ) -> bool:
+        if not bool(self.answer_quality_config.get("accept_rewrite_only_if_not_worse", False)):
+            return True
+        margin = float(self.answer_quality_config.get("rewrite_acceptance_margin", 0.0) or 0.0)
+        before_score = self._answer_quality_acceptance_score(before)
+        after_score = self._answer_quality_acceptance_score(after)
+        return after_score + margin >= before_score
+
     def _compute_uncertainty_stats(
         self,
         detection_result: Dict[str, Any],
@@ -838,7 +862,13 @@ class RAGPipeline:
             return dict(self.gating_config)
 
         merged = dict(self.gating_config)
-        merged.update(override)
+        for key, value in override.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                nested = dict(merged[key])
+                nested.update(value)
+                merged[key] = nested
+            else:
+                merged[key] = value
         return merged
 
     def _clamp01(self, x: Optional[float], default: float = 0.0) -> float:
@@ -1084,6 +1114,516 @@ class RAGPipeline:
 
         return strategy
 
+    def _is_closed_probe_question(self, query: str) -> bool:
+        text = (query or "").strip().lower()
+        return bool(
+            re.match(
+                r"^(does|do|did|is|are|can|could|should|would|will|must|may|has|have|had)\b",
+                text,
+            )
+        )
+
+    def _answer_has_direct_refutation(self, answer: str) -> bool:
+        text = (answer or "").strip().lower()
+        refutation_markers = (
+            "no,",
+            "does not",
+            "do not",
+            "is not",
+            "are not",
+            "not require",
+            "not mainly",
+            "not primarily",
+            "not stated",
+            "not specified",
+            "not supported",
+            "no evidence",
+            "no explicit",
+            "cannot conclude",
+            "should not",
+            "would contradict",
+        )
+        return any(marker in text for marker in refutation_markers)
+
+    def _passes_exhausted_answer_thresholds(
+        self,
+        stats: Dict[str, float],
+        *,
+        min_retrieval_max: float,
+        min_retrieval_mean: float,
+        min_source_consistency: float,
+        min_answer_completeness: float,
+        min_context_coverage: float,
+        max_answer_risk: float,
+        max_combined_conflict: float,
+        max_contradiction_rate: float,
+        max_contradiction_prob: float,
+    ) -> bool:
+        retrieval_max = float(stats.get("retrieval_max_score", 0.0) or 0.0)
+        retrieval_mean = float(stats.get("retrieval_mean_score", 0.0) or 0.0)
+        source_consistency = float(stats.get("source_consistency", 0.0) or 0.0)
+        answer_completeness = float(stats.get("answer_completeness_score", 1.0) or 0.0)
+        context_coverage = float(stats.get("context_coverage", 1.0) or 0.0)
+        answer_risk_value = stats.get("answer_include_risk")
+        combined_conflict_value = stats.get("combined_conflict")
+        contradiction_rate_value = stats.get("contradiction_rate")
+        contradiction_prob_value = stats.get("contradiction_prob_mean")
+        answer_risk = float(answer_risk_value if answer_risk_value is not None else 1.0)
+        combined_conflict = float(
+            combined_conflict_value if combined_conflict_value is not None else 1.0
+        )
+        contradiction_rate = float(
+            contradiction_rate_value if contradiction_rate_value is not None else 1.0
+        )
+        contradiction_prob = float(
+            contradiction_prob_value if contradiction_prob_value is not None else 1.0
+        )
+
+        return (
+            retrieval_max >= min_retrieval_max
+            and retrieval_mean >= min_retrieval_mean
+            and source_consistency >= min_source_consistency
+            and answer_completeness >= min_answer_completeness
+            and context_coverage >= min_context_coverage
+            and answer_risk <= max_answer_risk
+            and combined_conflict <= max_combined_conflict
+            and contradiction_rate <= max_contradiction_rate
+            and contradiction_prob <= max_contradiction_prob
+        )
+
+    def _resolve_exhausted_retrieve_more_action(
+        self,
+        stats: Dict[str, float],
+        gating_config: Dict[str, Any],
+        query: str = "",
+        answer: str = "",
+    ) -> str:
+        evidence_config = gating_config.get("evidence_sampling") or {}
+        if not isinstance(evidence_config, dict):
+            evidence_config = {}
+
+        action = str(
+            evidence_config.get(
+                "exhausted_retrieve_more_action",
+                gating_config.get("exhausted_retrieve_more_action", "retrieve_more"),
+            )
+            or "retrieve_more"
+        ).strip().lower()
+        stats["gate_retry_exhausted"] = 1.0
+
+        if action in {"none", "answer"}:
+            stats["gate_retry_exhausted_answer_allowed"] = 1.0
+            return "none"
+        if action not in {"answer_if_confident", "none_if_confident"}:
+            stats["gate_retry_exhausted_answer_allowed"] = 0.0
+            return "retrieve_more"
+
+        min_retrieval_max = float(evidence_config.get("exhausted_min_retrieval_max", 0.0))
+        min_retrieval_mean = float(evidence_config.get("exhausted_min_retrieval_mean", 0.0))
+        min_source_consistency = float(evidence_config.get("exhausted_min_source_consistency", 0.0))
+        max_answer_risk = float(evidence_config.get("exhausted_max_answer_include_risk", 1.0))
+        max_combined_conflict = float(evidence_config.get("exhausted_max_combined_conflict", 1.0))
+        max_contradiction_rate = float(evidence_config.get("exhausted_max_contradiction_rate", 1.0))
+        max_contradiction_prob = float(evidence_config.get("exhausted_max_contradiction_prob", 1.0))
+        min_answer_completeness = float(
+            evidence_config.get(
+                "exhausted_min_answer_completeness_score",
+                evidence_config.get("answer_min_answer_completeness_score", 0.0),
+            )
+        )
+        min_context_coverage = float(
+            evidence_config.get(
+                "exhausted_min_context_coverage",
+                evidence_config.get("answer_min_context_coverage", 0.0),
+            )
+        )
+
+        answer_allowed = self._passes_exhausted_answer_thresholds(
+            stats,
+            min_retrieval_max=min_retrieval_max,
+            min_retrieval_mean=min_retrieval_mean,
+            min_source_consistency=min_source_consistency,
+            min_answer_completeness=min_answer_completeness,
+            min_context_coverage=min_context_coverage,
+            max_answer_risk=max_answer_risk,
+            max_combined_conflict=max_combined_conflict,
+            max_contradiction_rate=max_contradiction_rate,
+            max_contradiction_prob=max_contradiction_prob,
+        )
+        stats["gate_retry_exhausted_strict_answer_allowed"] = float(
+            1.0 if answer_allowed else 0.0
+        )
+
+        if not answer_allowed and bool(
+            evidence_config.get("exhausted_relaxed_high_quality_enabled", False)
+        ):
+            closed_probe_without_refutation = self._is_closed_probe_question(
+                query
+            ) and not self._answer_has_direct_refutation(answer)
+            relaxed_allowed = not closed_probe_without_refutation and self._passes_exhausted_answer_thresholds(
+                stats,
+                min_retrieval_max=float(
+                    evidence_config.get("exhausted_relaxed_min_retrieval_max", min_retrieval_max)
+                ),
+                min_retrieval_mean=float(
+                    evidence_config.get("exhausted_relaxed_min_retrieval_mean", min_retrieval_mean)
+                ),
+                min_source_consistency=float(
+                    evidence_config.get(
+                        "exhausted_relaxed_min_source_consistency",
+                        min_source_consistency,
+                    )
+                ),
+                min_answer_completeness=float(
+                    evidence_config.get(
+                        "exhausted_relaxed_min_answer_completeness_score",
+                        min_answer_completeness,
+                    )
+                ),
+                min_context_coverage=float(
+                    evidence_config.get(
+                        "exhausted_relaxed_min_context_coverage",
+                        min_context_coverage,
+                    )
+                ),
+                max_answer_risk=float(
+                    evidence_config.get("exhausted_relaxed_max_answer_include_risk", max_answer_risk)
+                ),
+                max_combined_conflict=float(
+                    evidence_config.get("exhausted_relaxed_max_combined_conflict", max_combined_conflict)
+                ),
+                max_contradiction_rate=float(
+                    evidence_config.get(
+                        "exhausted_relaxed_max_contradiction_rate",
+                        max_contradiction_rate,
+                    )
+                ),
+                max_contradiction_prob=float(
+                    evidence_config.get(
+                        "exhausted_relaxed_max_contradiction_prob",
+                        max_contradiction_prob,
+                    )
+                ),
+            )
+            stats["gate_retry_exhausted_relaxed_blocked_closed_probe"] = float(
+                1.0 if closed_probe_without_refutation else 0.0
+            )
+            stats["gate_retry_exhausted_relaxed_answer_allowed"] = float(
+                1.0 if relaxed_allowed else 0.0
+            )
+            answer_allowed = relaxed_allowed
+
+        stats["gate_retry_exhausted_answer_allowed"] = float(1.0 if answer_allowed else 0.0)
+        return "none" if answer_allowed else "retrieve_more"
+
+    def _evidence_sampling_answer_allowed(
+        self,
+        stats: Dict[str, float],
+        evidence_report: Dict[str, Any],
+        gating_config: Dict[str, Any],
+    ) -> bool:
+        evidence_config = gating_config.get("evidence_sampling") or {}
+        if not isinstance(evidence_config, dict):
+            return True
+        if not bool(evidence_config.get("guard_answer_by_retrieval", False)):
+            return True
+
+        min_retrieval_max = float(evidence_config.get("answer_min_retrieval_max", 0.0))
+        min_retrieval_mean = float(evidence_config.get("answer_min_retrieval_mean", 0.0))
+        min_source_consistency = float(evidence_config.get("answer_min_source_consistency", 0.0))
+        min_answer_completeness = float(
+            evidence_config.get("answer_min_answer_completeness_score", 0.0)
+        )
+        min_context_coverage = float(evidence_config.get("answer_min_context_coverage", 0.0))
+        max_subset_risk = float(evidence_config.get("answer_max_subset_risk", 1.0))
+
+        retrieval_max = float(stats.get("retrieval_max_score", 0.0) or 0.0)
+        retrieval_mean = float(stats.get("retrieval_mean_score", 0.0) or 0.0)
+        source_consistency = float(stats.get("source_consistency", 0.0) or 0.0)
+        answer_completeness = float(stats.get("answer_completeness_score", 1.0) or 0.0)
+        context_coverage = float(stats.get("context_coverage", 1.0) or 0.0)
+        subset_risk = float(
+            evidence_report.get("answer_include_risk_max_across_subsets", 0.0) or 0.0
+        )
+
+        answer_allowed = (
+            retrieval_max >= min_retrieval_max
+            and retrieval_mean >= min_retrieval_mean
+            and source_consistency >= min_source_consistency
+            and answer_completeness >= min_answer_completeness
+            and context_coverage >= min_context_coverage
+            and subset_risk <= max_subset_risk
+        )
+        stats["gate_evidence_answer_guard_allowed"] = float(1.0 if answer_allowed else 0.0)
+        return answer_allowed
+
+    def _evidence_doc_key(self, doc: Dict[str, Any]) -> str:
+        metadata = doc.get("metadata") or {}
+        source = (
+            metadata.get("doc_id")
+            or metadata.get("title")
+            or metadata.get("source")
+            or metadata.get("path")
+            or ""
+        )
+        content = str(doc.get("content") or "")
+        return f"{source}|{content[:200]}"
+
+    def _dedupe_evidence_docs(self, docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        seen: set[str] = set()
+        out: List[Dict[str, Any]] = []
+        for doc in docs:
+            key = self._evidence_doc_key(doc)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(doc)
+        return out
+
+    def _build_evidence_subsets(
+        self,
+        query: str,
+        docs: List[Dict[str, Any]],
+        subset_size: int,
+        num_subsets: int,
+        seed: int,
+    ) -> List[Dict[str, Any]]:
+        docs = self._dedupe_evidence_docs(docs)
+        if not docs:
+            return []
+
+        subset_size = max(1, min(int(subset_size), len(docs)))
+        num_subsets = max(1, int(num_subsets))
+        rng = random.Random(int(seed))
+        subsets: List[Dict[str, Any]] = []
+        seen: set[tuple[str, ...]] = set()
+
+        def add(name: str, selected: List[Dict[str, Any]]) -> None:
+            selected = self._dedupe_evidence_docs(selected)[:subset_size]
+            if not selected:
+                return
+            key = tuple(self._evidence_doc_key(doc) for doc in selected)
+            if key in seen:
+                return
+            seen.add(key)
+            subsets.append({"name": name, "docs": selected})
+
+        add("top_ranked", docs[:subset_size])
+        add("rank_stride", (docs[::2] + docs[1::2])[:subset_size])
+        tail_mix = docs[: max(1, subset_size // 2)] + docs[-max(1, subset_size - subset_size // 2) :]
+        add("top_tail_mix", tail_mix)
+
+        named_families = self._extract_named_source_families(query)
+        if named_families:
+            family_docs: List[Dict[str, Any]] = []
+            used_ids: set[int] = set()
+            for family in named_families:
+                candidates = [doc for doc in docs if self._doc_source_family(doc) == family]
+                if candidates:
+                    chosen = candidates[0]
+                    family_docs.append(chosen)
+                    used_ids.add(id(chosen))
+            for doc in docs:
+                if len(family_docs) >= subset_size:
+                    break
+                if id(doc) not in used_ids:
+                    family_docs.append(doc)
+            add("named_family_balanced", family_docs)
+
+        attempts = 0
+        while len(subsets) < num_subsets and attempts < num_subsets * 10:
+            attempts += 1
+            if len(docs) <= subset_size:
+                add(f"sample_{attempts}", docs)
+                continue
+            head_count = max(1, subset_size // 2)
+            head = docs[: min(len(docs), max(subset_size, head_count + 1))]
+            tail = docs[min(len(docs), head_count) :]
+            selected = rng.sample(head, min(head_count, len(head)))
+            remaining = subset_size - len(selected)
+            selected_ids = {id(item) for item in selected}
+            pool = [doc for doc in tail if id(doc) not in selected_ids]
+            if len(pool) >= remaining:
+                selected.extend(rng.sample(pool, remaining))
+            else:
+                selected.extend(pool)
+                selected_ids = {id(item) for item in selected}
+                selected.extend(doc for doc in docs if id(doc) not in selected_ids)
+            add(f"sample_{attempts}", selected)
+
+        return subsets[:num_subsets]
+
+    def _evaluate_evidence_subset(
+        self,
+        query: str,
+        answer: str,
+        docs: List[Dict[str, Any]],
+        aggregation: str,
+        gating_config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        contexts = [str(doc.get("content") or "") for doc in docs if doc.get("content")]
+        detection = self._run_cuda_stage(
+            "evidence_subset_detector",
+            self.hallucination_detector.verify_answer_with_contexts,
+            answer=answer,
+            contexts=contexts,
+            aggregation=aggregation,
+            question=query,
+        )
+        retrieval_stats = self._compute_retrieval_stats(docs)
+        source_consistency = self._compute_source_consistency(
+            docs,
+            gating_config.get("source_consistency_top_k"),
+        )
+        stats: Dict[str, float] = {
+            "retrieval_max_score": retrieval_stats.get("max_score", 0.0),
+            "retrieval_mean_score": retrieval_stats.get("mean_score", 0.0),
+            "source_consistency": source_consistency,
+            "source_inconsistency": (
+                self._clamp01(1.0 - float(source_consistency))
+                if isinstance(source_consistency, (int, float))
+                else 0.0
+            ),
+        }
+        stats.update(self._compute_uncertainty_stats(detection, gating_config.get("uncertainty_source")))
+        stats.update(self._quality_stats(None))
+        stats["combined_conflict"] = self._clamp01(
+            0.45 * float(
+                stats.get("detector_conflict_consensus", stats.get("detector_conflict", 0.0))
+                or 0.0
+            )
+            + 0.35 * float(stats.get("source_inconsistency", 0.0) or 0.0)
+            + 0.20
+            * max(
+                0.0,
+                float(stats.get("retrieval_max_score", 0.0) or 0.0)
+                - float(stats.get("retrieval_mean_score", 0.0) or 0.0),
+            )
+        )
+        action = self._decide_gating_action(stats, gating_config)
+        return {
+            "action": action,
+            "stats": stats,
+            "families": [
+                family
+                for family in dict.fromkeys(self._doc_source_family(doc) for doc in docs)
+                if family
+            ],
+            "num_contexts": len(contexts),
+        }
+
+    def _summarize_evidence_sampling(
+        self,
+        subset_results: List[Dict[str, Any]],
+        baseline_action: str,
+    ) -> Dict[str, Any]:
+        actions = Counter(str(item.get("action") or "none") for item in subset_results)
+        total = len(subset_results)
+        max_action_count = max(actions.values()) if actions else 0
+        non_answer_count = actions["retrieve_more"] + actions["abstain"]
+        risks = [
+            float(
+                item.get("stats", {}).get(
+                    "answer_include_risk",
+                    item.get("stats", {}).get("unsupported_risk", 0.0),
+                )
+                or 0.0
+            )
+            for item in subset_results
+        ]
+        return {
+            "subset_count": total,
+            "subset_actions": dict(actions),
+            "subset_answer_rate": actions["none"] / total if total else 0.0,
+            "subset_retrieve_more_rate": actions["retrieve_more"] / total if total else 0.0,
+            "subset_abstain_rate": actions["abstain"] / total if total else 0.0,
+            "subset_non_answer_rate": non_answer_count / total if total else 0.0,
+            "subset_action_instability": 1.0 - (max_action_count / total) if total else 0.0,
+            "baseline_action": baseline_action,
+            "baseline_action_stability": (
+                actions[baseline_action] / total if total and baseline_action in actions else 0.0
+            ),
+            "answer_include_risk_mean_across_subsets": (
+                float(sum(risks) / len(risks)) if risks else None
+            ),
+            "answer_include_risk_max_across_subsets": max(risks) if risks else None,
+        }
+
+    def _run_evidence_sampling_gate(
+        self,
+        query: str,
+        answer: str,
+        docs: List[Dict[str, Any]],
+        aggregation: str,
+        gating_config: Dict[str, Any],
+        baseline_action: str,
+    ) -> Optional[Dict[str, Any]]:
+        evidence_config = gating_config.get("evidence_sampling") or {}
+        if not isinstance(evidence_config, dict) or not evidence_config.get("enabled"):
+            return None
+        if not self.hallucination_detector or not answer.strip() or not docs:
+            return {
+                "enabled": True,
+                "candidate_unavailable": True,
+                "baseline_action": baseline_action,
+                "policy_action": baseline_action,
+                "reason": "candidate_unavailable",
+            }
+
+        subset_size = int(evidence_config.get("subset_size", 4))
+        num_subsets = int(evidence_config.get("num_subsets", 4))
+        seed = int(evidence_config.get("seed", 7))
+        policy = str(evidence_config.get("policy") or "guarded_v3")
+        question_type = str(evidence_config.get("question_type") or "conflict")
+        include_details = bool(evidence_config.get("include_details", False))
+
+        subsets = self._build_evidence_subsets(
+            query=query,
+            docs=docs,
+            subset_size=subset_size,
+            num_subsets=num_subsets,
+            seed=seed,
+        )
+        subset_results = [
+            self._evaluate_evidence_subset(
+                query=query,
+                answer=answer,
+                docs=subset["docs"],
+                aggregation=aggregation,
+                gating_config=gating_config,
+            )
+            for subset in subsets
+        ]
+        summary = self._summarize_evidence_sampling(subset_results, baseline_action)
+        policy_row = {
+            **summary,
+            "question_type": question_type,
+            "type": question_type,
+            "baseline_action": baseline_action,
+        }
+        policy_action, reason = decide_evidence_sampling_policy(policy_row, policy)
+        report = {
+            "enabled": True,
+            "shadow_only": bool(evidence_config.get("shadow_only", True)),
+            "policy": policy,
+            "question_type": question_type,
+            "policy_action": policy_action,
+            "reason": reason,
+            **summary,
+        }
+        if include_details:
+            report["subsets"] = [
+                {
+                    "name": subset["name"],
+                    "action": result["action"],
+                    "families": result["families"],
+                    "num_contexts": result["num_contexts"],
+                    "stats": result["stats"],
+                }
+                for subset, result in zip(subsets, subset_results)
+            ]
+        return report
+
     def _normalize_generated_answer(self, answer: str) -> str:
         if not answer:
             return ""
@@ -1229,6 +1769,7 @@ class RAGPipeline:
         gating_action = "none"
         gating_stats = None
         gating_attempts = 0
+        evidence_sampling_history: List[Dict[str, Any]] = []
         final_retrieved_docs: List[Dict[str, Any]] = []
 
         current_k = k if k is not None else self.retriever.k
@@ -1308,6 +1849,7 @@ class RAGPipeline:
 
             result = {
                 'answer': answer,
+                'pre_gating_answer': answer,
                 'num_docs_retrieved': len(retrieved_docs),
             }
 
@@ -1333,6 +1875,8 @@ class RAGPipeline:
                 if feedback:
                     rewrite_count = 1
                     logger.info("Rewriting answer for low completeness/claim support")
+                    original_answer = answer
+                    original_answer_quality = answer_quality
                     answer = self._run_cuda_stage(
                         "llm_rewrite",
                         self.llm.generate_with_context,
@@ -1342,18 +1886,38 @@ class RAGPipeline:
                         quality_feedback=feedback,
                     )
                     answer = self._normalize_generated_answer(answer)
-                    result = {
-                        "answer": answer,
-                        "num_docs_retrieved": len(retrieved_docs),
-                        "answer_quality_rewrite_attempted": True,
-                    }
-                    answer_quality = self._audit_answer_quality(
+                    rewritten_answer_quality = self._audit_answer_quality(
                         query_text,
                         answer,
                         context_texts,
                         aggregation_mode,
                         False,
                     )
+                    rewrite_reverted = False
+                    if not self._should_accept_quality_rewrite(
+                        original_answer_quality,
+                        rewritten_answer_quality,
+                    ):
+                        logger.info("Keeping original answer because quality rewrite scored lower")
+                        answer = original_answer
+                        answer_quality = original_answer_quality
+                        rewrite_reverted = True
+                    else:
+                        answer_quality = rewritten_answer_quality
+
+                    result = {
+                        "answer": answer,
+                        "pre_gating_answer": answer,
+                        "num_docs_retrieved": len(retrieved_docs),
+                        "answer_quality_rewrite_attempted": True,
+                        "answer_quality_rewrite_reverted": rewrite_reverted,
+                        "answer_quality_rewrite_before_score": self._answer_quality_acceptance_score(
+                            original_answer_quality
+                        ),
+                        "answer_quality_rewrite_after_score": self._answer_quality_acceptance_score(
+                            rewritten_answer_quality
+                        ),
+                    }
 
             detection_updates, detection_result = self._detect_generated_answer(
                 answer,
@@ -1438,17 +2002,50 @@ class RAGPipeline:
                     gating_stats, gating_config
                 )
 
-                if decision == "retrieve_more" and gating_attempts < max_retries:
-                    gating_attempts += 1
-                    gating_action = "retrieve_more"
-                    next_k = int(current_k * k_multiplier)
-                    if max_k is not None:
-                        next_k = min(next_k, int(max_k))
-                    if next_k == current_k:
-                        break
-                    current_k = next_k
-                    logger.info(f"Gating triggered: retrieving more (k={current_k})")
-                    continue
+                evidence_sampling_report = None
+                if not model_requested_abstain:
+                    evidence_sampling_report = self._run_evidence_sampling_gate(
+                        query=query_text,
+                        answer=str(result.get("pre_gating_answer") or answer or ""),
+                        docs=retrieved_docs,
+                        aggregation=aggregation_mode,
+                        gating_config=gating_config,
+                        baseline_action=decision,
+                    )
+                    if evidence_sampling_report:
+                        evidence_sampling_history.append(evidence_sampling_report)
+                        result["evidence_sampling_gate"] = evidence_sampling_report
+                        result["evidence_sampling_history"] = evidence_sampling_history
+                        if not evidence_sampling_report.get("shadow_only", True):
+                            decision = str(
+                                evidence_sampling_report.get("policy_action") or decision
+                            )
+                            if decision == "none" and not self._evidence_sampling_answer_allowed(
+                                gating_stats,
+                                evidence_sampling_report,
+                                gating_config,
+                            ):
+                                decision = "retrieve_more"
+
+                            if decision == "retrieve_more":
+                                next_k = int(current_k * k_multiplier)
+                                if max_k is not None:
+                                    next_k = min(next_k, int(max_k))
+                                if gating_attempts < max_retries and next_k > current_k:
+                                    gating_attempts += 1
+                                    gating_action = "retrieve_more"
+                                    current_k = next_k
+                                    logger.info(
+                                        "Evidence sampling triggered: retrieving more (k=%s)",
+                                        current_k,
+                                    )
+                                    continue
+                                decision = self._resolve_exhausted_retrieve_more_action(
+                                    gating_stats,
+                                    gating_config,
+                                    query=query_text,
+                                    answer=str(result.get("pre_gating_answer") or answer or ""),
+                                )
 
                 if decision in {"abstain", "retrieve_more"}:
                     gating_action = decision

@@ -648,8 +648,14 @@ class HallucinationDetector:
         prior_strength = float(cfg.get("prior_strength", 1.0))
         entropy_weight = float(cfg.get("entropy_weight", 0.5))
         energy = cfg.get("energy", "hybrid")
+        sampling_device = str(
+            cfg.get("device") or ("cpu" if str(self.device).startswith("cuda") else self.device)
+        )
 
-        base_logits = base_logits.detach()
+        # The sampled variable is only batch_size x num_labels. Keeping this
+        # tiny Langevin loop on CPU avoids repeated CUDA autograd kernels that
+        # have been unstable on the local RTX 2070/PyTorch stack.
+        base_logits = base_logits.detach().to(device=sampling_device, dtype=torch.float32)
         base_probs = torch.softmax(base_logits, dim=-1)
         logits = base_logits.clone()
         samples = []

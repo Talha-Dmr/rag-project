@@ -88,6 +88,42 @@ def as_list(value: Any) -> list[str]:
     return []
 
 
+CONCEPT_TOKEN_ALIASES = {
+    "incident": {"incidents"},
+    "incidents": {"incident"},
+    "respond": {"response", "responses", "responds", "responded", "responding"},
+    "response": {"respond", "responds", "responded", "responding"},
+}
+
+
+def token_hit(normalized_text: str, token: str) -> bool:
+    if re.search(rf"\b{re.escape(token)}\b", normalized_text):
+        return True
+
+    aliases = CONCEPT_TOKEN_ALIASES.get(token, set())
+    if any(re.search(rf"\b{re.escape(alias)}\b", normalized_text) for alias in aliases):
+        return True
+
+    if token.endswith("s") and len(token) > 4:
+        singular = token[:-1]
+        if re.search(rf"\b{re.escape(singular)}\b", normalized_text):
+            return True
+
+    if len(token) >= 5:
+        for suffix in ("ing", "ed", "es", "s"):
+            if token.endswith(suffix) and len(token) > len(suffix) + 3:
+                stem = token[: -len(suffix)]
+                if re.search(rf"\b{re.escape(stem)}(?:e|ed|es|ing|s)?\b", normalized_text):
+                    return True
+
+        # Conservative prefix match catches common noun forms such as detect/detection
+        # without making short regulatory tokens too permissive.
+        if re.search(rf"\b{re.escape(token)}[a-z]{{2,}}\b", normalized_text):
+            return True
+
+    return False
+
+
 def text_hit(text: str, phrase: str) -> bool:
     normalized_text = " ".join((text or "").lower().split())
     normalized_phrase = " ".join(phrase.strip().lower().split())
@@ -102,11 +138,7 @@ def text_hit(text: str, phrase: str) -> bool:
     if not tokens:
         return False
 
-    token_hits = sum(
-        1
-        for token in tokens
-        if re.search(rf"\b{re.escape(token)}\b", normalized_text)
-    )
+    token_hits = sum(1 for token in tokens if token_hit(normalized_text, token))
     required = max(1, int(round(len(tokens) * 0.6)))
     return token_hits >= required
 
@@ -125,6 +157,10 @@ def forbidden_claim_hit(text: str, phrase: str) -> bool:
         "no ",
         "no explicit",
         "not ",
+        "not.",
+        "not,",
+        "not;",
+        "not:",
         "not explicitly",
         "not stated",
         "not specify",
@@ -161,18 +197,30 @@ def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
         "no,",
         "does not",
         "do not",
+        "is not",
+        "are not",
         "not require",
+        "not limited",
+        "not solely",
+        "not only",
         "not stated",
         "no evidence",
         "no explicit",
         "not explicitly",
         "not used",
         "not related",
+        "not primarily",
+        "not mainly",
         "not in the context",
         "not supported",
+        "cannot",
         "cannot conclude",
+        "cannot solely",
+        "cannot treat",
         "should not",
         "not encourage",
+        "would contradict",
+        "instead,",
         "i don't know based on the provided context",
     )
     cautious_markers = (
@@ -182,13 +230,22 @@ def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
         "incomplete",
         "mixed",
         "not established",
+        "no fixed",
+        "does not establish",
+        "does not provide",
         "no explicit",
         "not explicit",
         "not explicitly",
         "not stated",
+        "not mentioned",
+        "not mandated",
+        "not required",
+        "no particular",
+        "no specific",
         "no evidence",
         "not enough",
         "does not specify",
+        "does not mention",
         "cannot determine",
         "clarify",
         "gather more",
@@ -585,7 +642,20 @@ def run_full_rag(args: argparse.Namespace) -> None:
 
     abstain_message = (config.get("gating", {}).get("abstain_message", "") or "").strip()
     rows: list[dict[str, Any]] = []
-    for item in questions:
+    processed_ids: set[str] = set()
+    if args.resume and partial_jsonl.exists():
+        rows = read_jsonl(partial_jsonl)
+        processed_ids = {str(row.get("id") or "") for row in rows if row.get("id")}
+        print(
+            f"Resuming {run_name}: loaded {len(rows)} existing rows from {partial_jsonl}",
+            flush=True,
+        )
+    initial_completed = len(rows)
+    total_questions = len(questions)
+    benchmark_started = time.perf_counter()
+    for index, item in enumerate(questions, start=1):
+        if str(item.get("id") or "") in processed_ids:
+            continue
         started = time.perf_counter()
         result = rag.query(
             query_text=item["query"],
@@ -601,9 +671,12 @@ def run_full_rag(args: argparse.Namespace) -> None:
         row = {
             **item,
             "answer": answer,
+            "pre_gating_answer": result.get("pre_gating_answer"),
             "abstained": is_abstain_answer(answer, abstain_message),
             "gating_action": gating.get("action", "none"),
             "gating_stats": gating.get("stats"),
+            "evidence_sampling_gate": result.get("evidence_sampling_gate"),
+            "evidence_sampling_history": result.get("evidence_sampling_history"),
             "latency_sec": latency,
             "hallucination_detected": result.get("hallucination_detected"),
             "hallucination_detector_ran": result.get("hallucination_detector_ran"),
@@ -612,6 +685,10 @@ def run_full_rag(args: argparse.Namespace) -> None:
             "answer_include_score": result.get("answer_include_score"),
             "answer_quality": result.get("answer_quality"),
             "answer_quality_rewrite_count": result.get("answer_quality_rewrite_count"),
+            "answer_quality_rewrite_attempted": result.get("answer_quality_rewrite_attempted"),
+            "answer_quality_rewrite_reverted": result.get("answer_quality_rewrite_reverted"),
+            "answer_quality_rewrite_before_score": result.get("answer_quality_rewrite_before_score"),
+            "answer_quality_rewrite_after_score": result.get("answer_quality_rewrite_after_score"),
             "answer_completeness_score": result.get("answer_completeness_score"),
             "answer_completeness_risk": result.get("answer_completeness_risk"),
             "context_coverage": result.get("context_coverage"),
@@ -633,15 +710,26 @@ def run_full_rag(args: argparse.Namespace) -> None:
         }
         row.update(full_rag_expected_behavior_rubric(row))
         rows.append(row)
+        processed_ids.add(str(item.get("id") or ""))
+        elapsed = time.perf_counter() - benchmark_started
+        completed = len(rows)
+        percent = safe_div(completed, total_questions) * 100.0
+        completed_this_session = max(1, completed - initial_completed)
+        avg_latency = safe_div(elapsed, completed_this_session)
+        eta = avg_latency * (total_questions - completed)
         print(
-            f"{item.get('id')} action={row['gating_action']} "
+            f"[progress {completed}/{total_questions} {percent:.1f}% "
+            f"elapsed={elapsed/60:.1f}m eta={eta/60:.1f}m] "
+            f"{item.get('id')} detector={row.get('hallucination_detector_ran')} "
+            f"action={row['gating_action']} "
             f"abstain={row['abstained']} "
             f"expected_behavior={row.get('expected_behavior_match')} "
             f"include_risk={row.get('answer_include_risk')} "
             f"complete={row.get('answer_completeness_score')} "
-            f"context={row.get('context_coverage')}"
+            f"context={row.get('context_coverage')}",
+            flush=True,
         )
-        print(f"  A: {short(answer)}")
+        print(f"  A: {short(answer)}", flush=True)
         write_jsonl(partial_jsonl, rows)
         write_json(partial_summary_json, full_rag_summary(rows))
 
@@ -659,6 +747,7 @@ def run_full_rag(args: argparse.Namespace) -> None:
         "expected_behavior",
         "query",
         "answer",
+        "pre_gating_answer",
         "gating_action",
         "abstained",
         "answer_include_risk",
@@ -706,6 +795,11 @@ def main() -> None:
     parser.add_argument("--disable-detector", action="store_true")
     parser.add_argument("--disable-gating", action="store_true")
     parser.add_argument("--disable-answer-quality", action="store_true")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume full-rag mode from per_question.partial.jsonl in the output run directory.",
+    )
     args = parser.parse_args()
 
     if args.config is None:

@@ -26,7 +26,7 @@ def main() -> None:
     parser.add_argument("--config", default="gating_finreg_ebcar_logit_mi_sc009_shadowfast")
     parser.add_argument(
         "--questions",
-        default="data/domain_finreg/questions_finreg_conflict_50.jsonl",
+        default="data/domain_finreg/questions_finreg_conflict_phase1_refined_v2_50.jsonl",
     )
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--seed", type=int, default=7)

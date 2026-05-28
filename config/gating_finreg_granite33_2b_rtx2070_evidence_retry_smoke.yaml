@@ -1,0 +1,71 @@
+# RTX 2070 smoke config for IBM Granite 3.3 2B Instruct.
+# Goal: test whether a non-Qwen generator is stable for evidence-budget retry.
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cpu
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg
+    collection_name: rag_finreg
+
+llm:
+  model_name: ibm-granite/granite-3.3-2b-instruct
+  device: cuda
+  cache_folder: ./models/llm
+  dtype: float16
+  attn_implementation: eager
+  max_tokens: 128
+  max_prompt_tokens: 1536
+  truncation_side: left
+  temperature: 0.0
+  top_p: 1.0
+  use_cache: true
+  clear_cuda_cache_after_generate: true
+
+retrieval:
+  k: 5
+  score_threshold: 0.0
+
+reranker:
+  type: ebcar
+  top_k: 8
+  embedder_config:
+    model_name: sentence-transformers/all-MiniLM-L6-v2
+    device: cpu
+
+hallucination_detector:
+  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_balanced/best_model
+  base_model: microsoft/deberta-v3-small
+  device: cpu
+  mc_dropout_samples: 1
+  batch_size: 4
+  logit_sampling:
+    enabled: true
+    device: cpu
+    steps: 40
+    step_size: 0.03
+    noise_std: 0.1
+    energy: hybrid
+    prior_strength: 1.0
+    entropy_weight: 0.5
+
+sources:
+  consistency_top_k: 5
+
+gating:
+  enabled: true
+  strategy: retrieve_more
+  max_retries: 1
+  k_multiplier: 1.6
+  max_k: 8
+  contradiction_rate_threshold: 0.40
+  contradiction_prob_threshold: 0.5
+  uncertainty_source: logit_mi
+  uncertainty_threshold: 0.02
+  source_consistency_threshold: 0.35
+  source_consistency_top_k: 5
+  abstain_message: "I don't have enough reliable information to answer that."

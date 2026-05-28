@@ -8,6 +8,7 @@ Outputs mean contradiction/uncertainty/source-consistency over all/answered/abst
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import math
 import random
@@ -473,6 +474,11 @@ def main() -> None:
         action="store_true",
         help="Include a truncated answer preview in --dump-details output.",
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from an existing --dump-details JSONL file and skip completed question ids.",
+    )
     parser.add_argument("--contradiction-rate-threshold", type=float, default=None)
     parser.add_argument("--contradiction-prob-threshold", type=float, default=None)
     parser.add_argument("--uncertainty-threshold", type=float, default=None)
@@ -536,6 +542,35 @@ def main() -> None:
             "'epi_coupled_v2' adds margins to reduce threshold fragility."
         ),
     )
+    parser.add_argument(
+        "--evidence-sampling-shadow",
+        action="store_true",
+        help="Run guarded evidence-subset sampling as a shadow gate inside RAGPipeline.query.",
+    )
+    parser.add_argument(
+        "--evidence-sampling-apply",
+        action="store_true",
+        help=(
+            "Apply the evidence-sampling policy to the actual gate action. "
+            "Implies --evidence-sampling-shadow; use only for controlled eval."
+        ),
+    )
+    parser.add_argument(
+        "--evidence-sampling-policy",
+        default="guarded_v3",
+        choices=[
+            "baseline",
+            "subset_majority",
+            "guarded_v1",
+            "guarded_v2",
+            "guarded_v3",
+            "guarded_v4",
+            "guarded_v4_lite",
+        ],
+        help="Evidence sampling policy to use when --evidence-sampling-shadow is set.",
+    )
+    parser.add_argument("--evidence-subset-size", type=int, default=4)
+    parser.add_argument("--evidence-num-subsets", type=int, default=4)
     args = parser.parse_args()
 
     seed_everything(int(args.seed))
@@ -546,6 +581,24 @@ def main() -> None:
         questions = questions[: args.limit]
 
     config = load_config(args.config)
+    evidence_sampling_enabled = bool(args.evidence_sampling_shadow or args.evidence_sampling_apply)
+    if evidence_sampling_enabled:
+        gating_cfg = config.get("gating") or {}
+        if not isinstance(gating_cfg, dict):
+            gating_cfg = {}
+        evidence_cfg = dict(gating_cfg.get("evidence_sampling") or {})
+        evidence_cfg.update(
+            {
+                "enabled": True,
+                "shadow_only": not bool(args.evidence_sampling_apply),
+                "policy": args.evidence_sampling_policy,
+                "subset_size": int(args.evidence_subset_size),
+                "num_subsets": int(args.evidence_num_subsets),
+                "seed": int(args.seed),
+            }
+        )
+        gating_cfg["evidence_sampling"] = evidence_cfg
+        config["gating"] = gating_cfg
     if args.llm_temperature is not None:
         llm_cfg = config.get("llm") or {}
         if not isinstance(llm_cfg, dict):
@@ -601,6 +654,8 @@ def main() -> None:
 
     action_counts = Counter()
     shadow_action_counts = Counter()
+    evidence_shadow_action_counts = Counter()
+    evidence_shadow_reason_counts = Counter()
     total = 0
     abstain = 0
     shadow_abstain = 0
@@ -609,7 +664,8 @@ def main() -> None:
     if args.dump_details:
         details_path = Path(args.dump_details)
         details_path.parent.mkdir(parents=True, exist_ok=True)
-        details_fh = details_path.open("w", encoding="utf-8")
+        mode = "a" if args.resume and details_path.exists() else "w"
+        details_fh = details_path.open(mode, encoding="utf-8")
 
     buckets = {
         "all": defaultdict(list),
@@ -628,11 +684,90 @@ def main() -> None:
     u_ale_values: List[float] = []
     retrieval_spread_values: List[float] = []
     low_confidence_values: List[float] = []
+    processed_keys = set()
+
+    def detail_key(row: Dict) -> str:
+        return str(row.get("id") or row.get("query") or "")
+
+    def accumulate_detail_row(row: Dict) -> None:
+        nonlocal total, abstain, shadow_abstain, detector_failures
+
+        action = str(row.get("action") or "none")
+        stats = row.get("stats") or {}
+        is_abstain = bool(row.get("is_abstain"))
+
+        action_counts[action] += 1
+        total += 1
+        if is_abstain:
+            abstain += 1
+        if row.get("hallucination_detected") is None or row.get("hallucination_error"):
+            detector_failures += 1
+
+        update_stats(buckets["all"], stats)
+        update_stats(buckets["abstain" if is_abstain else "answered"], stats)
+
+        u_epi_values.append(float(row.get("u_epi") or 0.0))
+        u_epi_raw_values.append(float(row.get("u_epi_raw") or 0.0))
+        u_epi_stochastic_values.append(float(row.get("u_epi_stochastic") or 0.0))
+        u_ale_values.append(float(row.get("u_ale") or 0.0))
+        retrieval_spread_values.append(float(row.get("retrieval_spread") or 0.0))
+        low_confidence_values.append(float(row.get("low_confidence") or 0.0))
+
+        shadow_action = str(row.get("action_shadow_2d") or "")
+        if shadow_action:
+            shadow_action_counts[shadow_action] += 1
+            if shadow_action == "abstain":
+                shadow_abstain += 1
+            update_stats(shadow_buckets[shadow_action], stats)
+            if shadow_action != "abstain":
+                update_stats(shadow_buckets["non_abstain"], stats)
+
+        evidence_sampling_gate = row.get("evidence_sampling_gate") or {}
+        if evidence_sampling_gate:
+            evidence_shadow_action_counts[
+                str(evidence_sampling_gate.get("policy_action") or "none")
+            ] += 1
+            evidence_shadow_reason_counts[
+                str(evidence_sampling_gate.get("reason") or "unknown")
+            ] += 1
+
+    if args.resume and args.dump_details:
+        details_path = Path(args.dump_details)
+        if details_path.exists():
+            with details_path.open("r", encoding="utf-8") as existing_fh:
+                for line_no, line in enumerate(existing_fh, start=1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        raise SystemExit(
+                            f"{details_path}:{line_no}: invalid JSON while resuming: {exc}"
+                        ) from exc
+                    key = detail_key(row)
+                    if not key or key in processed_keys:
+                        continue
+                    processed_keys.add(key)
+                    accumulate_detail_row(row)
 
     for item in questions:
+        key = str(item.get("id") or item.get("query") or "")
+        if key and key in processed_keys:
+            continue
         query = item.get("query", "")
         if not query:
             continue
+
+        per_query_gating = copy.deepcopy(gating_override) if gating_override else {}
+        if evidence_sampling_enabled:
+            base_evidence_cfg = (
+                (config.get("gating") or {}).get("evidence_sampling") or {}
+            )
+            per_query_gating["evidence_sampling"] = {
+                **base_evidence_cfg,
+                "question_type": str(item.get("type") or ""),
+            }
 
         result = rag.query(
             query_text=query,
@@ -643,7 +778,7 @@ def main() -> None:
                 or (config.get("hallucination_detector", {}) or {}).get("aggregation")
                 or None
             ),
-            gating=gating_override if gating_override else None,
+            gating=per_query_gating if per_query_gating else None,
         )
         answer = (result.get("answer") or "").strip()
         gating = result.get("gating") or {}
@@ -700,8 +835,19 @@ def main() -> None:
             if not is_shadow_abstain:
                 update_stats(shadow_buckets["non_abstain"], stats)
 
+        evidence_sampling_gate = result.get("evidence_sampling_gate") or {}
+        if evidence_sampling_gate:
+            evidence_shadow_action_counts[
+                str(evidence_sampling_gate.get("policy_action") or "none")
+            ] += 1
+            evidence_shadow_reason_counts[
+                str(evidence_sampling_gate.get("reason") or "unknown")
+            ] += 1
+
         if details_fh is not None:
             row = {
+                "id": item.get("id"),
+                "type": item.get("type"),
                 "query": query,
                 "action": action,
                 "attempts": attempts,
@@ -718,6 +864,10 @@ def main() -> None:
             }
             if args.shadow_two_channel:
                 row["action_shadow_2d"] = shadow_action
+            if evidence_sampling_gate:
+                row["evidence_sampling_gate"] = evidence_sampling_gate
+            if result.get("evidence_sampling_history"):
+                row["evidence_sampling_history"] = result.get("evidence_sampling_history")
             if "hallucination_detected" in result:
                 row["hallucination_detected"] = result.get("hallucination_detected")
             if result.get("hallucination_error"):
@@ -726,6 +876,7 @@ def main() -> None:
                 preview = answer.replace("\n", " ").strip()
                 row["answer_preview"] = preview[:400]
             details_fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+            details_fh.flush()
 
     summary = {
         "total": total,
@@ -768,6 +919,26 @@ def main() -> None:
             # Backward-compatible alias: previous "answered" bucket actually meant non-abstain.
             "stats_answered": summarize(shadow_buckets["non_abstain"]),
             "stats_abstain": summarize(shadow_buckets["abstain"]),
+        },
+        "evidence_sampling_shadow": {
+            "enabled": evidence_sampling_enabled,
+            "applied": bool(args.evidence_sampling_apply),
+            "shadow_only": not bool(args.evidence_sampling_apply),
+            "policy": args.evidence_sampling_policy,
+            "subset_size": int(args.evidence_subset_size),
+            "num_subsets": int(args.evidence_num_subsets),
+            "evaluated": sum(evidence_shadow_action_counts.values()),
+            "missing": (
+                total - sum(evidence_shadow_action_counts.values())
+                if args.evidence_sampling_shadow
+                else 0
+            ),
+            "actions": dict(evidence_shadow_action_counts),
+            "reasons": dict(evidence_shadow_reason_counts),
+            "action_rates": {
+                action_name: (count / total) if total else 0.0
+                for action_name, count in evidence_shadow_action_counts.items()
+            },
         },
     }
 

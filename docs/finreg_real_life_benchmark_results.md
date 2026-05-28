@@ -1,6 +1,8 @@
 # FinReg Real-Life Benchmark Results
 
-Run date: 2026-05-08
+Original 40-question run date: 2026-05-08
+
+80-question extension and ablation run date: 2026-05-22
 
 This document records the report-facing benchmark results for the FinReg RAG
 detector integration. The full-RAG metrics are pre-review metrics: they are
@@ -19,12 +21,59 @@ The controlled benchmark has 80 fixed candidate-answer cases:
 - 20 `contradicted`
 - 20 `partial`
 
-The full RAG benchmark has 40 questions:
+The current full RAG benchmark has 80 questions:
 
-- 10 `factual_supported`
-- 10 `false_premise`
-- 10 `multi_source_nuanced`
-- 10 `low_evidence_policy`
+- 20 `factual_supported`
+- 20 `false_premise`
+- 20 `multi_source_nuanced`
+- 20 `low_evidence_policy`
+
+## 80-Question Full RAG Ablation Update
+
+The original 40-question Full RAG input was extended in place to 80 questions.
+The additional questions preserve the four existing behavior categories and
+increase coverage of third-party risk, internal models, suitability, AML
+governance, SREP, ICT resilience, stress testing, risk data, liquidity, and
+climate scenario analysis.
+
+The same 80 questions were evaluated in four modes. Answer-quality rewrite was
+disabled in the four ablation modes so detector and stochastic decision effects
+are not mixed with rewrite effects. The detector+quality row is included as an
+end-to-end reference run.
+
+| Mode | Expected Behavior | Forbidden Claim Hit | Answer Rate | Abstain Rate | Detector Run Rate | Mean Latency |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline | 0.8625 | 0.0000 | 0.9750 | 0.0250 | 0.0000 | 9.99 s |
+| Detector | 0.9125 | 0.0000 | 0.8875 | 0.1125 | 0.9750 | 9.44 s |
+| Stochastic | 0.8625 | 0.0000 | 0.9750 | 0.0250 | 0.9750 | 9.65 s |
+| Detector + Stochastic | 0.9125 | 0.0000 | 0.8875 | 0.1125 | 0.9750 | 9.49 s |
+| Detector + Quality reference | 0.9500 | 0.0000 | 0.8125 | 0.1875 | 0.9625 | 20.54 s |
+
+| Mode | factual_supported | false_premise | multi_source_nuanced | low_evidence_policy |
+| --- | ---: | ---: | ---: | ---: |
+| Baseline | 16/20 | 16/20 | 19/20 | 18/20 |
+| Detector | 16/20 | 20/20 | 19/20 | 18/20 |
+| Stochastic | 16/20 | 16/20 | 19/20 | 18/20 |
+| Detector + Stochastic | 16/20 | 20/20 | 19/20 | 18/20 |
+
+Interpretation:
+
+- Detector gating improved four false-premise cases over baseline, with no
+  newly failed cases in this run.
+- The implemented stochastic logit-MI gate did not fire at the configured
+  threshold and did not improve over baseline or detector-only behavior.
+- The detector+quality reference result is an end-to-end system result, not a
+  detector-only causal result, because answer-quality rewrite is enabled.
+- Remaining misses are primarily evidence coverage and answer synthesis issues,
+  so they should be investigated through retrieval analysis rather than only
+  detector threshold tuning.
+
+Reproduction commands:
+
+```powershell
+.\scripts\run_fullrag80_detector.ps1
+.\scripts\run_fullrag80_ablation.ps1
+```
 
 ## Controlled Detector Results
 

@@ -7,7 +7,7 @@ import re
 import os
 from pathlib import Path
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, __version__ as TRANSFORMERS_VERSION
 from src.core.base_classes import BaseLLM
 from src.core.logger import get_logger
 
@@ -45,11 +45,13 @@ class HuggingFaceLLM(BaseLLM):
         self.top_p = self.config.get('top_p', 0.9)
         self.load_in_8bit = self.config.get('load_in_8bit', False)
         self.use_chat_template = bool(self.config.get('use_chat_template', True))
+        self.truncation_side = str(self.config.get("truncation_side", "left")).strip().lower()
         self.enable_thinking = self.config.get('enable_thinking')
         self.device_map = self.config.get('device_map')
         self.low_cpu_mem_usage = bool(self.config.get('low_cpu_mem_usage', False))
         self.attn_implementation = self.config.get('attn_implementation')
         self.use_cache = bool(self.config.get('use_cache', True))
+        self.trust_remote_code = bool(self.config.get("trust_remote_code", False))
         self.clear_cuda_cache_after_generate = bool(
             self.config.get('clear_cuda_cache_after_generate', self.device == 'cuda')
         )
@@ -66,32 +68,18 @@ class HuggingFaceLLM(BaseLLM):
                 self.model_name,
                 cache_dir=self.cache_folder,
                 local_files_only=self.local_files_only,
+                trust_remote_code=self.trust_remote_code,
             )
 
             # Set pad token if not set
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
-
-            # Load model
-            model_kwargs = {
-                'cache_dir': self.cache_folder,
-                'dtype': self.dtype,
-                'local_files_only': self.local_files_only,
-            }
-            if self.device_map:
-                model_kwargs['device_map'] = self.device_map
-            if self.low_cpu_mem_usage:
-                model_kwargs['low_cpu_mem_usage'] = True
-            if self.attn_implementation:
-                model_kwargs['attn_implementation'] = self.attn_implementation
-
-            if self.load_in_8bit and self.device == 'cuda':
-                model_kwargs['load_in_8bit'] = True
-                model_kwargs.setdefault('device_map', 'auto')
+            if self.truncation_side in {"left", "right"}:
+                self.tokenizer.truncation_side = self.truncation_side
 
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
-                **model_kwargs
+                **self._model_kwargs()
             )
 
             if not self.load_in_8bit and not self.device_map:
@@ -104,6 +92,26 @@ class HuggingFaceLLM(BaseLLM):
         except Exception as e:
             logger.error(f"Failed to load LLM {self.model_name}: {e}")
             raise
+
+    def _model_kwargs(self) -> Dict[str, Any]:
+        dtype_key = "dtype" if str(TRANSFORMERS_VERSION).split(".", 1)[0] == "5" else "torch_dtype"
+        model_kwargs = {
+            'cache_dir': self.cache_folder,
+            'local_files_only': self.local_files_only,
+            'trust_remote_code': self.trust_remote_code,
+            dtype_key: self.dtype,
+        }
+        if self.device_map:
+            model_kwargs['device_map'] = self.device_map
+        if self.low_cpu_mem_usage:
+            model_kwargs['low_cpu_mem_usage'] = True
+        if self.attn_implementation:
+            model_kwargs['attn_implementation'] = self.attn_implementation
+
+        if self.load_in_8bit and self.device == 'cuda':
+            model_kwargs['load_in_8bit'] = True
+            model_kwargs.setdefault('device_map', 'auto')
+        return model_kwargs
 
     def _resolve_local_model(self, model_name: str) -> str:
         """Resolve a Hugging Face repo id to a bundled local snapshot when present."""
@@ -123,7 +131,9 @@ class HuggingFaceLLM(BaseLLM):
         snapshots = sorted(
             (
                 path for path in snapshots_dir.iterdir()
-                if path.is_dir() and (path / "config.json").exists()
+                if path.is_dir()
+                and (path / "config.json").exists()
+                and self._snapshot_has_weights(path)
             ),
             key=lambda path: path.stat().st_mtime,
             reverse=True,
@@ -134,6 +144,29 @@ class HuggingFaceLLM(BaseLLM):
         resolved = str(snapshots[0])
         logger.info("Resolved LLM %s to local snapshot: %s", raw_name, resolved)
         return resolved
+
+    def _snapshot_has_weights(self, snapshot_dir: Path) -> bool:
+        """Return true only when a local HF snapshot has complete weight files."""
+        if any(path.exists() for path in snapshot_dir.glob("*.bin")):
+            return True
+        if any(path.exists() for path in snapshot_dir.glob("*.safetensors")):
+            return True
+
+        index_path = snapshot_dir / "model.safetensors.index.json"
+        if not index_path.exists():
+            return False
+        try:
+            import json
+
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            weight_files = {
+                str(filename)
+                for filename in (index.get("weight_map") or {}).values()
+                if filename
+            }
+        except Exception:
+            return False
+        return bool(weight_files) and all((snapshot_dir / filename).exists() for filename in weight_files)
 
     def _resolve_dtype(self, raw_dtype: Any) -> Any:
         if raw_dtype is None:
@@ -193,7 +226,7 @@ class HuggingFaceLLM(BaseLLM):
             ).to(self.device)
 
             # Generate
-            with torch.no_grad():
+            with torch.inference_mode():
                 generate_kwargs = {
                     "max_new_tokens": max_tokens,
                     "do_sample": temperature > 0,

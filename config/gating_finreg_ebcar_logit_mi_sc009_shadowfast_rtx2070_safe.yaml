@@ -1,0 +1,74 @@
+# RTX 2070-safe version of gating_finreg_ebcar_logit_mi_sc009_shadowfast.
+#
+# Keep the local Qwen generator on GPU, but move small auxiliary models to CPU.
+# This avoids long mixed CUDA workloads during evidence-sampling evals while
+# preserving the same corpus, retrieval settings, detector checkpoint, and gate
+# thresholds used by the shadowfast baseline.
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cpu
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg
+    collection_name: rag_finreg
+
+llm:
+  model_name: Qwen/Qwen2.5-1.5B-Instruct
+  device: cuda
+  dtype: float32
+  attn_implementation: eager
+  max_tokens: 128
+  max_prompt_tokens: 1536
+  truncation_side: left
+  temperature: 0.0
+  top_p: 1.0
+  use_cache: false
+  clear_cuda_cache_after_generate: true
+
+retrieval:
+  k: 5
+  score_threshold: 0.0
+
+reranker:
+  type: ebcar
+  top_k: 5
+  embedder_config:
+    model_name: sentence-transformers/all-MiniLM-L6-v2
+    device: cpu
+
+hallucination_detector:
+  model_path: models/checkpoints/sgld_lora_warmstart_ambigqa_mini_noise5e-5_balanced/best_model
+  base_model: microsoft/deberta-v3-small
+  device: cpu
+  mc_dropout_samples: 1
+  batch_size: 4
+  logit_sampling:
+    enabled: true
+    device: cpu
+    steps: 40
+    step_size: 0.03
+    noise_std: 0.1
+    energy: hybrid
+    prior_strength: 1.0
+    entropy_weight: 0.5
+
+sources:
+  consistency_top_k: 5
+
+gating:
+  enabled: true
+  strategy: retrieve_more
+  max_retries: 0
+  k_multiplier: 2.0
+  max_k: 20
+  contradiction_rate_threshold: 0.40
+  contradiction_prob_threshold: 0.5
+  uncertainty_source: logit_mi
+  uncertainty_threshold: 0.02
+  source_consistency_threshold: 0.35
+  source_consistency_top_k: 5
+  abstain_message: "I don't have enough reliable information to answer that."

@@ -51,6 +51,8 @@ class HuggingFaceLLM(BaseLLM):
         self.low_cpu_mem_usage = bool(self.config.get('low_cpu_mem_usage', False))
         self.attn_implementation = self.config.get('attn_implementation')
         self.use_cache = bool(self.config.get('use_cache', True))
+        self.repetition_penalty = float(self.config.get('repetition_penalty', 1.0) or 1.0)
+        self.no_repeat_ngram_size = int(self.config.get('no_repeat_ngram_size', 0) or 0)
         self.trust_remote_code = bool(self.config.get("trust_remote_code", False))
         self.clear_cuda_cache_after_generate = bool(
             self.config.get('clear_cuda_cache_after_generate', self.device == 'cuda')
@@ -237,6 +239,10 @@ class HuggingFaceLLM(BaseLLM):
                     "remove_invalid_values": True,
                     "renormalize_logits": True,
                 }
+                if self.repetition_penalty and self.repetition_penalty != 1.0:
+                    generate_kwargs["repetition_penalty"] = self.repetition_penalty
+                if self.no_repeat_ngram_size > 0:
+                    generate_kwargs["no_repeat_ngram_size"] = self.no_repeat_ngram_size
                 if temperature > 0:
                     generate_kwargs["temperature"] = temperature
                     generate_kwargs["top_p"] = self.top_p
@@ -320,6 +326,16 @@ class HuggingFaceLLM(BaseLLM):
             "If the evidence is incomplete or mixed, say what is supported and what is not established. "
             "For broad what/how/main-elements questions, cover all distinct supported elements "
             "that are relevant to the question instead of giving only one narrow example. "
+            "When the question asks for areas, controls, capabilities, responsibilities, or how several "
+            "items fit together, explicitly address each named item from the question when the context supports it. "
+            "For risk-management lifecycle questions, cover supported identify/assess or measure, "
+            "manage or mitigate, monitor or report, and governance elements. "
+            "For ICT or security risk questions, cover supported identify, protect, detect, respond, "
+            "recover, testing, governance, and incident-management elements. "
+            "For management-body suitability questions, cover supported knowledge, skills, experience, "
+            "reputation, time commitment, independence, and conflicts-of-interest dimensions. "
+            "For climate or ESG questions, cover supported governance, risk identification, measurement, "
+            "management, monitoring, physical risk, and transition risk elements. "
             "For false-premise yes/no questions, start by clearly rejecting the premise when "
             "the context supports rejection. Do not output role labels. Answer in 2-5 concise sentences."
         )
@@ -330,6 +346,7 @@ class HuggingFaceLLM(BaseLLM):
             "CONTEXT:\n<<<\n"
             f"{context_text}\n"
             ">>>\n\n"
+            f"QUESTION AGAIN: {query}\n\n"
             "Answer the question using only the context above."
         )
 

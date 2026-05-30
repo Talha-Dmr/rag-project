@@ -1,0 +1,121 @@
+# RTX 3090 FinReg coverage-focused full RAG config.
+# Starts from guarded_v6 and increases retrieval/context budget, enables query
+# expansion, longer answers, and one deterministic answer-quality rewrite.
+
+data_loader:
+  default_loader: json
+  json:
+    content_field: content
+
+chunking:
+  strategy: section_aware
+  config:
+    max_chunk_size: 1200
+    min_chunk_size: 250
+    chunk_overlap: 120
+    max_heading_length: 120
+    allow_titlecase_headings: true
+
+embeddings:
+  type: huggingface
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: cpu
+  cache_folder: ./models/embeddings
+  batch_size: 32
+
+vector_store:
+  type: chroma
+  config:
+    persist_directory: ./data/vector_db/domain_finreg_real_section
+    collection_name: rag_finreg_real_section
+
+llm:
+  model_name: ibm-granite/granite-3.3-2b-instruct
+  device: cuda
+  cache_folder: ./models/llm
+  dtype: float16
+  max_tokens: 160
+  max_prompt_tokens: 1792
+  truncation_side: left
+  temperature: 0.0
+  top_p: 1.0
+  repetition_penalty: 1.05
+  no_repeat_ngram_size: 4
+  use_chat_template: true
+  attn_implementation: eager
+  use_cache: true
+  clear_cuda_cache_after_generate: true
+
+retrieval:
+  k: 16
+  score_threshold: 0.0
+  query_expansion:
+    enabled: true
+    max_queries: 3
+    per_query_k: 12
+    max_candidates: 24
+    merge_strategy: round_robin
+    fallback_terms: "governance controls responsibilities monitoring testing evidence limits avoid overclaiming"
+
+reranker:
+  type: cross_encoder
+  model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
+  device: cpu
+  top_k: 8
+
+hallucination_detector:
+  enabled: true
+  model_path: models/checkpoints/finregbench_modernbert_detector_v3_hardmix/best_model
+  base_model: tasksource/ModernBERT-base-nli
+  device: cpu
+  max_length: 768
+  batch_size: 1
+  hypothesis_format: question_and_candidate_answer
+  risk_mode: answer_include
+  aggregation: answer_include_best
+  answer_include_threshold: 0.97
+
+hallucination_aggregation: answer_include_best
+
+answer_quality:
+  enabled: true
+  min_concept_coverage: 0.55
+  min_context_coverage: 0.45
+  allow_context_concept_expansion: true
+  context_expansion_min_query_concepts: 3
+  rewrite_on_low_coverage: true
+  max_rewrites: 1
+  rewrite_max_tokens: 160
+  accept_rewrite_only_if_not_worse: true
+  max_required_concepts: 8
+  max_feedback_concepts: 6
+  claim_level: false
+  max_claims: 5
+  min_claim_include_rate: 0.75
+  max_claim_answer_include_risk: 0.97
+
+gating:
+  enabled: true
+  strategy: abstain
+  max_retries: 1
+  k_multiplier: 1.5
+  max_k: 24
+  contradiction_prob_metric: answer_include_risk
+  contradiction_prob_threshold: 0.97
+  contradiction_rate_metric: hard_contradiction_rate
+  contradiction_rate_threshold: 0.40
+  uncertainty_threshold: 1.0
+  abstain_message: "I don't have enough reliable evidence to support that answer."
+  evidence_sampling:
+    enabled: true
+    shadow_only: false
+    policy: guarded_v6
+    subset_size: 4
+    num_subsets: 5
+    seed: 7
+    include_details: false
+    exhausted_retrieve_more_action: none
+
+sources:
+  max_sources: 6
+  include_scores: true

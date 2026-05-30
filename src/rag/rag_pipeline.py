@@ -61,7 +61,7 @@ FINREG_QUERY_EXPANSIONS = [
     ),
     (
         re.compile(r"\bict|cyber|security risk|incident|resilience\b", re.IGNORECASE),
-        "identify protect detect respond recover testing cybersecurity incident response business continuity",
+        "identify protect detect respond recover testing cybersecurity incident response business continuity impact tolerances important business services mapping dependencies",
     ),
     (
         re.compile(r"\boutsourc|cloud|third(?:\s|-)?party|service provider\b", re.IGNORECASE),
@@ -78,6 +78,22 @@ FINREG_QUERY_EXPANSIONS = [
     (
         re.compile(r"\bintraday liquidity|payment|settlement\b", re.IGNORECASE),
         "payment settlement obligations liquidity risk monitoring tools stress scenarios reporting",
+    ),
+    (
+        re.compile(r"\bliquidity|ilaap|funding|liquid asset|collateral\b", re.IGNORECASE),
+        "ILAAP liquidity SREP liquid asset buffers collateral daily reporting under stress funding risk",
+    ),
+    (
+        re.compile(r"\bsuitability|management body|key function holder|independence of mind\b", re.IGNORECASE),
+        "individual suitability collective suitability knowledge experience reputation time commitment independence of mind diversity",
+    ),
+    (
+        re.compile(r"\bcore principles|banking supervision|supervisory independence|corrective powers\b", re.IGNORECASE),
+        "minimum standards prudential regulation supervision risk-based supervision corrective powers consolidated supervision supervisory framework",
+    ),
+    (
+        re.compile(r"\bbranch|subsidiar|third-country branch|home-state\b", re.IGNORECASE),
+        "branch subsidiary home-state supervision supervisory cooperation governance risk controls booking arrangements liquidity resolvability systemic importance",
     ),
     (
         re.compile(r"\bremuneration|risk culture|board|senior management\b", re.IGNORECASE),
@@ -1531,6 +1547,34 @@ class RAGPipeline:
             )
             for item in subset_results
         ]
+        def stat_values(key: str) -> List[float]:
+            values: List[float] = []
+            for item in subset_results:
+                value = item.get("stats", {}).get(key)
+                if isinstance(value, (int, float)):
+                    values.append(float(value))
+            return values
+
+        support_scores = stat_values("support_score")
+        entailment_probs = stat_values("entailment_prob_mean")
+        neutral_probs = stat_values("neutral_prob_mean")
+        contradiction_probs = stat_values("contradiction_prob_mean")
+        uncertainty_means = stat_values("uncertainty_mean")
+        top2_margins = stat_values("top2_margin_mean")
+        source_consistencies = stat_values("source_consistency")
+        retrieval_max_scores = stat_values("retrieval_max_score")
+        retrieval_mean_scores = stat_values("retrieval_mean_score")
+        vector_rows = [
+            [entailment_probs[index], neutral_probs[index], contradiction_probs[index]]
+            for index in range(
+                min(len(entailment_probs), len(neutral_probs), len(contradiction_probs))
+            )
+        ]
+        vector_instability = (
+            float(np.mean(np.std(np.array(vector_rows, dtype=float), axis=0)))
+            if len(vector_rows) >= 2
+            else 0.0
+        )
         return {
             "subset_count": total,
             "subset_actions": dict(actions),
@@ -1547,6 +1591,44 @@ class RAGPipeline:
                 float(sum(risks) / len(risks)) if risks else None
             ),
             "answer_include_risk_max_across_subsets": max(risks) if risks else None,
+            "support_score_mean_across_subsets": (
+                float(sum(support_scores) / len(support_scores)) if support_scores else None
+            ),
+            "entailment_prob_mean_across_subsets": (
+                float(sum(entailment_probs) / len(entailment_probs)) if entailment_probs else None
+            ),
+            "neutral_prob_mean_across_subsets": (
+                float(sum(neutral_probs) / len(neutral_probs)) if neutral_probs else None
+            ),
+            "contradiction_prob_mean_across_subsets": (
+                float(sum(contradiction_probs) / len(contradiction_probs))
+                if contradiction_probs
+                else None
+            ),
+            "uncertainty_mean_across_subsets": (
+                float(sum(uncertainty_means) / len(uncertainty_means))
+                if uncertainty_means
+                else None
+            ),
+            "top2_margin_mean_across_subsets": (
+                float(sum(top2_margins) / len(top2_margins)) if top2_margins else None
+            ),
+            "prob_vector_instability_across_subsets": vector_instability,
+            "source_consistency_mean_across_subsets": (
+                float(sum(source_consistencies) / len(source_consistencies))
+                if source_consistencies
+                else None
+            ),
+            "retrieval_max_score_mean_across_subsets": (
+                float(sum(retrieval_max_scores) / len(retrieval_max_scores))
+                if retrieval_max_scores
+                else None
+            ),
+            "retrieval_mean_score_mean_across_subsets": (
+                float(sum(retrieval_mean_scores) / len(retrieval_mean_scores))
+                if retrieval_mean_scores
+                else None
+            ),
         }
 
     def _run_evidence_sampling_gate(
@@ -1600,6 +1682,8 @@ class RAGPipeline:
             "question_type": question_type,
             "type": question_type,
             "baseline_action": baseline_action,
+            "query": query,
+            "answer": answer,
         }
         policy_action, reason = decide_evidence_sampling_policy(policy_row, policy)
         report = {
@@ -1638,6 +1722,27 @@ class RAGPipeline:
                 return cleaned[:end].strip().rstrip(".") + "."
 
         return cleaned
+
+    def _is_degenerate_answer(self, answer: str) -> bool:
+        """Catch repetition loops that can appear during local GPU generation."""
+        words = re.findall(r"[a-zA-Z][a-zA-Z0-9'-]{1,}", (answer or "").lower())
+        if len(words) < 24:
+            return False
+
+        counts = Counter(words)
+        most_common_word, most_common_count = counts.most_common(1)[0]
+        if len(most_common_word) > 3 and most_common_count / max(len(words), 1) >= 0.22:
+            return True
+
+        for ngram_size, max_allowed in ((3, 4), (4, 3), (5, 3)):
+            ngrams = [
+                tuple(words[index:index + ngram_size])
+                for index in range(0, len(words) - ngram_size + 1)
+            ]
+            if ngrams and Counter(ngrams).most_common(1)[0][1] >= max_allowed:
+                return True
+
+        return False
 
     def _model_requested_abstain(self, answer: str) -> bool:
         lower = (answer or "").strip().lower()
@@ -1846,11 +1951,16 @@ class RAGPipeline:
                 context_texts,
             )
             answer = self._normalize_generated_answer(answer)
+            degenerate_answer = self._is_degenerate_answer(answer)
+            if degenerate_answer:
+                logger.warning("Generated answer looked degenerate; abstaining instead of returning it.")
+                answer = abstain_message
 
             result = {
                 'answer': answer,
                 'pre_gating_answer': answer,
                 'num_docs_retrieved': len(retrieved_docs),
+                'generation_degenerate': degenerate_answer,
             }
 
             answer_quality = self._audit_answer_quality(
@@ -1877,33 +1987,44 @@ class RAGPipeline:
                     logger.info("Rewriting answer for low completeness/claim support")
                     original_answer = answer
                     original_answer_quality = answer_quality
-                    answer = self._run_cuda_stage(
-                        "llm_rewrite",
-                        self.llm.generate_with_context,
-                        query_text,
-                        context_texts,
-                        max_tokens=self.answer_quality_config.get("rewrite_max_tokens"),
-                        quality_feedback=feedback,
-                    )
-                    answer = self._normalize_generated_answer(answer)
-                    rewritten_answer_quality = self._audit_answer_quality(
-                        query_text,
-                        answer,
-                        context_texts,
-                        aggregation_mode,
-                        False,
-                    )
                     rewrite_reverted = False
-                    if not self._should_accept_quality_rewrite(
-                        original_answer_quality,
-                        rewritten_answer_quality,
-                    ):
-                        logger.info("Keeping original answer because quality rewrite scored lower")
+                    rewrite_error = None
+                    try:
+                        answer = self._run_cuda_stage(
+                            "llm_rewrite",
+                            self.llm.generate_with_context,
+                            query_text,
+                            context_texts,
+                            max_tokens=self.answer_quality_config.get("rewrite_max_tokens"),
+                            quality_feedback=feedback,
+                        )
+                        answer = self._normalize_generated_answer(answer)
+                        if self._is_degenerate_answer(answer):
+                            raise ValueError("degenerate rewrite output")
+                        rewritten_answer_quality = self._audit_answer_quality(
+                            query_text,
+                            answer,
+                            context_texts,
+                            aggregation_mode,
+                            False,
+                        )
+                        if not self._should_accept_quality_rewrite(
+                            original_answer_quality,
+                            rewritten_answer_quality,
+                        ):
+                            logger.info("Keeping original answer because quality rewrite scored lower")
+                            answer = original_answer
+                            answer_quality = original_answer_quality
+                            rewrite_reverted = True
+                        else:
+                            answer_quality = rewritten_answer_quality
+                    except Exception as exc:
+                        logger.warning("Answer quality rewrite failed; keeping original answer: %s", exc)
                         answer = original_answer
                         answer_quality = original_answer_quality
                         rewrite_reverted = True
-                    else:
-                        answer_quality = rewritten_answer_quality
+                        rewritten_answer_quality = original_answer_quality
+                        rewrite_error = str(exc)
 
                     result = {
                         "answer": answer,
@@ -1918,6 +2039,8 @@ class RAGPipeline:
                             rewritten_answer_quality
                         ),
                     }
+                    if rewrite_error:
+                        result["answer_quality_rewrite_error"] = rewrite_error[:500]
 
             detection_updates, detection_result = self._detect_generated_answer(
                 answer,

@@ -13,6 +13,80 @@ def canonical_action(action: str) -> str:
     return "answer" if action in ("none", "answer") else action
 
 
+def _float(row: dict[str, Any], key: str, default: float = 0.0) -> float:
+    value = row.get(key)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _is_closed_probe(text: str) -> bool:
+    first = (text or "").strip().lower().split(" ", 1)[0]
+    return first in {"can", "could", "does", "do", "is", "are", "should", "will", "would"}
+
+
+def _is_low_evidence_probe(text: str) -> bool:
+    query = f" {(text or '').strip().lower()} "
+    return (
+        query.strip().startswith("if ")
+        and " not " in query
+        and any(marker in query for marker in (" how should ", " what should ", " should the system "))
+    )
+
+
+def _has_direct_refutation(text: str) -> bool:
+    answer = f" {(text or '').strip().lower()} "
+    markers = (
+        " no,",
+        " no ",
+        " not ",
+        " does not ",
+        " do not ",
+        " is not ",
+        " are not ",
+        " cannot ",
+        " can't ",
+        " should not ",
+        " without ",
+        " no evidence ",
+        " not stated ",
+        " not establish ",
+        " does not establish ",
+        " not supported ",
+    )
+    return any(marker in answer for marker in markers)
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _vector_answer_risk(row: dict[str, Any]) -> float:
+    """Continuous detector-vector risk, independent of hard predicted labels."""
+    risk_mean = _float(row, "answer_include_risk_mean_across_subsets")
+    support_mean = _float(row, "support_score_mean_across_subsets", 1.0)
+    entailment_mean = _float(row, "entailment_prob_mean_across_subsets")
+    neutral_mean = _float(row, "neutral_prob_mean_across_subsets")
+    contradiction_mean = _float(row, "contradiction_prob_mean_across_subsets")
+    uncertainty_mean = _float(row, "uncertainty_mean_across_subsets")
+    vector_instability = _float(row, "prob_vector_instability_across_subsets")
+    top2_margin = _float(row, "top2_margin_mean_across_subsets")
+    not_included_mass = _clamp01(neutral_mean + contradiction_mean)
+
+    return _clamp01(
+        0.34 * risk_mean
+        + 0.22 * not_included_mass
+        + 0.16 * (1.0 - support_mean)
+        + 0.12 * (1.0 - entailment_mean)
+        + 0.08 * uncertainty_mean
+        + 0.08 * vector_instability
+        - 0.04 * top2_margin
+    )
+
+
 def decide_policy(row: dict[str, Any], policy: str) -> tuple[str, str]:
     qtype = str(row.get("type") or row.get("question_type") or "")
     baseline = str(row.get("baseline_action") or "none")
@@ -20,11 +94,18 @@ def decide_policy(row: dict[str, Any], policy: str) -> tuple[str, str]:
     if row.get("candidate_unavailable"):
         return baseline, "candidate_unavailable"
 
-    answer_rate = float(row.get("subset_answer_rate") or 0.0)
-    non_answer_rate = float(row.get("subset_non_answer_rate") or 0.0)
-    instability = float(row.get("subset_action_instability") or 0.0)
-    risk_mean = float(row.get("answer_include_risk_mean_across_subsets") or 0.0)
-    risk_max = float(row.get("answer_include_risk_max_across_subsets") or 0.0)
+    answer_rate = _float(row, "subset_answer_rate")
+    non_answer_rate = _float(row, "subset_non_answer_rate")
+    instability = _float(row, "subset_action_instability")
+    risk_mean = _float(row, "answer_include_risk_mean_across_subsets")
+    risk_max = _float(row, "answer_include_risk_max_across_subsets")
+    support_mean = _float(row, "support_score_mean_across_subsets", 1.0)
+    entailment_mean = _float(row, "entailment_prob_mean_across_subsets")
+    neutral_mean = _float(row, "neutral_prob_mean_across_subsets")
+    contradiction_mean = _float(row, "contradiction_prob_mean_across_subsets")
+    vector_instability = _float(row, "prob_vector_instability_across_subsets")
+    query = str(row.get("query") or row.get("question") or "")
+    answer = str(row.get("answer") or row.get("candidate_answer") or "")
 
     if policy == "baseline":
         return baseline, "baseline"
@@ -118,5 +199,88 @@ def decide_policy(row: dict[str, Any], policy: str) -> tuple[str, str]:
         if answer_rate >= 0.75 and risk_max < 0.65:
             return "none", "conflict_stable_safe"
         return baseline, "conflict_fallback_baseline"
+
+    if policy == "guarded_v5":
+        # Conservative production candidate:
+        # - preserve an existing non-answer when subset checks agree with it
+        # - request more evidence only when subsets show non-answer pressure or
+        #   a combined low-support/high-neutral/high-risk pattern
+        # - avoid risk-only gating, which over-triggers on correct FinReg answers
+        if canonical_action(baseline) != "answer":
+            if non_answer_rate >= 0.50:
+                return baseline, "baseline_non_answer_confirmed"
+            return baseline, "baseline_non_answer_preserved"
+
+        if non_answer_rate >= 0.50:
+            return "retrieve_more", "subset_non_answer_majority"
+        if non_answer_rate >= 0.20 and risk_mean >= 0.85:
+            return "retrieve_more", "partial_subset_non_answer_high_risk"
+        if risk_mean >= 0.85 and neutral_mean >= 0.93 and support_mean <= 0.30:
+            return "retrieve_more", "low_support_high_neutral_risk"
+        if instability >= 0.25 and risk_max >= 0.85:
+            return "retrieve_more", "unstable_high_risk"
+        return baseline, "stable_or_insufficient_signal"
+
+    if policy == "guarded_v6":
+        # guarded_v5 plus a closed-question refutation guard. This catches
+        # yes/no regulatory probes where the answer discusses related evidence
+        # but never directly rejects the unsupported premise.
+        if _is_closed_probe(query) and not _has_direct_refutation(answer) and risk_mean >= 0.75:
+            return "abstain", "closed_probe_without_refutation"
+
+        if canonical_action(baseline) != "answer":
+            if non_answer_rate >= 0.50:
+                return baseline, "baseline_non_answer_confirmed"
+            return baseline, "baseline_non_answer_preserved"
+
+        if non_answer_rate >= 0.50:
+            return "retrieve_more", "subset_non_answer_majority"
+        if non_answer_rate >= 0.20 and risk_mean >= 0.85:
+            return "retrieve_more", "partial_subset_non_answer_high_risk"
+        if risk_mean >= 0.85 and neutral_mean >= 0.93 and support_mean <= 0.30:
+            return "retrieve_more", "low_support_high_neutral_risk"
+        if instability >= 0.25 and risk_max >= 0.85:
+            return "retrieve_more", "unstable_high_risk"
+        return baseline, "stable_or_insufficient_signal"
+
+    if policy == "vector_v3":
+        # guarded_v6 with a continuous detector-vector layer. This uses the
+        # entailment/neutral/contradiction probability distribution across
+        # sampled evidence subsets, not only the final hard detector action.
+        closed_without_refutation = _is_closed_probe(query) and not _has_direct_refutation(answer)
+        not_included_mass = _clamp01(neutral_mean + contradiction_mean)
+        vector_risk = _vector_answer_risk(row)
+
+        if closed_without_refutation and vector_risk >= 0.64 and not_included_mass >= 0.76:
+            return "abstain", "closed_probe_vector_not_included"
+        if (
+            _is_low_evidence_probe(query)
+            and vector_risk >= 0.68
+            and risk_mean >= 0.80
+            and support_mean <= 0.20
+            and not_included_mass >= 0.82
+        ):
+            return "abstain", "low_evidence_vector_not_included"
+
+        if canonical_action(baseline) != "answer":
+            if non_answer_rate >= 0.50:
+                return baseline, "baseline_non_answer_confirmed"
+            if vector_risk >= 0.78 and support_mean <= 0.22:
+                return baseline, "baseline_non_answer_vector_confirmed"
+            return baseline, "baseline_non_answer_preserved"
+
+        if non_answer_rate >= 0.50:
+            return "retrieve_more", "subset_non_answer_majority"
+        if non_answer_rate >= 0.20 and vector_risk >= 0.76:
+            return "retrieve_more", "partial_subset_non_answer_vector_risk"
+        if vector_risk >= 0.73 and support_mean <= 0.16 and neutral_mean >= 0.86:
+            return "retrieve_more", "low_support_high_neutral_vector"
+        if vector_risk >= 0.84 and entailment_mean <= 0.10 and not_included_mass >= 0.88:
+            return "retrieve_more", "low_entailment_not_included_vector"
+        if contradiction_mean >= 0.16 and vector_risk >= 0.66 and support_mean <= 0.35:
+            return "retrieve_more", "soft_contradiction_vector"
+        if vector_instability >= 0.05 and risk_max >= 0.82:
+            return "retrieve_more", "unstable_probability_vector"
+        return baseline, "vector_stable_or_insufficient_signal"
 
     raise ValueError(f"Unknown evidence sampling policy: {policy}")

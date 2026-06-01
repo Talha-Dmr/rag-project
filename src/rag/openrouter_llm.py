@@ -1,5 +1,8 @@
 """
-OpenRouter-backed LLM wrapper (OpenAI-compatible chat completions API).
+OpenAI-compatible chat-completions LLM wrapper.
+
+Originally added for OpenRouter; also supports direct providers such as DeepSeek
+when configured with their base URL and API key environment variable.
 """
 
 from __future__ import annotations
@@ -20,12 +23,13 @@ logger = get_logger(__name__)
 
 class OpenRouterLLM(BaseLLM):
     """
-    LLM wrapper using OpenRouter chat completions API.
+    LLM wrapper using an OpenAI-compatible chat completions API.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         super().__init__(config)
 
+        self.provider_name = str(self.config.get("provider_name", "OpenRouter")).strip() or "OpenRouter"
         self.model_name = self.config.get("model_name", "openrouter/free")
         fallback_cfg = self.config.get("fallback_models", [])
         if isinstance(fallback_cfg, str):
@@ -34,10 +38,10 @@ class OpenRouterLLM(BaseLLM):
             self.fallback_models = [str(m).strip() for m in fallback_cfg if str(m).strip()]
         else:
             self.fallback_models = []
-        self.base_url = self.config.get(
+        self.base_url = self._normalize_base_url(self.config.get(
             "base_url",
             "https://openrouter.ai/api/v1/chat/completions",
-        )
+        ))
         self.api_key_env = self.config.get("api_key_env", "OPENROUTER_API_KEY")
         self.api_key = self.config.get("api_key") or os.getenv(self.api_key_env, "")
         self.site_url = self.config.get("site_url")
@@ -56,7 +60,13 @@ class OpenRouterLLM(BaseLLM):
                 f"Missing API key. Set {self.api_key_env} or provide llm.api_key in config."
             )
 
-        logger.info("Using OpenRouter model: %s", self.model_name)
+        logger.info("Using %s model: %s", self.provider_name, self.model_name)
+
+    def _normalize_base_url(self, raw_url: str) -> str:
+        url = str(raw_url).strip().rstrip("/")
+        if url.endswith("/chat/completions"):
+            return url
+        return f"{url}/chat/completions"
 
     def _headers(self) -> Dict[str, str]:
         headers = {
@@ -72,7 +82,7 @@ class OpenRouterLLM(BaseLLM):
     def _extract_text(self, response_payload: Dict[str, Any]) -> str:
         choices = response_payload.get("choices") or []
         if not choices:
-            raise RuntimeError(f"OpenRouter response missing choices: {response_payload}")
+            raise RuntimeError(f"{self.provider_name} response missing choices: {response_payload}")
 
         message = (choices[0] or {}).get("message") or {}
         content = message.get("content", "")
@@ -129,7 +139,8 @@ class OpenRouterLLM(BaseLLM):
                 if e.code in retryable_codes and attempt < self.max_retries:
                     sleep_sec = self.retry_backoff_sec * (2**attempt)
                     logger.warning(
-                        "OpenRouter HTTP %s for model %s (retry %s/%s) - waiting %.1fs",
+                        "%s HTTP %s for model %s (retry %s/%s) - waiting %.1fs",
+                        self.provider_name,
                         e.code,
                         model_name,
                         attempt + 1,
@@ -139,13 +150,14 @@ class OpenRouterLLM(BaseLLM):
                     time.sleep(sleep_sec)
                     continue
 
-                raise RuntimeError(f"OpenRouter HTTP {e.code}: {detail}") from e
+                raise RuntimeError(f"{self.provider_name} HTTP {e.code}: {detail}") from e
             except Exception as e:
                 last_error = e
                 if attempt < self.max_retries:
                     sleep_sec = self.retry_backoff_sec * (2**attempt)
                     logger.warning(
-                        "OpenRouter request error for model %s (retry %s/%s): %s - waiting %.1fs",
+                        "%s request error for model %s (retry %s/%s): %s - waiting %.1fs",
+                        self.provider_name,
                         model_name,
                         attempt + 1,
                         self.max_retries,
@@ -154,15 +166,15 @@ class OpenRouterLLM(BaseLLM):
                     )
                     time.sleep(sleep_sec)
                     continue
-                raise RuntimeError(f"OpenRouter request failed: {e}") from e
+                raise RuntimeError(f"{self.provider_name} request failed: {e}") from e
 
         if not data:
             raise RuntimeError(
-                f"OpenRouter request failed with empty response for model {model_name}: {last_error}"
+                f"{self.provider_name} request failed with empty response for model {model_name}: {last_error}"
             )
 
         if "error" in data:
-            raise RuntimeError(f"OpenRouter error: {data['error']}")
+            raise RuntimeError(f"{self.provider_name} error: {data['error']}")
 
         return self._extract_text(data)
 
@@ -172,7 +184,7 @@ class OpenRouterLLM(BaseLLM):
         for idx, model_name in enumerate(models_to_try):
             try:
                 if idx > 0:
-                    logger.warning("OpenRouter fallback model activated: %s", model_name)
+                    logger.warning("%s fallback model activated: %s", self.provider_name, model_name)
                 return self._chat_single(
                     model_name=model_name,
                     messages=messages,
@@ -183,7 +195,7 @@ class OpenRouterLLM(BaseLLM):
                 errors.append(str(e))
                 continue
 
-        raise RuntimeError("OpenRouter all model attempts failed: " + " | ".join(errors))
+        raise RuntimeError(f"{self.provider_name} all model attempts failed: " + " | ".join(errors))
 
     def generate(
         self,

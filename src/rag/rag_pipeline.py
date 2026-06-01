@@ -2538,7 +2538,15 @@ class RAGPipeline:
         llm_type = str(llm_config.get("type", "huggingface")).strip().lower()
         if llm_type in {"none", "disabled", "noop", "detector_only"}:
             llm = _NoopLLM(llm_config)
-        elif llm_type in {"openrouter", "api", "openai_compatible"}:
+        elif llm_type in {"openrouter", "api", "openai_compatible", "deepseek"}:
+            if llm_type == "deepseek":
+                llm_config = {
+                    "provider_name": "DeepSeek",
+                    "model_name": "deepseek-v4-flash",
+                    "base_url": "https://api.deepseek.com",
+                    "api_key_env": "DEEPSEEK_API_KEY",
+                    **llm_config,
+                }
             llm = OpenRouterLLM(llm_config)
         else:
             llm = HuggingFaceLLM(llm_config)

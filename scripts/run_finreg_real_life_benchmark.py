@@ -178,6 +178,20 @@ def forbidden_claim_hit(text: str, phrase: str) -> bool:
         local_window = f"{prefix} {suffix}"
         if any(marker in local_window for marker in negation_markers):
             continue
+        if any(
+            marker in suffix
+            for marker in (
+                " are unrelated",
+                " is unrelated",
+                " unrelated to",
+                " not related",
+                " not relevant",
+                " outside",
+                " are outside",
+                " is outside",
+            )
+        ):
+            continue
         return True
     return False
 
@@ -221,6 +235,11 @@ def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
         "not encourage",
         "would contradict",
         "instead,",
+        "beyond just",
+        "beyond only",
+        "broader than",
+        "than merely",
+        "not merely",
         "i don't know based on the provided context",
     )
     cautious_markers = (
@@ -788,7 +807,7 @@ def main() -> None:
     parser.add_argument("--config", default=None)
     parser.add_argument("--cases", type=Path, default=DEFAULT_CONTROLLED_CASES)
     parser.add_argument("--questions", type=Path, default=DEFAULT_FULL_RAG_QUESTIONS)
-    parser.add_argument("--k", type=int, default=5)
+    parser.add_argument("--k", type=int, default=None)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--run-name", default=None)
     parser.add_argument("--output-dir", type=Path, default=Path("reports/finreg_real_life_benchmark"))

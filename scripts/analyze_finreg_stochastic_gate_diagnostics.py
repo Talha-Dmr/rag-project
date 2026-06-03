@@ -16,22 +16,15 @@ from pathlib import Path
 from typing import Any
 
 from scripts.eval_grounding_proxy import (
+    augment_stats_with_evidence_gate,
     compute_shadow_epistemic,
     compute_shadow_uncertainty,
     decide_shadow_action_2d,
 )
+from src.rag.stochastic_epistemic_adapter import ADAPTER_SOURCES
 
 
-DEFAULT_EPI_SOURCES = [
-    "logit_mi",
-    "stochastic_ou",
-    "stochastic_langevin",
-    "stochastic_mirror_langevin",
-    "stochastic_wright_fisher",
-    "stochastic_sghmc",
-    "stochastic_sgbd",
-    "stochastic_prox_langevin",
-]
+DEFAULT_EPI_SOURCES = list(ADAPTER_SOURCES)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -156,7 +149,10 @@ def action_for(
     policy: str,
     uncertainty_formula: str,
 ) -> tuple[str, float, float]:
-    stats = row.get("stats") or {}
+    stats = augment_stats_with_evidence_gate(
+        row.get("stats") or {},
+        row.get("evidence_sampling_gate") or {},
+    )
     metrics = compute_shadow_uncertainty(stats, formula=uncertainty_formula)
     u_epi_base = float(metrics["u_epi"])
     u_epi = compute_shadow_epistemic(
@@ -206,7 +202,10 @@ def main() -> None:
     for source in sources:
         values: list[float] = []
         for row in rows:
-            stats = row.get("stats") or {}
+            stats = augment_stats_with_evidence_gate(
+                row.get("stats") or {},
+                row.get("evidence_sampling_gate") or {},
+            )
             metrics = compute_shadow_uncertainty(stats, formula=args.uncertainty_formula)
             values.append(
                 compute_shadow_epistemic(

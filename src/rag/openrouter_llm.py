@@ -54,6 +54,7 @@ class OpenRouterLLM(BaseLLM):
         )
         self.temperature = float(self.config.get("temperature", 0.7))
         self.top_p = float(self.config.get("top_p", 0.9))
+        self.thinking = self.config.get("thinking")
 
         if not self.api_key:
             raise ValueError(
@@ -112,6 +113,8 @@ class OpenRouterLLM(BaseLLM):
             "temperature": float(temperature),
             "top_p": float(self.top_p),
         }
+        if self.thinking is not None:
+            payload["thinking"] = self.thinking
 
         body = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(

@@ -24,6 +24,7 @@ from src.rag.openrouter_llm import OpenRouterLLM
 from src.rag.answer_quality import audit_answer_quality, build_quality_feedback, split_claims
 from src.rag.evidence_sampling_policy import decide_policy as decide_evidence_sampling_policy
 from src.rag.retriever import Retriever
+from src.rag.stochastic_epistemic_adapter import compute_epistemic_adapter
 from src.core.base_classes import BaseLLM, BaseReranker
 from src.core.logger import get_logger
 
@@ -1040,9 +1041,33 @@ class RAGPipeline:
         contradiction_prob = self._get_selected_metric(
             stats, gating_config, "contradiction_prob_metric", "contradiction_prob_mean", 0.0
         )
-        uncertainty = self._get_selected_metric(
-            stats, gating_config, "uncertainty_metric", "uncertainty_mean", 0.0
+        uncertainty_metric_name = str(
+            gating_config.get("uncertainty_metric", "uncertainty_mean") or "uncertainty_mean"
         )
+        uncertainty_metric_for_baseline = (
+            "uncertainty_mean"
+            if uncertainty_metric_name in {"epistemic_adapter", "uncertainty_epistemic_adapter"}
+            else uncertainty_metric_name
+        )
+        uncertainty = self._get_selected_metric(
+            stats,
+            {"uncertainty_metric": uncertainty_metric_for_baseline},
+            "uncertainty_metric",
+            "uncertainty_mean",
+            0.0,
+        )
+        epistemic_adapter = str(gating_config.get("epistemic_adapter") or "").strip()
+        if epistemic_adapter:
+            adapter_score = compute_epistemic_adapter(
+                stats=stats,
+                u_epi_baseline=float(uncertainty),
+                source=epistemic_adapter,
+            )
+            stats["uncertainty_epistemic_adapter"] = float(adapter_score)
+            stats["uncertainty_epistemic_adapter_baseline"] = float(uncertainty)
+            stats["uncertainty_epistemic_adapter_source"] = epistemic_adapter
+            if uncertainty_metric_name in {"epistemic_adapter", "uncertainty_epistemic_adapter"}:
+                uncertainty = float(adapter_score)
         answer_completeness_score = stats.get("answer_completeness_score", 1.0)
         context_coverage = stats.get("context_coverage", 1.0)
         claim_include_rate = stats.get("claim_include_rate", 1.0)
@@ -1561,6 +1586,13 @@ class RAGPipeline:
         contradiction_probs = stat_values("contradiction_prob_mean")
         uncertainty_means = stat_values("uncertainty_mean")
         top2_margins = stat_values("top2_margin_mean")
+        contradiction_stds = stat_values("contradiction_prob_std")
+        label_disagreements = stat_values("label_disagreement")
+        label_entropies = stat_values("label_entropy")
+        conflict_masses = stat_values("conflict_mass_mean")
+        confidence_means = stat_values("confidence_mean")
+        answer_completeness_scores = stat_values("answer_completeness_score")
+        context_coverages = stat_values("context_coverage")
         source_consistencies = stat_values("source_consistency")
         retrieval_max_scores = stat_values("retrieval_max_score")
         retrieval_mean_scores = stat_values("retrieval_mean_score")
@@ -1613,6 +1645,33 @@ class RAGPipeline:
             "top2_margin_mean_across_subsets": (
                 float(sum(top2_margins) / len(top2_margins)) if top2_margins else None
             ),
+            "contradiction_prob_std_mean_across_subsets": (
+                float(sum(contradiction_stds) / len(contradiction_stds))
+                if contradiction_stds
+                else None
+            ),
+            "label_disagreement_mean_across_subsets": (
+                float(sum(label_disagreements) / len(label_disagreements))
+                if label_disagreements
+                else None
+            ),
+            "label_entropy_mean_across_subsets": (
+                float(sum(label_entropies) / len(label_entropies)) if label_entropies else None
+            ),
+            "conflict_mass_mean_across_subsets": (
+                float(sum(conflict_masses) / len(conflict_masses)) if conflict_masses else None
+            ),
+            "confidence_mean_across_subsets": (
+                float(sum(confidence_means) / len(confidence_means)) if confidence_means else None
+            ),
+            "answer_completeness_score_mean_across_subsets": (
+                float(sum(answer_completeness_scores) / len(answer_completeness_scores))
+                if answer_completeness_scores
+                else None
+            ),
+            "context_coverage_mean_across_subsets": (
+                float(sum(context_coverages) / len(context_coverages)) if context_coverages else None
+            ),
             "prob_vector_instability_across_subsets": vector_instability,
             "source_consistency_mean_across_subsets": (
                 float(sum(source_consistencies) / len(source_consistencies))
@@ -1658,6 +1717,8 @@ class RAGPipeline:
         policy = str(evidence_config.get("policy") or "guarded_v3")
         question_type = str(evidence_config.get("question_type") or "conflict")
         include_details = bool(evidence_config.get("include_details", False))
+        adapter_source = str(evidence_config.get("adapter_source") or "").strip()
+        adapter_threshold = evidence_config.get("adapter_threshold")
 
         subsets = self._build_evidence_subsets(
             query=query,
@@ -1685,7 +1746,26 @@ class RAGPipeline:
             "query": query,
             "answer": answer,
         }
+        if adapter_source:
+            policy_row["adapter_source"] = adapter_source
+        if isinstance(adapter_threshold, (int, float)):
+            policy_row["adapter_threshold"] = float(adapter_threshold)
         policy_action, reason = decide_evidence_sampling_policy(policy_row, policy)
+        report_adapter_source = adapter_source
+        if not report_adapter_source and policy in {"adapter_evidence_instability", "evidence_instability_v1"}:
+            report_adapter_source = "evidence_instability"
+        if not report_adapter_source and policy in {
+            "adapter_active_retrieval",
+            "active_retrieval_multicriteria_v1",
+        }:
+            report_adapter_source = "active_retrieval_multicriteria"
+        adapter_score = None
+        if report_adapter_source:
+            adapter_score = compute_epistemic_adapter(
+                stats=policy_row,
+                u_epi_baseline=float(summary.get("uncertainty_mean_across_subsets") or 0.0),
+                source=report_adapter_source,
+            )
         report = {
             "enabled": True,
             "shadow_only": bool(evidence_config.get("shadow_only", True)),
@@ -1695,6 +1775,11 @@ class RAGPipeline:
             "reason": reason,
             **summary,
         }
+        if report_adapter_source:
+            report["epistemic_adapter_source"] = report_adapter_source
+            report["epistemic_adapter_score"] = adapter_score
+        if isinstance(adapter_threshold, (int, float)):
+            report["epistemic_adapter_threshold"] = float(adapter_threshold)
         if include_details:
             report["subsets"] = [
                 {

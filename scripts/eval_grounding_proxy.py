@@ -18,6 +18,11 @@ from typing import Dict, List
 
 from src.core.config_loader import load_config
 from src.rag.rag_pipeline import RAGPipeline
+from src.rag.stochastic_epistemic_adapter import (
+    ADAPTER_SOURCES,
+    augment_stats_with_evidence_gate as shared_augment_stats_with_evidence_gate,
+    compute_epistemic_adapter,
+)
 
 
 def seed_everything(seed: int) -> None:
@@ -265,7 +270,31 @@ def compute_shadow_uncertainty(
     }
 
 
-def compute_shadow_epistemic(stats: Dict[str, float], u_epi_baseline: float, epi_source: str) -> float:
+def _legacy_augment_stats_with_evidence_gate(stats: Dict, evidence_sampling_gate: Dict | None) -> Dict:
+    """Return a shallow stats copy enriched with evidence-subset gate fields."""
+    if not evidence_sampling_gate:
+        return stats
+    augmented = dict(stats)
+    for key in (
+        "subset_answer_rate",
+        "subset_retrieve_more_rate",
+        "subset_abstain_rate",
+        "subset_non_answer_rate",
+        "subset_action_instability",
+        "baseline_action_stability",
+        "answer_include_risk_mean_across_subsets",
+        "answer_include_risk_max_across_subsets",
+        "support_score_mean_across_subsets",
+        "contradiction_prob_mean_across_subsets",
+        "uncertainty_mean_across_subsets",
+        "top2_margin_mean_across_subsets",
+    ):
+        if key in evidence_sampling_gate:
+            augmented[key] = evidence_sampling_gate[key]
+    return augmented
+
+
+def _legacy_compute_shadow_epistemic(stats: Dict[str, float], u_epi_baseline: float, epi_source: str) -> float:
     """
     Shadow epistemic adapter.
 
@@ -280,15 +309,38 @@ def compute_shadow_epistemic(stats: Dict[str, float], u_epi_baseline: float, epi
     contradiction_prob = _clamp01(_to_float(stats.get("contradiction_prob_mean"), 0.0))
     contradiction_prob_std = _clamp01(_to_float(stats.get("contradiction_prob_std"), 0.0))
     label_disagreement = _clamp01(_to_float(stats.get("label_disagreement"), 0.0))
+    label_entropy = _clamp01(_to_float(stats.get("label_entropy"), 0.0))
     neutral_prob_mean = _clamp01(_to_float(stats.get("neutral_prob_mean"), 0.0))
+    entailment_prob_mean = _clamp01(_to_float(stats.get("entailment_prob_mean"), 0.0))
     low_confidence = _clamp01(_to_float(stats.get("low_confidence"), 0.0))
     conflict_mass = _clamp01(_to_float(stats.get("conflict_mass_mean"), 0.0))
+    top2_margin = _clamp01(_to_float(stats.get("top2_margin_mean"), 0.0))
+    support_score = _clamp01(_to_float(stats.get("support_score"), 1.0))
+    answer_completeness = _clamp01(_to_float(stats.get("answer_completeness_score"), 1.0))
+    context_coverage = _clamp01(_to_float(stats.get("context_coverage"), 1.0))
+    source_consistency = _clamp01(_to_float(stats.get("source_consistency"), 1.0))
+    retrieval_max_score = _clamp01(_to_float(stats.get("retrieval_max_score"), 0.0))
+    retrieval_mean_score = _clamp01(_to_float(stats.get("retrieval_mean_score"), 0.0))
+    contradiction_neutral_gap = _clamp01(
+        max(0.0, _to_float(stats.get("contradiction_neutral_gap_mean"), 0.0))
+    )
     retrieval_spread = _clamp01(
         max(
             0.0,
-            _to_float(stats.get("retrieval_max_score"), 0.0)
-            - _to_float(stats.get("retrieval_mean_score"), 0.0),
+            retrieval_max_score - retrieval_mean_score,
         )
+    )
+    total_prob = max(1e-8, entailment_prob_mean + neutral_prob_mean + contradiction_prob)
+    p_e = entailment_prob_mean / total_prob
+    p_n = neutral_prob_mean / total_prob
+    p_c = contradiction_prob / total_prob
+    simplex_entropy = 0.0
+    for p in (p_e, p_n, p_c):
+        simplex_entropy -= p * math.log(max(1e-8, p))
+    entropy_norm = _clamp01(simplex_entropy / math.log(3.0))
+    label_entropy = _clamp01(_to_float(stats.get("label_entropy"), entropy_norm))
+    simplex_variance = _clamp01(
+        (p_e * (1.0 - p_e) + p_n * (1.0 - p_n) + p_c * (1.0 - p_c)) / 0.75
     )
 
     if source in ("stochastic_ou", "ou"):
@@ -315,15 +367,6 @@ def compute_shadow_epistemic(stats: Dict[str, float], u_epi_baseline: float, epi
         # Mirror-Langevin-like proxy:
         # - Use simplex-aware entropy normalization as mirror geometry signal.
         # - Reward disagreement/spread while keeping baseline inertia.
-        entailment_prob_mean = _clamp01(_to_float(stats.get("entailment_prob_mean"), 0.0))
-        total_prob = max(1e-8, entailment_prob_mean + neutral_prob_mean + contradiction_prob)
-        p_e = entailment_prob_mean / total_prob
-        p_n = neutral_prob_mean / total_prob
-        p_c = contradiction_prob / total_prob
-        entropy = 0.0
-        for p in (p_e, p_n, p_c):
-            entropy -= p * math.log(max(1e-8, p))
-        entropy_norm = _clamp01(entropy / math.log(3.0))
         mirror_tension = 1.0 - entropy_norm
         return max(
             0.0,
@@ -337,11 +380,6 @@ def compute_shadow_epistemic(stats: Dict[str, float], u_epi_baseline: float, epi
         # Wright-Fisher-like proxy:
         # - Diffusion strength is higher near simplex interior and lower near corners.
         # - Combine with disagreement to keep conflict-awareness.
-        entailment_prob_mean = _clamp01(_to_float(stats.get("entailment_prob_mean"), 0.0))
-        total_prob = max(1e-8, entailment_prob_mean + neutral_prob_mean + contradiction_prob)
-        p_e = entailment_prob_mean / total_prob
-        p_n = neutral_prob_mean / total_prob
-        p_c = contradiction_prob / total_prob
         wf_strength = (p_e * (1.0 - p_e) + p_n * (1.0 - p_n) + p_c * (1.0 - p_c)) / 3.0
         wf_strength = _clamp01(wf_strength / 0.25)
         return max(
@@ -397,7 +435,241 @@ def compute_shadow_epistemic(stats: Dict[str, float], u_epi_baseline: float, epi
             + 0.08 * retrieval_spread,
         )
 
+    if source in ("stochastic_sgld", "sgld"):
+        # SGLD-like proxy:
+        # - Uses a stronger conflict-gradient term than SGHMC.
+        # - Keeps enough baseline inertia to avoid pure contradiction-prob gating.
+        return max(
+            0.0,
+            0.54 * base
+            + 0.18 * contradiction_prob
+            + 0.12 * low_confidence
+            + 0.10 * contradiction_prob_std
+            + 0.06 * retrieval_spread,
+        )
+
+    if source in ("adaptive_sgld", "stochastic_adaptive_sgld", "asgld"):
+        # Adaptive SGLD-like proxy:
+        # - Raises diffusion when conflict and low confidence co-occur.
+        # - Dampens isolated confidence noise by coupling terms multiplicatively.
+        adaptive_noise = _clamp01(0.5 * low_confidence + 0.5 * conflict_mass)
+        coupled_conflict = _clamp01(contradiction_prob * (0.5 + 0.5 * low_confidence))
+        return max(
+            0.0,
+            0.50 * base
+            + 0.18 * coupled_conflict
+            + 0.14 * adaptive_noise
+            + 0.10 * contradiction_prob_std
+            + 0.08 * label_disagreement,
+        )
+
+    if source in ("dirichlet_simplex", "stochastic_dirichlet_simplex", "dirichlet"):
+        # Dirichlet/simplex proxy:
+        # - Treats the detector probability vector as a simplex distribution.
+        # - High entropy/variance means the vector is diffuse rather than decisively entailed.
+        not_entailment_mass = _clamp01(p_n + p_c)
+        return max(
+            0.0,
+            0.44 * base
+            + 0.18 * entropy_norm
+            + 0.16 * simplex_variance
+            + 0.14 * not_entailment_mass
+            + 0.08 * label_disagreement,
+        )
+
+    if source in ("stein_particle", "stochastic_stein_particle", "svgd"):
+        # Stein-particle-style proxy:
+        # - Rewards ensemble-like repulsion from disagreement/spread signals.
+        # - Keeps conflict probability as an attractor toward retrieve_more.
+        particle_repulsion = _clamp01(
+            0.40 * label_disagreement
+            + 0.30 * contradiction_prob_std
+            + 0.20 * retrieval_spread
+            + 0.10 * (1.0 - top2_margin)
+        )
+        return max(
+            0.0,
+            0.48 * base
+            + 0.22 * particle_repulsion
+            + 0.16 * contradiction_prob
+            + 0.08 * neutral_prob_mean
+            + 0.06 * conflict_mass,
+        )
+
+    if source in ("conformal_margin", "stochastic_conformal_margin", "conformal"):
+        # Conformal-margin proxy:
+        # - Uses low detector margin and low support as abstention/retrieve pressure.
+        # - This is not a conformal guarantee; it is a replay-friendly margin proxy.
+        support_score = _clamp01(_to_float(stats.get("support_score"), 1.0))
+        margin_risk = _clamp01(1.0 - top2_margin)
+        not_included_mass = _clamp01(neutral_prob_mean + contradiction_prob)
+        return max(
+            0.0,
+            0.42 * base
+            + 0.22 * margin_risk
+            + 0.16 * (1.0 - support_score)
+            + 0.12 * not_included_mass
+            + 0.08 * contradiction_prob_std,
+        )
+
+    if source in ("risk_budgeted_bayesian", "stochastic_risk_budgeted_bayes", "rbb"):
+        # Risk-budgeted Bayesian-style proxy:
+        # - Blends posterior-like unsupported mass with evidence dispersion.
+        # - Designed to spend retrieve_more budget on high-risk, low-support answers.
+        support_score = _clamp01(_to_float(stats.get("support_score"), 1.0))
+        posterior_unsupported = _clamp01(
+            0.45 * contradiction_prob
+            + 0.35 * neutral_prob_mean
+            + 0.20 * (1.0 - support_score)
+        )
+        dispersion = _clamp01(
+            0.45 * contradiction_prob_std
+            + 0.35 * label_disagreement
+            + 0.20 * retrieval_spread
+        )
+        return max(
+            0.0,
+            0.46 * base
+            + 0.24 * posterior_unsupported
+            + 0.18 * dispersion
+            + 0.12 * low_confidence,
+        )
+
+    if source in ("retrieval_evaluator_crag", "crag_retrieval", "crag"):
+        # CRAG-style retrieval evaluator proxy:
+        # - Estimate whether the retrieved evidence is good enough to trust.
+        # - Emphasizes retrieval/source quality and answer support, not model sampling.
+        evidence_quality_risk = _clamp01(
+            0.22 * (1.0 - retrieval_max_score)
+            + 0.18 * (1.0 - retrieval_mean_score)
+            + 0.16 * retrieval_spread
+            + 0.18 * (1.0 - source_consistency)
+            + 0.14 * (1.0 - support_score)
+            + 0.06 * (1.0 - context_coverage)
+            + 0.06 * (1.0 - answer_completeness)
+        )
+        return max(
+            0.0,
+            0.42 * base
+            + 0.30 * evidence_quality_risk
+            + 0.16 * contradiction_prob
+            + 0.12 * label_disagreement,
+        )
+
+    if source in ("active_retrieval_multicriteria", "uar_multicriteria", "active_retrieval"):
+        # Unified-active-retrieval-style proxy:
+        # - Keep separate criteria visible before blending: knowledge gap, conflict,
+        #   source inconsistency, and incomplete answer/evidence coverage.
+        knowledge_gap = _clamp01(0.55 * (1.0 - support_score) + 0.45 * low_confidence)
+        evidence_conflict = _clamp01(
+            0.45 * contradiction_prob
+            + 0.25 * label_disagreement
+            + 0.20 * conflict_mass
+            + 0.10 * contradiction_prob_std
+        )
+        source_gap = _clamp01(
+            0.55 * (1.0 - source_consistency)
+            + 0.25 * retrieval_spread
+            + 0.20 * (1.0 - retrieval_mean_score)
+        )
+        incompleteness = _clamp01(
+            0.45 * (1.0 - answer_completeness)
+            + 0.35 * (1.0 - context_coverage)
+            + 0.20 * (1.0 - support_score)
+        )
+        criteria_peak = max(knowledge_gap, evidence_conflict, source_gap, incompleteness)
+        criteria_mean = _clamp01(
+            (knowledge_gap + evidence_conflict + source_gap + incompleteness) / 4.0
+        )
+        return max(
+            0.0,
+            0.36 * base
+            + 0.34 * criteria_peak
+            + 0.20 * criteria_mean
+            + 0.10 * contradiction_prob_std,
+        )
+
+    if source in ("semantic_entropy_proxy", "semantic_entropy", "sep_proxy"):
+        # Semantic-entropy-inspired proxy:
+        # - Approximates semantic uncertainty from detector distribution shape.
+        # - This is not sampled semantic entropy; it is a cheap replay-compatible proxy.
+        margin_risk = _clamp01(1.0 - top2_margin)
+        semantic_dispersion = _clamp01(
+            0.35 * label_entropy
+            + 0.25 * entropy_norm
+            + 0.18 * margin_risk
+            + 0.12 * label_disagreement
+            + 0.10 * (1.0 - support_score)
+        )
+        return max(
+            0.0,
+            0.44 * base
+            + 0.32 * semantic_dispersion
+            + 0.14 * neutral_prob_mean
+            + 0.10 * contradiction_prob_std,
+        )
+
+    if source in ("evidence_instability", "subset_instability", "vector_instability"):
+        # Evidence-subset-instability proxy:
+        # - Reuses the already computed evidence-subset sampling diagnostics.
+        # - Falls back to base-only behavior when no subset diagnostics are present.
+        subset_instability = _clamp01(_to_float(stats.get("subset_action_instability"), 0.0))
+        subset_non_answer = _clamp01(_to_float(stats.get("subset_non_answer_rate"), 0.0))
+        subset_retrieve = _clamp01(_to_float(stats.get("subset_retrieve_more_rate"), 0.0))
+        subset_abstain = _clamp01(_to_float(stats.get("subset_abstain_rate"), 0.0))
+        subset_risk_mean = _clamp01(
+            _to_float(
+                stats.get("answer_include_risk_mean_across_subsets"),
+                _to_float(stats.get("answer_include_risk"), 0.0),
+            )
+        )
+        subset_risk_max = _clamp01(
+            _to_float(
+                stats.get("answer_include_risk_max_across_subsets"),
+                subset_risk_mean,
+            )
+        )
+        return max(
+            0.0,
+            0.34 * base
+            + 0.24 * subset_instability
+            + 0.18 * subset_risk_max
+            + 0.12 * subset_risk_mean
+            + 0.08 * subset_non_answer
+            + 0.04 * max(subset_retrieve, subset_abstain),
+        )
+
+    if source in ("energy_margin", "semantic_energy_margin", "energy"):
+        # Semantic-energy / margin-style proxy:
+        # - Uses low margin and diffuse label mass as cheap energy-like uncertainty.
+        # - Contradiction-vs-neutral gap is treated as extra risk only when positive.
+        margin_energy = _clamp01(
+            0.34 * (1.0 - top2_margin)
+            + 0.22 * entropy_norm
+            + 0.18 * label_entropy
+            + 0.12 * (1.0 - support_score)
+            + 0.08 * contradiction_neutral_gap
+            + 0.06 * contradiction_prob_std
+        )
+        return max(
+            0.0,
+            0.40 * base
+            + 0.36 * margin_energy
+            + 0.14 * contradiction_prob
+            + 0.10 * conflict_mass,
+        )
+
     return base
+
+
+# Keep the public script helpers stable, but delegate to the shared runtime
+# implementation so replay and runtime adapter scores cannot drift apart.
+def augment_stats_with_evidence_gate(stats: Dict, evidence_sampling_gate: Dict | None) -> Dict:
+    return shared_augment_stats_with_evidence_gate(stats, evidence_sampling_gate)
+
+
+def compute_shadow_epistemic(stats: Dict[str, float], u_epi_baseline: float, epi_source: str) -> float:
+    return compute_epistemic_adapter(stats, u_epi_baseline, epi_source)
 
 
 def decide_shadow_action_2d(
@@ -510,14 +782,7 @@ def main() -> None:
         "--shadow-epi-source",
         default="logit_mi",
         choices=[
-            "logit_mi",
-            "stochastic_ou",
-            "stochastic_langevin",
-            "stochastic_mirror_langevin",
-            "stochastic_wright_fisher",
-            "stochastic_sghmc",
-            "stochastic_sgbd",
-            "stochastic_prox_langevin",
+            *ADAPTER_SOURCES,
         ],
         help="Shadow epistemic source adapter (does not affect actual gate decisions).",
     )
@@ -566,6 +831,13 @@ def main() -> None:
             "guarded_v3",
             "guarded_v4",
             "guarded_v4_lite",
+            "guarded_v5",
+            "guarded_v6",
+            "vector_v3",
+            "adapter_evidence_instability",
+            "evidence_instability_v1",
+            "adapter_active_retrieval",
+            "active_retrieval_multicriteria_v1",
         ],
         help="Evidence sampling policy to use when --evidence-sampling-shadow is set.",
     )
@@ -799,13 +1071,16 @@ def main() -> None:
         update_stats(buckets["all"], stats)
         update_stats(buckets["abstain" if is_abstain else "answered"], stats)
 
+        evidence_sampling_gate = result.get("evidence_sampling_gate") or {}
+        adapter_stats = augment_stats_with_evidence_gate(stats, evidence_sampling_gate)
+
         shadow_metrics = compute_shadow_uncertainty(
-            stats,
+            adapter_stats,
             formula=args.shadow_uncertainty_formula,
         )
         u_epi = shadow_metrics["u_epi"]
         u_epi_stochastic = compute_shadow_epistemic(
-            stats=stats,
+            stats=adapter_stats,
             u_epi_baseline=u_epi,
             epi_source=args.shadow_epi_source,
         )
@@ -835,7 +1110,6 @@ def main() -> None:
             if not is_shadow_abstain:
                 update_stats(shadow_buckets["non_abstain"], stats)
 
-        evidence_sampling_gate = result.get("evidence_sampling_gate") or {}
         if evidence_sampling_gate:
             evidence_shadow_action_counts[
                 str(evidence_sampling_gate.get("policy_action") or "none")

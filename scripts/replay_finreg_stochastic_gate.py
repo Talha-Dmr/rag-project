@@ -15,24 +15,17 @@ from pathlib import Path
 from typing import Any
 
 from scripts.eval_grounding_proxy import (
+    augment_stats_with_evidence_gate,
     compute_shadow_epistemic,
     compute_shadow_uncertainty,
     decide_shadow_action_2d,
     summarize,
     update_stats,
 )
+from src.rag.stochastic_epistemic_adapter import ADAPTER_SOURCES
 
 
-DEFAULT_EPI_SOURCES = [
-    "logit_mi",
-    "stochastic_ou",
-    "stochastic_langevin",
-    "stochastic_mirror_langevin",
-    "stochastic_wright_fisher",
-    "stochastic_sghmc",
-    "stochastic_sgbd",
-    "stochastic_prox_langevin",
-]
+DEFAULT_EPI_SOURCES = list(ADAPTER_SOURCES)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -160,7 +153,10 @@ def replay(
                 by_expected_action: dict[str, Counter[str]] = defaultdict(Counter)
 
                 for row in rows:
-                    stats = row.get("stats") or {}
+                    stats = augment_stats_with_evidence_gate(
+                        row.get("stats") or {},
+                        row.get("evidence_sampling_gate") or {},
+                    )
                     qid = str(row.get("id") or "")
                     if not qid:
                         qid = question_ids_by_query.get(str(row.get("query") or "").strip(), "")

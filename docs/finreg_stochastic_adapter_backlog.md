@@ -114,3 +114,366 @@ Retest artifacts from 2026-05-28:
 Related diagnostic note:
 
 - `docs/finreg_stochastic_gating_diagnostic_note.md`
+
+## 2026-06-01 Extended Mathematical Adapter Sweep
+
+New shadow/replay-only adapters were added to `scripts/eval_grounding_proxy.py` and included in
+the replay/diagnostic defaults:
+
+- `stochastic_sgld`
+- `stochastic_adaptive_sgld`
+- `dirichlet_simplex`
+- `stein_particle`
+- `conformal_margin`
+- `risk_budgeted_bayesian`
+
+External research checked during this pass:
+
+- C-RAG, "Certified Generation Risks for Retrieval-Augmented Language Models"
+  (`https://arxiv.org/abs/2402.03181`): supports treating RAG quality as a risk-bound problem, but
+  requires an explicit bounded risk function and calibration procedure.
+- CONFLARE, "CONFormal LArge language model REtrieval" (`https://arxiv.org/abs/2404.04287`):
+  reinforces retrieval-uncertainty calibration as a first-class RAG problem.
+- Conformal-RAG / conditional conformal factuality (`https://arxiv.org/abs/2506.20978`): points
+  toward sub-claim quality/factuality guarantees rather than only whole-answer accuracy.
+- SVGD uncertainty work (`https://arxiv.org/abs/2106.10760`): supports particle/ensemble-style
+  uncertainty, but a scalar replay proxy is only a weak approximation of that idea.
+- SGLD/Bayesian uncertainty background (`https://arxiv.org/abs/1409.0578`): supports Langevin-style
+  posterior sampling, but the current adapter is not actually sampling model weights or detector
+  posterior states.
+
+These are still scalar replay adapters. They do not replace the current runtime evidence-subset
+sampling policy. Their purpose is to test whether a more explicitly stochastic mathematical
+adapter has enough signal to justify a runtime implementation.
+
+Extended replay artifacts:
+
+- `evaluation_results/auto_eval/deep_dive_stochastic_extended_replay_current50_notype_seed7.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_extended_replay_shadow_current50_seed7.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_extended_replay_shadow_current50_seed11.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_extended_replay_shadow_current50_seed19.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_extended_replay_applied_float32_current50_seed7.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_extended_replay_applied_float32_current50_seed11.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_extended_replay_applied_float32_current50_seed13.json`
+
+Aggregate result across the seven replay sets:
+
+| Source | Wins | Mean rank | Mean score | Score sd | Mean answer | Mean retrieve |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `logit_mi` | 4 | 2.71 | 0.7284 | 0.0510 | 0.497 | 0.503 |
+| `stochastic_mirror_langevin` | 2 | 3.00 | 0.7214 | 0.0189 | 0.623 | 0.377 |
+| `stochastic_ou` | 0 | 4.71 | 0.6967 | 0.0366 | 0.734 | 0.266 |
+| `stochastic_adaptive_sgld` | 0 | 5.43 | 0.7025 | 0.0345 | 0.626 | 0.374 |
+| `stochastic_sgbd` | 1 | 6.00 | 0.6963 | 0.0389 | 0.694 | 0.306 |
+| `stein_particle` | 0 | 8.00 | 0.6978 | 0.0305 | 0.706 | 0.294 |
+
+Interpretation:
+
+- `logit_mi` remains the strongest reference baseline by wins and mean rank.
+- `stochastic_mirror_langevin` is the best mathematical stochastic candidate so far. It has a
+  close mean score to `logit_mi`, much lower score variance, and wins two applied replay seeds.
+- `stochastic_sgbd` is still useful as an LFM2/no-type challenger, but its strength did not hold
+  across the wider replay set.
+- `stochastic_adaptive_sgld` is a promising second-tier candidate; it repeatedly appears near the
+  top but does not beat `stochastic_mirror_langevin` in aggregate.
+- `stein_particle` has isolated strong runs, but its aggregate rank is not yet high enough to
+  promote.
+- `dirichlet_simplex`, `conformal_margin`, and `risk_budgeted_bayesian` did not beat the existing
+  shortlist in this sweep.
+
+Updated shortlist for the next adapter block:
+
+1. Keep `logit_mi` as the baseline/reference.
+2. Promote `stochastic_mirror_langevin` as the primary mathematical stochastic candidate.
+3. Keep `stochastic_adaptive_sgld` as the secondary candidate.
+4. Keep `stochastic_sgbd` as an LFM2-specific challenger, not the default choice.
+5. Keep `stein_particle` only as an exploratory ablation.
+
+Next action before a FullRAG160 claim:
+
+- Do not run every adapter on DeepSeek FullRAG160.
+- First move the top 1-2 candidates into a shared runtime-compatible adapter path or replay them
+  from DeepSeek-derived per-question statistics.
+- Then compare only `logit_mi`, `stochastic_mirror_langevin`, and optionally
+  `stochastic_adaptive_sgld`/`stochastic_sgbd` against the current `vector_v3` evidence-subset
+  policy.
+
+## Expanded Candidate Families To Research Next
+
+The current adapter sweep is not exhaustive. The next research block should widen the candidate
+space, but it should separate candidates that can be tested with existing per-question statistics
+from candidates that require new runtime signals.
+
+### A. Directly Testable With Current Signals
+
+These can be added as replay/shadow adapters without changing the generator:
+
+1. Semantic-entropy-inspired adapter
+   - Basis: semantic uncertainty / semantic entropy work.
+   - Local approximation: combine detector label entropy, top-2 margin, label disagreement, and
+     support score.
+   - Runtime risk: low; all ingredients already exist.
+   - Caveat: this is not true sampled semantic entropy unless we generate multiple answers.
+
+2. CRAG-style retrieval evaluator adapter
+   - Basis: Corrective RAG uses a retrieval evaluator to decide whether documents are good enough.
+   - Local approximation: combine retrieval max/mean/spread, source consistency, context coverage,
+     answer completeness, and support score.
+   - Runtime risk: low; aligns strongly with the project goal because it evaluates evidence quality
+     before trusting generation.
+
+3. UAR/active-retrieval multi-criteria adapter
+   - Basis: active retrieval methods decide when retrieval is useful instead of always retrieving.
+   - Local approximation: separate uncertainty into orthogonal criteria:
+     knowledge insufficiency, evidence conflict, source inconsistency, and answer incompleteness.
+   - Runtime risk: low to medium; decision surface is more interpretable than a single blended
+     scalar.
+
+4. Evidence-instability adapter
+   - Basis: our own `vector_v3` evidence-subset policy plus Speculative RAG's multi-subset drafting
+     idea.
+   - Local approximation: use subset action instability, subset answer rate, subset retrieve-more
+     rate, and cross-subset risk spread.
+   - Runtime risk: low; this is closest to what is already working.
+
+5. Energy/margin adapter
+   - Basis: semantic energy and margin-based hallucination detection.
+   - Local approximation: use low top-2 margin, high entropy, low support, and contradiction-neutral
+     gap.
+   - Runtime risk: low; likely useful as a cheap detector-side signal.
+
+### B. Testable But More Expensive
+
+These require additional calls or more detector passes:
+
+1. SelfCheck-style answer consistency
+   - Generate several low-temperature candidate answers or drafts, then check whether they agree.
+   - Useful for hallucination risk, but costly with DeepSeek and very costly locally.
+   - Good fit as a small 20Q/50Q experiment before any FullRAG160 run.
+
+2. Speculative multi-draft RAG
+   - Draft answers from different evidence subsets, then verify/select.
+   - Strong conceptual fit with our evidence subset sampling, but it changes the runtime pipeline
+     more than a scalar gate.
+   - Candidate role: future quality improvement after gating is stable.
+
+3. True conformal/risk-controlled abstention
+   - Requires a calibration set and a defined risk function.
+   - Strong for thesis/research contribution if implemented carefully.
+   - Not equivalent to the current `conformal_margin` replay proxy.
+
+4. Bayesian/stochastic embedding retrieval
+   - Sample query/chunk embeddings or perturb embedding space to estimate retrieval confidence.
+   - Strong conceptual fit, especially for financial QA, but requires retrieval-layer changes.
+   - Candidate role: retrieval-side uncertainty, not just answer-side gating.
+
+### C. Probably Not Worth Prioritizing Now
+
+These are valid research ideas but poorly matched to the current project constraints:
+
+- Weight-space SGLD/HMC over the LLM: too expensive and not feasible with the current local hardware.
+- Full hidden-state semantic entropy probes: promising, but require model internals/training and are
+  awkward with API-only DeepSeek.
+- Heavy RL-trained active retrieval policies: interesting but too large a scope for the current
+  benchmark/debugging cycle.
+
+## Expanded Research Sources
+
+Additional sources checked after the initial sweep:
+
+- "To Retrieve or Not to Retrieve? Uncertainty Detection for Dynamic Retrieval Augmented Generation"
+  (`https://arxiv.org/abs/2501.09292`): dynamic retrieval can be driven by uncertainty metrics and
+  can reduce retrieval calls while preserving much of QA quality.
+- FLARE / "Active Retrieval Augmented Generation" (`https://arxiv.org/abs/2305.06983`): supports
+  iterative retrieval based on low-confidence future generation.
+- "Unified Active Retrieval for Retrieval Augmented Generation" (`https://arxiv.org/abs/2406.12534`):
+  motivates multi-criterion retrieval decisions instead of one uncertainty threshold.
+- "Corrective Retrieval Augmented Generation" (`https://arxiv.org/abs/2401.15884`): supports adding
+  a retrieval/evidence evaluator before trusting generated answers.
+- "Speculative RAG" (`https://arxiv.org/abs/2407.08223`): supports using distinct evidence subsets
+  to produce diverse drafts and reduce long-context position bias.
+- "UncertaintyRAG" (`https://arxiv.org/abs/2410.02719`): supports retrieval-side uncertainty based
+  on span/chunk uncertainty, which maps to our retrieval quality problem more than to generation
+  model selection.
+- "SelfCheckGPT" (`https://arxiv.org/abs/2303.08896`): supports stochastic answer consistency as a
+  black-box hallucination signal.
+- "Semantic Entropy Probes" (`https://arxiv.org/abs/2406.15927`) and semantic uncertainty work
+  (`https://arxiv.org/abs/2302.09664`): supports semantic-level uncertainty instead of raw token or
+  label entropy.
+- "Semantic Energy" (`https://arxiv.org/abs/2508.14496`): motivates energy/margin-style uncertainty
+  beyond plain entropy.
+- "Learning Conformal Abstention Policies" (`https://arxiv.org/abs/2502.06884`): supports adaptive
+  risk/abstention thresholds, but requires a real calibration procedure.
+
+## Revised Research Plan
+
+Do not stop at the current six new adapters. The next controlled block should add and replay these
+families in this order:
+
+1. `retrieval_evaluator_crag`
+2. `active_retrieval_multicriteria`
+3. `semantic_entropy_proxy`
+4. `evidence_instability`
+5. `energy_margin`
+6. `selfcheck_consistency` on a small sample only
+7. `conformal_risk_calibrated` after a calibration split is defined
+8. `bayesian_embedding_retrieval` as a retrieval-layer follow-up
+
+Promotion rule:
+
+- A scalar adapter can be promoted only if it changes action decisions in a useful way, not merely
+  by shifting thresholds.
+- Any expensive stochastic method must first prove value on 20Q/50Q before touching FullRAG160.
+- The final contribution should remain project-aligned: better evidence-grounded selective
+  answering, not just chasing one benchmark score.
+
+## 2026-06-01 Expanded Replay Results
+
+The first five cheap candidates from the revised research plan were implemented as replay/shadow
+adapters:
+
+- `retrieval_evaluator_crag`
+- `active_retrieval_multicriteria`
+- `semantic_entropy_proxy`
+- `evidence_instability`
+- `energy_margin`
+
+Replay artifacts:
+
+- `evaluation_results/auto_eval/deep_dive_stochastic_expanded_replay_current50_notype_seed7.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_expanded_replay_shadow_current50_seed7.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_expanded_replay_shadow_current50_seed11.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_expanded_replay_shadow_current50_seed19.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_expanded_replay_applied_float32_current50_seed7.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_expanded_replay_applied_float32_current50_seed11.json`
+- `evaluation_results/auto_eval/deep_dive_stochastic_expanded_replay_applied_float32_current50_seed13.json`
+
+Aggregate result across the same seven replay sets:
+
+| Source | Wins | Mean rank | Mean score | Score sd | Mean answer | Mean retrieve |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `evidence_instability` | 3 | 2.00 | 0.7537 | 0.0349 | 0.543 | 0.457 |
+| `logit_mi` | 1 | 4.43 | 0.7284 | 0.0510 | 0.497 | 0.503 |
+| `stochastic_mirror_langevin` | 0 | 4.57 | 0.7214 | 0.0189 | 0.623 | 0.377 |
+| `active_retrieval_multicriteria` | 1 | 6.14 | 0.7215 | 0.0197 | 0.526 | 0.474 |
+| `stochastic_ou` | 0 | 7.00 | 0.6967 | 0.0366 | 0.734 | 0.266 |
+| `stochastic_adaptive_sgld` | 0 | 7.71 | 0.7025 | 0.0345 | 0.626 | 0.374 |
+| `semantic_entropy_proxy` | 1 | 10.71 | 0.7008 | 0.0449 | 0.623 | 0.377 |
+| `retrieval_evaluator_crag` | 1 | 15.43 | 0.6936 | 0.0438 | 0.757 | 0.243 |
+| `energy_margin` | 0 | 15.86 | 0.6903 | 0.0297 | 0.717 | 0.283 |
+
+Per-run highlights:
+
+- `retrieval_evaluator_crag` was best on the LFM2 no-type seed7 replay
+  (`0.7847`, `answer=37`, `retrieve_more=13`), but did not generalize across the other replay
+  sets.
+- `evidence_instability` won three of seven replay sets and was top-3 in every replay set. This is
+  the strongest expanded candidate.
+- `active_retrieval_multicriteria` won applied float32 seed11 and was strong on applied seed7/13.
+- `semantic_entropy_proxy` won shadow seed19 but was not stable enough across all sets.
+- `energy_margin` did not materially improve over the older candidates.
+
+Updated interpretation:
+
+- The strongest signal is not another Langevin-style scalar transform. The strongest signal is the
+  stability of the evidence-subset decision itself.
+- `evidence_instability` is highly project-aligned because it formalizes the stochastic evidence
+  perturbation idea already used by `vector_v3`.
+- `active_retrieval_multicriteria` is the best non-subset cheap candidate and is more interpretable
+  than the old scalar adapters.
+- `stochastic_mirror_langevin` remains the best purely mathematical scalar stochastic candidate,
+  but it is no longer the top overall research candidate after expanding the search.
+
+Revised next shortlist:
+
+1. `evidence_instability` as the primary stochastic gating direction.
+2. `active_retrieval_multicriteria` as the primary cheap non-subset challenger.
+3. `stochastic_mirror_langevin` as the best pure mathematical scalar adapter.
+4. `logit_mi` as the baseline/reference.
+5. `semantic_entropy_proxy` as an exploratory ablation only.
+
+Next implementation direction:
+
+- Move `evidence_instability` and `active_retrieval_multicriteria` toward shared runtime-compatible
+  adapter code.
+- Compare them against current `vector_v3` rather than treating them as independent of it.
+- Do not run `retrieval_evaluator_crag` or `energy_margin` on FullRAG160 unless later reformulated.
+
+## 2026-06-03 Runtime Adapter Bridge
+
+Runtime-compatible adapter code was added after the expanded replay sweep.
+
+Shared implementation:
+
+- `src/rag/stochastic_epistemic_adapter.py`
+
+Runtime integration points:
+
+- `src/rag/rag_pipeline.py`
+- `src/rag/evidence_sampling_policy.py`
+
+Replay/diagnostic scripts now delegate to the shared adapter implementation:
+
+- `scripts/eval_grounding_proxy.py`
+- `scripts/replay_finreg_stochastic_gate.py`
+- `scripts/analyze_finreg_stochastic_gate_diagnostics.py`
+
+This prevents the replay formulas and runtime formulas from drifting apart.
+
+Runtime use cases:
+
+1. Scalar uncertainty adapter for the main gate:
+
+   ```yaml
+   gating:
+     epistemic_adapter: stochastic_mirror_langevin
+     uncertainty_metric: uncertainty_epistemic_adapter
+   ```
+
+   If `uncertainty_metric` is not set to `uncertainty_epistemic_adapter`, the adapter score is
+   still written into `stats["uncertainty_epistemic_adapter"]` for diagnostics but does not change
+   the main gate decision.
+
+2. Evidence-subset adapter policy:
+
+   ```yaml
+   gating:
+     evidence_sampling:
+       enabled: true
+       shadow_only: false
+       policy: adapter_evidence_instability
+       adapter_threshold: 0.42
+   ```
+
+   This uses the shared `evidence_instability` score over evidence-subset summary fields. It should
+   be compared against `vector_v3`, not treated as unrelated to it.
+
+3. Active retrieval challenger:
+
+   ```yaml
+   gating:
+     evidence_sampling:
+       enabled: true
+       shadow_only: false
+       policy: adapter_active_retrieval
+       adapter_threshold: 0.25
+   ```
+
+   This uses the shared `active_retrieval_multicriteria` score over retrieval, support, source, and
+   detector-conflict summary fields.
+
+Verification:
+
+- Compile check passed for the shared adapter, runtime pipeline, evidence policy, and replay tools.
+- Smoke replay on `finreg_grounding_proxy_evidence_applied_float32_current50_seed7_details.jsonl`
+  preserved the expanded result order:
+  `evidence_instability` first, `active_retrieval_multicriteria` second,
+  `stochastic_mirror_langevin` third.
+
+Important limitation:
+
+- This bridge makes the shortlist runtime-compatible; it does not prove the new runtime policies on
+  FullRAG160 yet.
+- The next empirical step is a small applied run or a DeepSeek-derived replay comparing:
+  `vector_v3`, `adapter_evidence_instability`, `adapter_active_retrieval`, and
+  `stochastic_mirror_langevin` as a scalar uncertainty adapter.

@@ -1,7 +1,6 @@
-# Direct DeepSeek V4 Flash FinReg vector-stochastic full RAG config.
-# Keeps the 160-question coverage/vector setup from the Granite 3090 config,
-# but moves generation and answer-quality rewrites to the DeepSeek API so local
-# CUDA is only used where explicitly configured by retrieval/detector components.
+# DeepSeek V4 Flash FinReg coverage-quality ablation.
+# Matches gating_finreg_deepseek_v4_flash_evidence_vector_v3_coverage_quality,
+# but disables vector-stochastic evidence sampling to isolate its contribution.
 
 data_loader:
   default_loader: json
@@ -106,7 +105,7 @@ gating:
   uncertainty_threshold: 1.0
   abstain_message: "I don't have enough reliable evidence to support that answer."
   evidence_sampling:
-    enabled: true
+    enabled: false
     shadow_only: false
     policy: vector_v3
     subset_size: 4

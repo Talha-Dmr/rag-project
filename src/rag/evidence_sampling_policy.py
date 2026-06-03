@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.rag.stochastic_epistemic_adapter import compute_epistemic_adapter
+
 
 def canonical_action(action: str) -> str:
     return "answer" if action in ("none", "answer") else action
@@ -84,6 +86,18 @@ def _vector_answer_risk(row: dict[str, Any]) -> float:
         + 0.08 * uncertainty_mean
         + 0.08 * vector_instability
         - 0.04 * top2_margin
+    )
+
+
+def _adapter_baseline_uncertainty(row: dict[str, Any]) -> float:
+    return _float(row, "uncertainty_mean_across_subsets", _float(row, "uncertainty_mean", 0.0))
+
+
+def _adapter_score(row: dict[str, Any], source: str) -> float:
+    return compute_epistemic_adapter(
+        stats=row,
+        u_epi_baseline=_adapter_baseline_uncertainty(row),
+        source=source,
     )
 
 
@@ -282,5 +296,29 @@ def decide_policy(row: dict[str, Any], policy: str) -> tuple[str, str]:
         if vector_instability >= 0.05 and risk_max >= 0.82:
             return "retrieve_more", "unstable_probability_vector"
         return baseline, "vector_stable_or_insufficient_signal"
+
+    if policy in {"adapter_evidence_instability", "evidence_instability_v1"}:
+        score = _adapter_score(row, "evidence_instability")
+        threshold = _float(row, "adapter_threshold", 0.42)
+
+        if canonical_action(baseline) != "answer":
+            if score >= threshold or non_answer_rate >= 0.50:
+                return baseline, "baseline_non_answer_adapter_confirmed"
+            return baseline, "baseline_non_answer_preserved"
+        if score >= threshold:
+            return "retrieve_more", "evidence_instability_high"
+        return baseline, "evidence_instability_stable"
+
+    if policy in {"adapter_active_retrieval", "active_retrieval_multicriteria_v1"}:
+        score = _adapter_score(row, "active_retrieval_multicriteria")
+        threshold = _float(row, "adapter_threshold", 0.25)
+
+        if canonical_action(baseline) != "answer":
+            if score >= threshold or non_answer_rate >= 0.50:
+                return baseline, "baseline_non_answer_adapter_confirmed"
+            return baseline, "baseline_non_answer_preserved"
+        if score >= threshold:
+            return "retrieve_more", "active_retrieval_multicriteria_high"
+        return baseline, "active_retrieval_multicriteria_stable"
 
     raise ValueError(f"Unknown evidence sampling policy: {policy}")

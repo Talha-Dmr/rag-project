@@ -477,3 +477,138 @@ Important limitation:
 - The next empirical step is a small applied run or a DeepSeek-derived replay comparing:
   `vector_v3`, `adapter_evidence_instability`, `adapter_active_retrieval`, and
   `stochastic_mirror_langevin` as a scalar uncertainty adapter.
+
+## 2026-06-04 Mirror Langevin v2 Research Pass
+
+Question:
+
+- Can a more explicitly simplex-aware `stochastic_mirror_langevin_v2` beat the current
+  `stochastic_mirror_langevin` scalar adapter without turning into an evidence-instability clone?
+
+Implementation tested:
+
+- Added `stochastic_mirror_langevin_v2` to `src/rag/stochastic_epistemic_adapter.py`.
+- Kept v1 unchanged.
+- Fixed a v1 research weakness in the v2 formula only: empty detector probability vectors are no
+  longer treated as high-confidence simplex corners. V2 multiplies mirror geometry terms by observed
+  detector probability mass.
+- V2 blends:
+  - baseline epistemic inertia,
+  - detector-mass-gated mirror tension,
+  - conflict dispersion,
+  - boundary/margin risk,
+  - support risk,
+  - unsupported neutral/contradiction mass.
+
+Replay outputs:
+
+- Coarse-grid replay reports:
+  - `evaluation_results/auto_eval/mirror_v2_replay_current50_notype_seed7.json`
+  - `evaluation_results/auto_eval/mirror_v2_replay_shadow_current50_seed7.json`
+  - `evaluation_results/auto_eval/mirror_v2_replay_shadow_current50_seed11.json`
+  - `evaluation_results/auto_eval/mirror_v2_replay_shadow_current50_seed19.json`
+  - `evaluation_results/auto_eval/mirror_v2_replay_applied_float32_current50_seed7.json`
+  - `evaluation_results/auto_eval/mirror_v2_replay_applied_float32_current50_seed11.json`
+  - `evaluation_results/auto_eval/mirror_v2_replay_applied_float32_current50_seed13.json`
+- Fine-threshold v2-only replay reports:
+  - `evaluation_results/auto_eval/mirror_v2_fine_replay_current50_notype_seed7.json`
+  - `evaluation_results/auto_eval/mirror_v2_fine_replay_shadow_current50_seed7.json`
+  - `evaluation_results/auto_eval/mirror_v2_fine_replay_shadow_current50_seed11.json`
+  - `evaluation_results/auto_eval/mirror_v2_fine_replay_shadow_current50_seed19.json`
+  - `evaluation_results/auto_eval/mirror_v2_fine_replay_applied_float32_current50_seed7.json`
+  - `evaluation_results/auto_eval/mirror_v2_fine_replay_applied_float32_current50_seed11.json`
+  - `evaluation_results/auto_eval/mirror_v2_fine_replay_applied_float32_current50_seed13.json`
+
+Aggregate with fine-threshold v2:
+
+| Adapter | Wins | Mean rank | Mean score | Score sd | Answer rate | Retrieve rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `evidence_instability` | 4 | 1.86 | 0.7537 | 0.0349 | 0.543 | 0.457 |
+| `logit_mi` | 1 | 3.29 | 0.7284 | 0.0510 | 0.497 | 0.503 |
+| `stochastic_mirror_langevin_v2` | 1 | 4.00 | 0.7149 | 0.0438 | 0.600 | 0.400 |
+| `active_retrieval_multicriteria` | 1 | 4.14 | 0.7215 | 0.0197 | 0.526 | 0.474 |
+| `stochastic_mirror_langevin` | 0 | 3.57 | 0.7214 | 0.0189 | 0.623 | 0.377 |
+| `stochastic_adaptive_sgld` | 0 | 5.57 | 0.7025 | 0.0345 | 0.626 | 0.374 |
+| `stochastic_sgbd` | 0 | 5.57 | 0.6963 | 0.0389 | 0.694 | 0.306 |
+
+Interpretation:
+
+- V2 is not the new primary mathematical adapter. It wins one no-type replay set after fine
+  calibration, but loses to v1 on mean score and stability.
+- V2 is still useful as a research artifact because it isolates the detector-mass issue in the
+  mirror geometry: missing detector vectors should not be interpreted as simplex certainty.
+- The current decision remains:
+  1. `evidence_instability` is the strongest overall stochastic gating direction.
+  2. `stochastic_mirror_langevin` remains the best pure mathematical scalar adapter.
+  3. `stochastic_mirror_langevin_v2` stays in backlog for future formula work, not promotion.
+
+## 2026-06-04 Detector-Only Gate Ablation
+
+Motivation:
+
+- A project contributor raised the concern that most of the behavior may come from the detector
+  itself, and that the gate may be relatively unimportant.
+- This is a valid risk. The right answer is an ablation, not an argument.
+
+Detector-only adapter sources added:
+
+- `detector_contradiction`: direct `contradiction_prob_mean`
+- `detector_uncertainty`: direct detector `uncertainty_mean`
+- `detector_label_disagreement`: direct label disagreement
+- `detector_conflict_mass`: direct conflict mass
+- `detector_margin_risk`: `1 - top2_margin_mean`
+- `detector_support_risk`: `1 - support_score`
+
+These are intentionally simple. They use the same replay decision policy and threshold sweep as the
+gate adapters, but they do not blend multiple stochastic/evidence-stability signals.
+
+Replay outputs:
+
+- `evaluation_results/auto_eval/detector_only_ablation_current50_notype_seed7.json`
+- `evaluation_results/auto_eval/detector_only_ablation_shadow_current50_seed7.json`
+- `evaluation_results/auto_eval/detector_only_ablation_shadow_current50_seed11.json`
+- `evaluation_results/auto_eval/detector_only_ablation_shadow_current50_seed19.json`
+- `evaluation_results/auto_eval/detector_only_ablation_applied_float32_current50_seed7.json`
+- `evaluation_results/auto_eval/detector_only_ablation_applied_float32_current50_seed11.json`
+- `evaluation_results/auto_eval/detector_only_ablation_applied_float32_current50_seed13.json`
+
+Aggregate source ranking:
+
+| Source | Wins | Mean rank | Mean score | Score sd | Answer rate | Retrieve rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `evidence_instability` | 3 | 2.57 | 0.7740 | 0.0374 | 0.429 | 0.571 |
+| `detector_support_risk` | 1 | 2.86 | 0.7589 | 0.0293 | 0.654 | 0.346 |
+| `detector_contradiction` | 1 | 3.00 | 0.7634 | 0.0241 | 0.551 | 0.449 |
+| `stochastic_mirror_langevin` | 1 | 5.00 | 0.7342 | 0.0214 | 0.606 | 0.394 |
+| `detector_uncertainty` | 1 | 5.14 | 0.7425 | 0.0398 | 0.497 | 0.503 |
+| `active_retrieval_multicriteria` | 0 | 4.43 | 0.7461 | 0.0255 | 0.491 | 0.509 |
+| `logit_mi` | 0 | 6.14 | 0.7425 | 0.0398 | 0.497 | 0.503 |
+| `detector_conflict_mass` | 0 | 7.29 | 0.7092 | 0.0259 | 0.634 | 0.366 |
+| `detector_label_disagreement` | 0 | 8.57 | 0.6894 | 0.0355 | 0.700 | 0.300 |
+| `detector_margin_risk` | 0 | 10.00 | 0.6450 | 0.0000 | 0.000 | 1.000 |
+
+Group comparison:
+
+| Group | Mean score | Score sd | Wins vs other group |
+| --- | ---: | ---: | ---: |
+| Best detector-only source per set | 0.7825 | 0.0290 | 2 |
+| Best non-detector gate source per set | 0.7863 | 0.0266 | 4 |
+
+Interpretation:
+
+- The criticism is partially correct: simple detector-only thresholds are strong baselines.
+- The gate is not irrelevant: the best non-detector gate group still wins more sets and has a
+  slightly higher aggregate score.
+- The current evidence does not support claiming that stochastic gating dominates detector-only
+  behavior by a large margin.
+- The defensible project contribution is narrower and stronger:
+  detector signals are converted into safer RAG actions through calibrated gating and
+  evidence-subset stability, with detector-only thresholding as the required baseline.
+
+Decision:
+
+- Keep detector-only ablation in every future 160Q / DeepSeek replay.
+- Do not present gate improvements without a detector-only baseline.
+- Treat `evidence_instability` as the main stochastic gating candidate only if it continues to beat
+  the best detector-only source on FullRAG160 or improves stability/operating behavior in a way the
+  detector-only source does not.

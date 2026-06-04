@@ -13,9 +13,16 @@ from typing import Any
 
 ADAPTER_SOURCES = [
     "logit_mi",
+    "detector_contradiction",
+    "detector_uncertainty",
+    "detector_label_disagreement",
+    "detector_conflict_mass",
+    "detector_margin_risk",
+    "detector_support_risk",
     "stochastic_ou",
     "stochastic_langevin",
     "stochastic_mirror_langevin",
+    "stochastic_mirror_langevin_v2",
     "stochastic_wright_fisher",
     "stochastic_sghmc",
     "stochastic_sgbd",
@@ -98,6 +105,12 @@ def compute_epistemic_adapter(
     if source_key in ("logit_mi", "baseline"):
         return base
 
+    detector_uncertainty = clamp01(
+        to_float(
+            stats.get("uncertainty_mean"),
+            to_float(stats.get("uncertainty_mean_across_subsets"), base),
+        )
+    )
     contradiction_prob = clamp01(
         to_float(
             stats.get("contradiction_prob_mean"),
@@ -187,7 +200,8 @@ def compute_epistemic_adapter(
     )
     retrieval_spread = clamp01(max(0.0, retrieval_max_score - retrieval_mean_score))
 
-    total_prob = max(1e-8, entailment_prob_mean + neutral_prob_mean + contradiction_prob)
+    raw_total_prob = entailment_prob_mean + neutral_prob_mean + contradiction_prob
+    total_prob = max(1e-8, raw_total_prob)
     p_e = entailment_prob_mean / total_prob
     p_n = neutral_prob_mean / total_prob
     p_c = contradiction_prob / total_prob
@@ -204,6 +218,28 @@ def compute_epistemic_adapter(
     simplex_variance = clamp01(
         (p_e * (1.0 - p_e) + p_n * (1.0 - p_n) + p_c * (1.0 - p_c)) / 0.75
     )
+
+    if source_key in (
+        "detector_contradiction",
+        "detector_contradiction_prob",
+        "contradiction_prob",
+    ):
+        return contradiction_prob
+
+    if source_key in ("detector_uncertainty", "detector_uncertainty_mean", "uncertainty_mean"):
+        return detector_uncertainty
+
+    if source_key in ("detector_label_disagreement", "label_disagreement"):
+        return label_disagreement
+
+    if source_key in ("detector_conflict_mass", "conflict_mass"):
+        return conflict_mass
+
+    if source_key in ("detector_margin_risk", "margin_risk", "top2_margin_risk"):
+        return clamp01(1.0 - top2_margin)
+
+    if source_key in ("detector_support_risk", "support_risk", "unsupported_risk"):
+        return clamp01(1.0 - support_score)
 
     if source_key in ("stochastic_ou", "ou"):
         return max(
@@ -231,6 +267,33 @@ def compute_epistemic_adapter(
             + 0.16 * contradiction_prob_std
             + 0.14 * label_disagreement
             + 0.12 * mirror_tension,
+        )
+
+    if source_key in ("stochastic_mirror_langevin_v2", "mirror_langevin_v2", "mla_v2"):
+        detector_mass = clamp01(raw_total_prob)
+        mirror_tension = detector_mass * (1.0 - entropy_norm)
+        margin_risk = detector_mass * clamp01(1.0 - top2_margin)
+        unsupported_mass = detector_mass * clamp01(neutral_prob_mean + contradiction_prob)
+        support_risk = clamp01(1.0 - support_score)
+        boundary_risk = clamp01(
+            0.45 * margin_risk
+            + 0.30 * label_entropy
+            + 0.25 * simplex_variance * detector_mass
+        )
+        conflict_dispersion = clamp01(
+            0.40 * contradiction_prob_std
+            + 0.30 * label_disagreement
+            + 0.20 * conflict_mass
+            + 0.10 * retrieval_spread
+        )
+        return max(
+            0.0,
+            0.50 * base
+            + 0.12 * mirror_tension
+            + 0.24 * conflict_dispersion
+            + 0.12 * boundary_risk
+            + 0.08 * support_risk
+            + 0.06 * unsupported_mass,
         )
 
     if source_key in ("stochastic_wright_fisher", "wright_fisher", "wf"):

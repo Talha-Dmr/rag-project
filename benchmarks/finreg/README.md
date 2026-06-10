@@ -18,16 +18,39 @@ computes detector metrics such as not-included recall and false include rate.
 
 ## Full RAG Benchmark
 
-`full_rag_questions.jsonl` evaluates the end-to-end system. It contains 80
-questions: 20 topics x 4 question types (`factual_supported`, `false_premise`,
+`full_rag_questions.jsonl` evaluates the end-to-end system. It contains 160
+questions across 4 question types (`factual_supported`, `false_premise`,
 `multi_source_nuanced`, and `low_evidence_policy`). Each row contains a question,
 manual review guidance, expected answer points, and forbidden claims. The system
 retrieves evidence, generates an answer, runs detector/gating, and exports a
 manual review sheet.
 
-The second set of 40 questions extends the original benchmark in the same file,
-rather than creating a replacement file. It adds detector-relevant false-premise
-and low-evidence cases while preserving the original IDs and evaluation format.
+This 160-question set is the canonical regression benchmark. It should remain
+stable so detector-only, detector+stochastic, and future model/API changes can be
+compared against the same target.
+
+## Full RAG Hard Benchmark
+
+`full_rag_questions_hard.jsonl` is a harder derived benchmark built from the
+canonical 160Q set by `scripts/build_finreg_hard_benchmark.py`. It keeps the
+same row schema and adds `source_id` so each hard row can be traced back to the
+canonical question it was derived from.
+
+The hard set is designed to stress the part of the project that matters for
+stochastic gating: selective answering under low evidence, partial support,
+misattribution, cross-source synthesis, and completeness without invented
+regulatory details. Its current distribution is:
+
+- 20 `factual_supported`
+- 20 `hard_factual_completeness`
+- 30 `false_premise_misattribution`
+- 40 `low_evidence_specific_claim`
+- 30 `cross_source_conflict`
+- 20 `partial_support_overclaim`
+
+Use the canonical 160Q set for final regression claims. Use the hard 160Q set to
+develop and pressure-test stochastic gating policies that otherwise look
+unimportant because the canonical set is already easy for the baseline.
 
 The benchmark script reports pre-review metrics such as answer rate, abstain
 rate, answer-include risk, expected-point coverage, forbidden-claim hit rate,

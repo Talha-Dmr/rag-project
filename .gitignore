@@ -56,6 +56,8 @@ data/*
 *.csv
 *.json
 !artifact_manifest_phase2_2.json
+!benchmarks/finreg/full_rag_questions_hard_v2_validation.json
+!benchmarks/finreg/full_rag_questions_hard_v2_review.csv
 *.pdf
 *.txt
 !data/processed/

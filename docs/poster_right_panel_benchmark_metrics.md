@@ -9,32 +9,40 @@ The final benchmark contains 160 financial regulation questions. It was designed
     <tr>
       <th>System Variant</th>
       <th>Expected Behaviour Match</th>
+      <th>Point Coverage</th>
       <th>Answer Rate</th>
       <th>Abstain Rate</th>
       <th>Forbidden Claim Hit Rate</th>
+      <th>Mean Latency</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>Baseline RAG</td>
-      <td>83.125%</td>
-      <td>100.000%</td>
-      <td>0.000%</td>
-      <td>0.625%</td>
+      <td>80.00%</td>
+      <td>24.34%</td>
+      <td>100.00%</td>
+      <td>0.00%</td>
+      <td>0.00%</td>
+      <td>5.32s</td>
     </tr>
     <tr>
       <td>RAG + Detector</td>
-      <td>95.625%</td>
-      <td>49.375%</td>
-      <td>50.625%</td>
-      <td>0.625%</td>
+      <td>92.50%</td>
+      <td>13.44%</td>
+      <td>46.25%</td>
+      <td>53.75%</td>
+      <td>0.00%</td>
+      <td>5.48s</td>
     </tr>
     <tr>
       <td>RAG + Detector + Stochastic Gate</td>
-      <td>98.125%</td>
-      <td>45.000%</td>
-      <td>55.000%</td>
-      <td>0.000%</td>
+      <td>93.12%</td>
+      <td>13.28%</td>
+      <td>45.62%</td>
+      <td>54.37%</td>
+      <td>0.00%</td>
+      <td>5.88s</td>
     </tr>
   </tbody>
 </table>
@@ -90,6 +98,11 @@ The final benchmark contains 160 financial regulation questions. It was designed
       <td>This is the main end-to-end quality metric. It evaluates whether the full system behaves correctly, not only whether it produces fluent text.</td>
     </tr>
     <tr>
+      <td>Point Coverage</td>
+      <td>The percentage of audited expected propositions that appear to be covered by the answer.</td>
+      <td>This is useful as a secondary metric, but it is stricter after the audit because expected points are longer atomic propositions rather than short keyword labels.</td>
+    </tr>
+    <tr>
       <td>Answer Rate</td>
       <td>The percentage of questions where the system returned a substantive answer instead of abstaining.</td>
       <td>A high answer rate shows usefulness, but it can be risky if the system answers unsupported questions too confidently.</td>
@@ -103,6 +116,11 @@ The final benchmark contains 160 financial regulation questions. It was designed
       <td>Forbidden Claim Hit Rate</td>
       <td>The percentage of questions where the generated answer included a claim that was explicitly marked as unsupported or fabricated in the benchmark.</td>
       <td>This directly measures harmful hallucination behaviour. Lower is better, and 0.000% means the system avoided all benchmark-defined forbidden claims.</td>
+    </tr>
+    <tr>
+      <td>Mean Latency</td>
+      <td>The average runtime per benchmark question.</td>
+      <td>This tracks the practical cost of adding detector and stochastic gating layers.</td>
     </tr>
   </tbody>
 </table>
@@ -127,5 +145,4 @@ These are sanity-check questions where the answer is directly supported by the r
 
 ## Key Finding
 
-The baseline RAG system answered every question, which made it useful but more vulnerable to overclaiming. Adding the detector substantially improved expected behaviour by filtering unsupported answers. Adding stochastic uncertainty gating produced the strongest safety result by further reducing risky outputs and eliminating forbidden claim hits in the final benchmark.
-
+The baseline RAG system answered every question and reached 80.00% expected behaviour, but it still failed more often on unsupported-detail, source-transfer, and cautious-policy prompts. Adding the detector raised expected behaviour to 92.50% by abstaining on high-risk answers. Adding stochastic uncertainty gating gave a smaller positive gain to 93.12% while preserving 0.00% forbidden claim hits. Point coverage is reported as a secondary metric because the audited expected points are now stricter atomic propositions.

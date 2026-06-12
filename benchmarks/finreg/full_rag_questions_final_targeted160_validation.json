@@ -19,7 +19,18 @@
   "missing_paths": [],
   "missing_evidence_text_rows": [],
   "exact_forbidden_claims_present_in_corpus": [],
+  "quality_issue_count": 0,
+  "duplicate_expected_point_rows_count": 0,
+  "duplicate_expected_point_rows": [],
+  "short_expected_point_rows_count": 0,
+  "short_expected_point_rows": [],
+  "boilerplate_evidence_rows_count": 0,
+  "boilerplate_evidence_rows": [],
+  "unsupported_support_labels_count": 0,
+  "unsupported_support_labels": [],
+  "empty_support_evidence_rows_count": 0,
+  "empty_support_evidence_rows": [],
   "strict_caution_required_count": 144,
-  "min_expected_points": 5,
-  "max_expected_points": 8
+  "min_expected_points": 4,
+  "max_expected_points": 5
 }

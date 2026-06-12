@@ -297,7 +297,24 @@ def _forced_concepts(query_norm: str, config: dict[str, Any] | None = None) -> l
     cfg = config or {}
     concepts: list[str] = []
     rules: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
-    if bool(cfg.get("use_builtin_forced_rules", True)):
+    explicit_citation_query = bool(re.search(r"\bparagraph\s+\d+\b", query_norm))
+    explicit_lifecycle_request = any(
+        marker in query_norm
+        for marker in (
+            "all distinct",
+            "capabilities",
+            "each named item",
+            "identify protect detect respond recover",
+            "identify, protect, detect, respond, recover",
+            "lifecycle",
+            "main elements",
+            "responsibilities",
+        )
+    )
+    use_builtin_rules = bool(cfg.get("use_builtin_forced_rules", True)) and (
+        not explicit_citation_query or explicit_lifecycle_request
+    )
+    if use_builtin_rules:
         rules.extend(FORCED_CONCEPT_RULES)
 
     for rule in cfg.get("forced_concept_rules") or []:

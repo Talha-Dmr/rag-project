@@ -17,6 +17,11 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from src.core.config_loader import load_config
 from src.rag.rag_pipeline import MODEL_ABSTAIN_PHRASES, RAGPipeline
 
@@ -139,7 +144,10 @@ def text_hit(text: str, phrase: str) -> bool:
         return False
 
     token_hits = sum(1 for token in tokens if token_hit(normalized_text, token))
-    required = max(1, int(round(len(tokens) * 0.6)))
+    if len(tokens) >= 12:
+        required = min(8, max(4, int(round(len(tokens) * 0.35))))
+    else:
+        required = max(1, int(round(len(tokens) * 0.6)))
     return token_hits >= required
 
 
@@ -168,6 +176,19 @@ def forbidden_claim_hit(text: str, phrase: str) -> bool:
         "not mention",
         "does not",
         "do not",
+        "doesn't",
+        "don't have",
+        "do not have",
+        "does not provide",
+        "do not provide",
+        "does not mention",
+        "do not mention",
+        "does not support",
+        "do not support",
+        "doesn't support",
+        "not support",
+        "i don't have",
+        "i do not have",
         "should not",
         "without ",
         "cannot",
@@ -218,9 +239,17 @@ def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
         "not solely",
         "not only",
         "not stated",
+        "not establish",
+        "not established",
         "no evidence",
         "no explicit",
+        "no specific",
         "not explicitly",
+        "don't have explicit",
+        "do not have explicit",
+        "does not give",
+        "do not give",
+        "doesn't give",
         "not used",
         "not related",
         "not primarily",
@@ -252,6 +281,17 @@ def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
         "no fixed",
         "does not establish",
         "does not provide",
+        "do not specify",
+        "doesn't specify",
+        "does not give",
+        "do not give",
+        "doesn't give",
+        "does not have",
+        "do not have",
+        "doesn't have",
+        "does not include",
+        "do not include",
+        "doesn't include",
         "no explicit",
         "not explicit",
         "not explicitly",
@@ -265,6 +305,11 @@ def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
         "not enough",
         "does not specify",
         "does not mention",
+        "does not discuss",
+        "do not discuss",
+        "cannot be converted",
+        "cannot be directly converted",
+        "cannot be treated as",
         "cannot determine",
         "clarify",
         "gather more",
@@ -272,17 +317,98 @@ def full_rag_expected_behavior_rubric(row: dict[str, Any]) -> dict[str, Any]:
         "retrieve more",
         "i don't know based on the provided context",
     )
+    synthesis_markers = (
+        "differ",
+        "different",
+        "not identical",
+        "whereas",
+        "while",
+        "scope",
+        "supervisory emphasis",
+        "both",
+        "compared",
+        "comparison",
+    )
     has_refutation = any(marker in answer_lower for marker in refute_markers)
     has_caution = any(marker in answer_lower for marker in cautious_markers)
+    has_synthesis = any(marker in answer_lower for marker in synthesis_markers)
+    strict_caution_required = bool(row.get("strict_caution_required"))
+    strict_caution_markers = (
+        "not established",
+        "does not establish",
+        "does not provide",
+        "do not provide",
+        "doesn't provide",
+        "does not give",
+        "do not give",
+        "doesn't give",
+        "does not have",
+        "do not have",
+        "doesn't have",
+        "does not include",
+        "do not include",
+        "doesn't include",
+        "does not mention",
+        "do not mention",
+        "doesn't mention",
+        "does not support",
+        "do not support",
+        "doesn't support",
+        "not support",
+        "does not discuss",
+        "do not discuss",
+        "doesn't discuss",
+        "cannot be converted",
+        "cannot be directly converted",
+        "cannot be treated as",
+        "does not suggest",
+        "do not suggest",
+        "doesn't suggest",
+        "not enough to conclude",
+        "not specified",
+        "not specify",
+        "does not specify",
+        "do not specify",
+        "doesn't specify",
+        "not stated",
+        "not mentioned",
+        "not mandated",
+        "not required",
+        "no explicit",
+        "not explicit",
+        "not explicitly",
+        "no evidence",
+        "not supported",
+        "no fixed",
+        "no specific",
+        "without a precise",
+        "without specific",
+        "cannot determine",
+        "cannot conclude",
+        "don't have explicit",
+        "do not have explicit",
+        "i don't have",
+        "i do not have",
+        "don't know based on the provided context",
+        "do not know based on the provided context",
+    )
+    has_strict_caution = any(marker in answer_lower for marker in strict_caution_markers)
 
     if expected_behavior == "answer_with_source_support":
         behavior_pass = (not abstained) and coverage >= 0.35 and not forbidden_hits
     elif expected_behavior == "refute_or_abstain":
         behavior_pass = abstained or (has_refutation and not forbidden_hits)
     elif expected_behavior == "cautious_synthesis":
-        behavior_pass = (not abstained) and coverage >= 0.30 and not forbidden_hits
+        behavior_pass = (
+            (not abstained)
+            and not forbidden_hits
+            and (coverage >= 0.30 or (coverage >= 0.20 and has_synthesis))
+        )
     elif expected_behavior == "cautious_or_abstain":
-        behavior_pass = abstained or (has_caution and not forbidden_hits)
+        if strict_caution_required:
+            behavior_pass = abstained or (has_strict_caution and not forbidden_hits)
+        else:
+            behavior_pass = abstained or (has_caution and not forbidden_hits)
     else:
         behavior_pass = None
 

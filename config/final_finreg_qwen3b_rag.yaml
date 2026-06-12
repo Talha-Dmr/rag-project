@@ -1,7 +1,5 @@
-# RTX 3090 FinReg vector-stochastic full RAG config.
-# Uses the same coverage-quality retrieval/rewrite setup as guarded_v6, but
-# switches evidence sampling to vector_v3 so the detector probability vector
-# influences retry/abstain decisions.
+# Final report baseline: retrieval, reranking, generation, and answer quality.
+# Detector and gating are disabled so this isolates the RAG pipeline.
 
 data_loader:
   default_loader: json
@@ -31,18 +29,19 @@ vector_store:
     collection_name: rag_finreg_real_section
 
 llm:
-  model_name: ibm-granite/granite-3.3-2b-instruct
+  model_name: Qwen/Qwen2.5-3B-Instruct
   device: cuda
   cache_folder: ./models/llm
   dtype: float16
-  max_tokens: 220
-  max_prompt_tokens: 2300
-  truncation_side: left
+  max_tokens: 300
+  max_prompt_tokens: 6000
+  truncation_side: right
   temperature: 0.0
   top_p: 1.0
   repetition_penalty: 1.05
   no_repeat_ngram_size: 4
   use_chat_template: true
+  low_cpu_mem_usage: true
   attn_implementation: eager
   use_cache: true
   clear_cuda_cache_after_generate: true
@@ -65,18 +64,7 @@ reranker:
   top_k: 12
 
 hallucination_detector:
-  enabled: true
-  model_path: models/checkpoints/finregbench_modernbert_detector_v3_hardmix/best_model
-  base_model: tasksource/ModernBERT-base-nli
-  device: cuda
-  max_length: 768
-  batch_size: 1
-  hypothesis_format: question_and_candidate_answer
-  risk_mode: answer_include
-  aggregation: answer_include_best
-  answer_include_threshold: 0.97
-
-hallucination_aggregation: answer_include_best
+  enabled: false
 
 answer_quality:
   enabled: true
@@ -86,37 +74,22 @@ answer_quality:
   context_expansion_min_query_concepts: 3
   rewrite_on_low_coverage: true
   max_rewrites: 1
-  rewrite_max_tokens: 220
+  rewrite_max_tokens: 300
   accept_rewrite_only_if_not_worse: true
   max_required_concepts: 8
   max_feedback_concepts: 6
   claim_level: false
   max_claims: 5
-  min_claim_include_rate: 0.75
-  max_claim_answer_include_risk: 0.97
 
 gating:
-  enabled: true
-  strategy: abstain
-  max_retries: 1
-  k_multiplier: 1.5
-  max_k: 24
-  contradiction_prob_metric: answer_include_risk
-  contradiction_prob_threshold: 0.97
-  contradiction_rate_metric: hard_contradiction_rate
-  contradiction_rate_threshold: 0.40
-  uncertainty_threshold: 1.0
+  enabled: false
   abstain_message: "I don't have enough reliable evidence to support that answer."
-  evidence_sampling:
-    enabled: true
-    shadow_only: false
-    policy: vector_v3
-    subset_size: 4
-    num_subsets: 5
-    seed: 7
-    include_details: false
-    exhausted_retrieve_more_action: none
 
 sources:
   max_sources: 6
   include_scores: true
+  balance_named_families: true
+  balance_min_named_families: 2
+  exact_citation_resolver_enabled: true
+  exact_citation_max_per_citation: 1
+  citation_data_dir: data/processed/finreg

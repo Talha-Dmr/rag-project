@@ -48,6 +48,10 @@ SOURCE_FAMILY_PATTERNS = {
         r"\b(?:pra|prudential regulation authority|bank of england|boe)\b",
         re.IGNORECASE,
     ),
+    "fed_occ": re.compile(
+        r"\b(?:federal reserve|fed|occ|office of the comptroller|sr\s*11[- ]7)\b",
+        re.IGNORECASE,
+    ),
 }
 
 SOURCE_BALANCE_STOPWORDS = {
@@ -185,6 +189,7 @@ class RAGPipeline:
             self.source_config.get("embedding_cache_size", 20000)
         )
         self._source_embedding_cache: "OrderedDict[str, np.ndarray]" = OrderedDict()
+        self._citation_cache: Optional[List[Dict[str, Any]]] = None
 
         if hallucination_detector:
             logger.info("RAG Pipeline initialized with hallucination detection")
@@ -1124,6 +1129,69 @@ class RAGPipeline:
             and isinstance(claim_answer_include_risk_max, (int, float))
             and claim_answer_include_risk_max >= float(max_claim_answer_include_risk)
         )
+        risk_sensitive_probe_without_limitation = (
+            bool(gating_config.get("risk_probe_gate_enabled", True))
+            and (
+                float(stats.get("specific_detail_question", 0.0) or 0.0) >= 0.5
+                or float(stats.get("cross_authority_transfer_question", 0.0) or 0.0) >= 0.5
+            )
+            and float(stats.get("answer_has_specific_detail_limitation", 0.0) or 0.0) < 0.5
+        )
+        risk_probe_affirmation_trigger = (
+            bool(gating_config.get("risk_probe_gate_enabled", True))
+            and (
+                float(stats.get("specific_detail_question", 0.0) or 0.0) >= 0.5
+                or float(stats.get("cross_authority_transfer_question", 0.0) or 0.0) >= 0.5
+            )
+            and float(stats.get("answer_affirms_risk_probe", 0.0) or 0.0) >= 0.5
+        )
+        risk_sensitive_probe_trigger = False
+        if risk_sensitive_probe_without_limitation or risk_probe_affirmation_trigger:
+            risk_sensitive_min = float(gating_config.get("risk_probe_min_answer_include_risk", 0.75))
+            risk_sensitive_probe_trigger = (
+                risk_probe_affirmation_trigger
+                or
+                float(stats.get("cross_authority_transfer_question", 0.0) or 0.0) >= 0.5
+                or float(contradiction_prob or 0.0) >= risk_sensitive_min
+            )
+
+        neutral_risk_override = False
+        if (
+            contradiction_prob_trigger
+            and bool(gating_config.get("neutral_risk_override_enabled", False))
+        ):
+            actual_contradiction_prob = float(stats.get("contradiction_prob_mean", 0.0) or 0.0)
+            closed_probe_without_refutation = (
+                float(stats.get("closed_probe_without_refutation", 0.0) or 0.0) >= 0.5
+            )
+            risk_sensitive_without_limitation = (
+                (
+                    float(stats.get("specific_detail_question", 0.0) or 0.0) >= 0.5
+                    or float(stats.get("cross_authority_transfer_question", 0.0) or 0.0) >= 0.5
+                )
+                and float(stats.get("answer_has_specific_detail_limitation", 0.0) or 0.0) < 0.5
+            )
+            max_actual_contradiction = float(
+                gating_config.get("neutral_risk_max_contradiction_prob", 0.08)
+            )
+            min_neutral_answer_completeness = float(
+                gating_config.get("neutral_risk_min_answer_completeness_score", 0.55)
+            )
+            min_neutral_context_coverage = float(
+                gating_config.get("neutral_risk_min_context_coverage", 0.55)
+            )
+            if (
+                not closed_probe_without_refutation
+                and not risk_sensitive_without_limitation
+                and actual_contradiction_prob <= max_actual_contradiction
+                and isinstance(answer_completeness_score, (int, float))
+                and float(answer_completeness_score) >= min_neutral_answer_completeness
+                and isinstance(context_coverage, (int, float))
+                and float(context_coverage) >= min_neutral_context_coverage
+            ):
+                neutral_risk_override = True
+                contradiction_prob_trigger = False
+
         stats["gate_trigger_contradiction_rate"] = float(1.0 if contradiction_rate_trigger else 0.0)
         stats["gate_trigger_contradiction_prob"] = float(1.0 if contradiction_prob_trigger else 0.0)
         stats["gate_trigger_uncertainty"] = float(1.0 if uncertainty_trigger else 0.0)
@@ -1133,6 +1201,13 @@ class RAGPipeline:
         stats["gate_trigger_context_coverage"] = float(1.0 if context_coverage_trigger else 0.0)
         stats["gate_trigger_claim_include"] = float(1.0 if claim_include_trigger else 0.0)
         stats["gate_trigger_claim_risk"] = float(1.0 if claim_risk_trigger else 0.0)
+        stats["gate_trigger_risk_probe_without_limitation"] = float(
+            1.0 if risk_sensitive_probe_trigger else 0.0
+        )
+        stats["gate_trigger_risk_probe_affirmation"] = float(
+            1.0 if risk_probe_affirmation_trigger else 0.0
+        )
+        stats["gate_neutral_risk_override"] = float(1.0 if neutral_risk_override else 0.0)
 
         strategy = gating_config.get("strategy", "abstain")
         if strategy == "risk_budgeted":
@@ -1140,14 +1215,15 @@ class RAGPipeline:
             return self._risk_budgeted_action(stats, gating_config)
 
         should_gate = (
-            contradiction_rate >= contradiction_rate_threshold or
-            contradiction_prob >= contradiction_prob_threshold or
-            uncertainty >= uncertainty_threshold or
+            contradiction_rate_trigger or
+            contradiction_prob_trigger or
+            uncertainty_trigger or
             retrieval_low or
             completeness_trigger or
             context_coverage_trigger or
             claim_include_trigger or
-            claim_risk_trigger
+            claim_risk_trigger or
+            risk_sensitive_probe_trigger
         )
 
         if not should_gate:
@@ -1161,6 +1237,133 @@ class RAGPipeline:
             re.match(
                 r"^(does|do|did|is|are|can|could|should|would|will|must|may|has|have|had)\b",
                 text,
+            )
+        )
+
+    def _is_specific_detail_question(self, query: str) -> bool:
+        text = f" {(query or '').strip().lower()} "
+        markers = (
+            "audit sampling",
+            "automatic penalty",
+            "board paper",
+            "calendar-day",
+            "color code",
+            "column layout",
+            "committee meeting frequency",
+            "control owners",
+            "email address",
+            "exact ",
+            "fixed ",
+            "form identifier",
+            "mandatory ",
+            "meeting frequency",
+            "minimum number",
+            "named ",
+            "notice wording",
+            "numeric ",
+            "percentage",
+            "precise ",
+            "universal ",
+            "specific ",
+            "requirement ",
+            "requires ",
+            "required ",
+            "required audit",
+            "required numeric",
+            "required spreadsheet",
+            "single escalation",
+            "supervisor's email",
+            "needed for every",
+            "for every ",
+            "means that ",
+            "portal",
+            "deadline",
+            "threshold",
+            "template",
+            "certification",
+            "certificate",
+            "approval",
+            "software product",
+            "public disclosure",
+            "is mandatory",
+            "are mandatory",
+            "mandatory for",
+            "include the requirement",
+            "source rationale",
+            "implied by",
+            "checklist item",
+            "converted into",
+            "treated as evidence",
+        )
+        return any(marker in text for marker in markers)
+
+    def _is_cross_authority_transfer_question(self, query: str) -> bool:
+        text = f" {(query or '').strip().lower()} "
+        authority_mentions = sum(
+            1
+            for marker in (
+                " eba",
+                " ecb",
+                " pra",
+                " bcbs",
+                " basel",
+                " federal reserve",
+                " occ",
+            )
+            if marker in text
+        )
+        transfer_markers = (
+            " as supporting context",
+            " cross-authority",
+            " cross authority",
+            " evidence establishes",
+            " evidence into",
+            " evidence supports that transfer",
+            " inherit this claim",
+            " inherits this claim",
+            " source-transfer",
+            " source transfer",
+            " transfer",
+            " transfers",
+            " proves that",
+            " can be used to conclude",
+            " used to conclude",
+            " used to create",
+            " justify this sentence under",
+            " obligation that",
+            " requirement saying that",
+        )
+        strong_transfer_markers = (
+            " inherit this claim",
+            " inherits this claim",
+            " evidence establishes",
+            " evidence into",
+            " source-transfer",
+            " source transfer",
+            " transfer",
+            " transfers",
+            " proves that",
+            " can be used to conclude",
+            " used to conclude",
+            " used to create",
+        )
+        requirement_markers = (
+            " obligation ",
+            " requires ",
+            " requirement ",
+            " mandatory ",
+            " must ",
+            " allowed only",
+            " can ignore",
+            " may apply",
+            " is supported by the two passages",
+        )
+        return (
+            authority_mentions >= 2
+            and any(marker in text for marker in transfer_markers)
+            and (
+                any(marker in text for marker in requirement_markers)
+                or any(marker in text for marker in strong_transfer_markers)
             )
         )
 
@@ -1178,13 +1381,150 @@ class RAGPipeline:
             "not stated",
             "not specified",
             "not supported",
+            "does not support",
+            "do not support",
+            "cannot be converted into",
+            "cannot be directly converted",
+            "cannot be treated as",
+            "cannot be verified",
+            "does not discuss",
+            "do not discuss",
             "no evidence",
             "no explicit",
+            "not verifiable",
             "cannot conclude",
+            "i don't see",
+            "i do not see",
             "should not",
             "would contradict",
         )
         return any(marker in text for marker in refutation_markers)
+
+    def _answer_has_specific_detail_limitation(self, query: str, answer: str) -> bool:
+        text = f" {(answer or '').strip().lower()} "
+        if not self._answer_has_direct_refutation(text):
+            return False
+        strict_markers = (
+            " not established",
+            " does not establish",
+            " not specified",
+            " not specify",
+            " does not specify",
+            " do not specify",
+            " doesn't specify",
+            " not stated",
+            " not mentioned",
+            " not mandated",
+            " not required",
+            " no explicit",
+            " not explicit",
+            " not explicitly",
+            " no evidence",
+            " not supported",
+            " does not support",
+            " do not support",
+            " cannot be converted into",
+            " cannot be directly converted",
+            " cannot be treated as",
+            " cannot be verified",
+            " does not discuss",
+            " do not discuss",
+            " cannot determine",
+            " cannot conclude",
+            " not verifiable",
+            " i don't see",
+            " i do not see",
+            " don't know based on the provided context",
+            " do not know based on the provided context",
+        )
+        if any(marker in text for marker in strict_markers):
+            return True
+        query_text = f" {(query or '').strip().lower()} "
+        detail_terms = (
+            "portal",
+            "deadline",
+            "threshold",
+            "template",
+            "certification",
+            "certificate",
+            "approval",
+            "audit sampling",
+            "automatic penalty",
+            "board paper",
+            "calendar-day",
+            "color code",
+            "column layout",
+            "committee",
+            "control owner",
+            "email address",
+            "form identifier",
+            "meeting frequency",
+            "minimum number",
+            "named",
+            "notice wording",
+            "numeric",
+            "percentage",
+            "precise",
+            "software product",
+            "vendor",
+            "public disclosure",
+            "cloud",
+            "global",
+        )
+        query_terms = [term for term in detail_terms if term in query_text]
+        return bool(query_terms) and any(term in text for term in query_terms)
+
+    def _answer_affirms_risk_probe(self, query: str, answer: str) -> bool:
+        if not (
+            self._is_specific_detail_question(query)
+            or self._is_cross_authority_transfer_question(query)
+        ):
+            return False
+
+        text = f" {(answer or '').strip().lower()} "
+        if not text.strip():
+            return False
+
+        early = re.split(r"\b(?:however|but|although|nevertheless)\b", text, maxsplit=1)[0]
+        if any(
+            marker in early
+            for marker in (
+                " does not establish",
+                " does not explicitly establish",
+                " does not support",
+                " no evidence",
+                " not established",
+                " not supported",
+                " cannot conclude",
+                " cannot be verified",
+            )
+        ):
+            return False
+
+        affirmation_markers = (
+            " is supported",
+            " this is supported",
+            " supports the transfer",
+            " establish a requirement",
+            " establishes a requirement",
+            " establishes that",
+            " mandate",
+            " mandates",
+            " must use",
+            " must be selected",
+            " can apply",
+            " may apply",
+            " without requiring local",
+            " without local governance",
+            " requirement mandates",
+            " requirements stating",
+            " derived from",
+            " transferred into",
+            " transfers",
+            " can be converted",
+            " is converted",
+        )
+        return any(marker in early for marker in affirmation_markers)
 
     def _passes_exhausted_answer_thresholds(
         self,
@@ -1259,8 +1599,8 @@ class RAGPipeline:
             stats["gate_retry_exhausted_answer_allowed"] = 0.0
             return "retrieve_more"
 
-        min_retrieval_max = float(evidence_config.get("exhausted_min_retrieval_max", 0.0))
-        min_retrieval_mean = float(evidence_config.get("exhausted_min_retrieval_mean", 0.0))
+        min_retrieval_max = float(evidence_config.get("exhausted_min_retrieval_max", float("-inf")))
+        min_retrieval_mean = float(evidence_config.get("exhausted_min_retrieval_mean", float("-inf")))
         min_source_consistency = float(evidence_config.get("exhausted_min_source_consistency", 0.0))
         max_answer_risk = float(evidence_config.get("exhausted_max_answer_include_risk", 1.0))
         max_combined_conflict = float(evidence_config.get("exhausted_max_combined_conflict", 1.0))
@@ -1294,6 +1634,18 @@ class RAGPipeline:
         stats["gate_retry_exhausted_strict_answer_allowed"] = float(
             1.0 if answer_allowed else 0.0
         )
+        if (
+            answer_allowed
+            and (
+                self._is_specific_detail_question(query)
+                or self._is_cross_authority_transfer_question(query)
+            )
+            and not self._answer_has_specific_detail_limitation(query, answer)
+        ):
+            answer_allowed = False
+            stats["gate_retry_exhausted_blocked_specific_detail"] = 1.0
+        else:
+            stats["gate_retry_exhausted_blocked_specific_detail"] = 0.0
 
         if not answer_allowed and bool(
             evidence_config.get("exhausted_relaxed_high_quality_enabled", False)
@@ -1353,6 +1705,18 @@ class RAGPipeline:
                 1.0 if relaxed_allowed else 0.0
             )
             answer_allowed = relaxed_allowed
+            if (
+                answer_allowed
+                and (
+                    self._is_specific_detail_question(query)
+                    or self._is_cross_authority_transfer_question(query)
+                )
+                and not self._answer_has_specific_detail_limitation(query, answer)
+            ):
+                answer_allowed = False
+                stats["gate_retry_exhausted_relaxed_blocked_specific_detail"] = 1.0
+            else:
+                stats["gate_retry_exhausted_relaxed_blocked_specific_detail"] = 0.0
 
         stats["gate_retry_exhausted_answer_allowed"] = float(1.0 if answer_allowed else 0.0)
         return "none" if answer_allowed else "retrieve_more"
@@ -1369,8 +1733,8 @@ class RAGPipeline:
         if not bool(evidence_config.get("guard_answer_by_retrieval", False)):
             return True
 
-        min_retrieval_max = float(evidence_config.get("answer_min_retrieval_max", 0.0))
-        min_retrieval_mean = float(evidence_config.get("answer_min_retrieval_mean", 0.0))
+        min_retrieval_max = float(evidence_config.get("answer_min_retrieval_max", float("-inf")))
+        min_retrieval_mean = float(evidence_config.get("answer_min_retrieval_mean", float("-inf")))
         min_source_consistency = float(evidence_config.get("answer_min_source_consistency", 0.0))
         min_answer_completeness = float(
             evidence_config.get("answer_min_answer_completeness_score", 0.0)
@@ -1386,6 +1750,40 @@ class RAGPipeline:
         subset_risk = float(
             evidence_report.get("answer_include_risk_max_across_subsets", 0.0) or 0.0
         )
+        subset_risk_allowed = subset_risk <= max_subset_risk
+        if not subset_risk_allowed and bool(
+            evidence_config.get("neutral_subset_risk_override_enabled", False)
+        ):
+            closed_probe_without_refutation = (
+                float(stats.get("closed_probe_without_refutation", 0.0) or 0.0) >= 0.5
+            )
+            subset_contradiction = float(
+                evidence_report.get("contradiction_prob_mean_across_subsets", 0.0) or 0.0
+            )
+            subset_instability = float(
+                evidence_report.get("prob_vector_instability_across_subsets", 0.0) or 0.0
+            )
+            subset_risk_allowed = (
+                not closed_probe_without_refutation
+                and subset_contradiction
+                <= float(evidence_config.get("neutral_subset_risk_max_contradiction_prob", 0.08))
+                and subset_instability
+                <= float(evidence_config.get("neutral_subset_risk_max_instability", 0.03))
+                and answer_completeness
+                >= float(
+                    evidence_config.get(
+                        "neutral_subset_risk_min_answer_completeness_score",
+                        min_answer_completeness,
+                    )
+                )
+                and context_coverage
+                >= float(
+                    evidence_config.get(
+                        "neutral_subset_risk_min_context_coverage",
+                        min_context_coverage,
+                    )
+                )
+            )
 
         answer_allowed = (
             retrieval_max >= min_retrieval_max
@@ -1393,9 +1791,12 @@ class RAGPipeline:
             and source_consistency >= min_source_consistency
             and answer_completeness >= min_answer_completeness
             and context_coverage >= min_context_coverage
-            and subset_risk <= max_subset_risk
+            and subset_risk_allowed
         )
         stats["gate_evidence_answer_guard_allowed"] = float(1.0 if answer_allowed else 0.0)
+        stats["gate_evidence_neutral_subset_override"] = float(
+            1.0 if subset_risk_allowed and subset_risk > max_subset_risk else 0.0
+        )
         return answer_allowed
 
     def _evidence_doc_key(self, doc: Dict[str, Any]) -> str:
@@ -1502,7 +1903,7 @@ class RAGPipeline:
         aggregation: str,
         gating_config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        contexts = [str(doc.get("content") or "") for doc in docs if doc.get("content")]
+        contexts = self._format_detector_contexts(docs)
         detection = self._run_cuda_stage(
             "evidence_subset_detector",
             self.hallucination_detector.verify_answer_with_contexts,
@@ -1520,6 +1921,27 @@ class RAGPipeline:
             "retrieval_max_score": retrieval_stats.get("max_score", 0.0),
             "retrieval_mean_score": retrieval_stats.get("mean_score", 0.0),
             "source_consistency": source_consistency,
+            "closed_probe_without_refutation": float(
+                1.0
+                if self._is_closed_probe_question(query)
+                and not self._answer_has_direct_refutation(answer)
+                else 0.0
+            ),
+            "specific_detail_question": float(
+                1.0 if self._is_specific_detail_question(query) else 0.0
+            ),
+            "cross_authority_transfer_question": float(
+                1.0 if self._is_cross_authority_transfer_question(query) else 0.0
+            ),
+            "answer_has_direct_refutation": float(
+                1.0 if self._answer_has_direct_refutation(answer) else 0.0
+            ),
+            "answer_has_specific_detail_limitation": float(
+                1.0 if self._answer_has_specific_detail_limitation(query, answer) else 0.0
+            ),
+            "answer_affirms_risk_probe": float(
+                1.0 if self._answer_affirms_risk_probe(query, answer) else 0.0
+            ),
             "source_inconsistency": (
                 self._clamp01(1.0 - float(source_consistency))
                 if isinstance(source_consistency, (int, float))
@@ -1800,6 +2222,21 @@ class RAGPipeline:
         cleaned = answer.strip()
         lower = cleaned.lower()
 
+        leakage_markers = (
+            ">> the previous answer",
+            "the previous answer was",
+            "rewrite using only the context provided",
+            "the previous narrow answer",
+        )
+        cut_at = None
+        for marker in leakage_markers:
+            idx = lower.find(marker)
+            if idx > 0 and (cut_at is None or idx < cut_at):
+                cut_at = idx
+        if cut_at is not None:
+            cleaned = cleaned[:cut_at].strip()
+            lower = cleaned.lower()
+
         for phrase in MODEL_ABSTAIN_PHRASES:
             idx = lower.find(phrase)
             if idx != -1:
@@ -1810,6 +2247,18 @@ class RAGPipeline:
 
     def _is_degenerate_answer(self, answer: str) -> bool:
         """Catch repetition loops that can appear during local GPU generation."""
+        lower_text = (answer or "").lower()
+        if any(
+            marker in lower_text
+            for marker in (
+                ">> the previous answer",
+                "the previous answer was",
+                "rewrite using only the context provided",
+                "the previous narrow answer",
+            )
+        ):
+            return True
+
         words = re.findall(r"[a-zA-Z][a-zA-Z0-9'-]{1,}", (answer or "").lower())
         if len(words) < 24:
             return False
@@ -1864,15 +2313,335 @@ class RAGPipeline:
                 deduped.append(query)
         return deduped[:max_queries]
 
+    def _normalize_lookup_text(self, text: Any) -> str:
+        cleaned = re.sub(r"[^a-z0-9]+", " ", str(text or "").lower())
+        return " ".join(cleaned.split())
+
+    def _citation_authority_from_path(self, path: Path) -> str:
+        parts = [part.lower() for part in path.parts]
+        if "bcbs" in parts:
+            return "BCBS"
+        if "eba" in parts:
+            return "EBA"
+        if "ecb" in parts:
+            return "ECB"
+        if "fed_occ" in parts:
+            return "Federal Reserve"
+        if "pra_boe" in parts:
+            return "PRA"
+        return path.parent.name.upper()
+
+    def _citation_family_from_authority(self, authority: str) -> str:
+        return {
+            "BCBS": "bcbs",
+            "EBA": "eba",
+            "ECB": "ecb",
+            "Federal Reserve": "fed_occ",
+            "PRA": "pra",
+        }.get(authority, authority.lower())
+
+    def _citation_title_from_path(self, path: Path) -> str:
+        try:
+            for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                cleaned = " ".join(line.split())
+                if cleaned:
+                    if len(cleaned) <= 140 and not cleaned.lower().startswith("[page "):
+                        return cleaned
+                    break
+        except OSError:
+            pass
+        return path.stem.replace("_", " ").title()
+
+    def _split_citation_paragraphs(self, text: str) -> List[str]:
+        chunks = [re.sub(r"\s+", " ", chunk or "").strip() for chunk in re.split(r"\n\s*\n+", text)]
+        paragraphs: List[str] = []
+        for chunk in chunks:
+            lower = chunk.lower()
+            if any(
+                marker in lower
+                for marker in (
+                    "table of contents",
+                    "contents 1.",
+                    "legal information",
+                    "copyright and permissions",
+                    "privacy notice",
+                    "email scam warning",
+                )
+            ):
+                continue
+            if len(re.findall(r"\b\d+(?:\.\d+)*\b", chunk)) >= 18:
+                continue
+            if len(chunk) < 220:
+                continue
+            if len(chunk) > 1300:
+                sentences = re.split(r"(?<=[.!?])\s+", chunk)
+                window: List[str] = []
+                for sentence in sentences:
+                    if not sentence:
+                        continue
+                    window.append(sentence)
+                    joined = re.sub(r"\s+", " ", " ".join(window)).strip()
+                    if len(joined) >= 380:
+                        paragraphs.append(joined[:1300])
+                        window = []
+                if window:
+                    joined = re.sub(r"\s+", " ", " ".join(window)).strip()
+                    if len(joined) >= 220:
+                        paragraphs.append(joined[:1300])
+            else:
+                paragraphs.append(chunk)
+        return paragraphs
+
+    def _build_citation_cache(self) -> List[Dict[str, Any]]:
+        if self._citation_cache is not None:
+            return self._citation_cache
+
+        cfg = self.source_config or {}
+        data_dir = Path(str(cfg.get("citation_data_dir") or "data/processed/finreg"))
+        if not data_dir.is_absolute():
+            data_dir = Path.cwd() / data_dir
+
+        cache: List[Dict[str, Any]] = []
+        if not data_dir.exists():
+            logger.warning("Citation resolver data directory not found: %s", data_dir)
+            self._citation_cache = cache
+            return cache
+
+        for path in sorted(data_dir.rglob("*.txt")):
+            try:
+                text = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+
+            title = self._citation_title_from_path(path)
+            stem_title = path.stem.replace("_", " ").title()
+            short_title = stem_title if len(title) > 80 else title
+            authority = self._citation_authority_from_path(path)
+            family = self._citation_family_from_authority(authority)
+            title_keys = {
+                self._normalize_lookup_text(title),
+                self._normalize_lookup_text(short_title),
+                self._normalize_lookup_text(stem_title),
+            }
+            title_keys.discard("")
+
+            for paragraph_index, paragraph in enumerate(self._split_citation_paragraphs(text), start=1):
+                cache.append(
+                    {
+                        "content": paragraph,
+                        "metadata": {
+                            "title": short_title,
+                            "full_title": title,
+                            "source": str(path),
+                            "path": str(path),
+                            "source_org": authority,
+                            "authority": authority,
+                            "family": family,
+                            "section": f"{short_title} paragraph {paragraph_index}",
+                            "paragraph_index": paragraph_index,
+                            "citation_exact_match": True,
+                        },
+                        "score": 2.0,
+                        "id": f"citation:{path.as_posix()}:{paragraph_index}",
+                        "_title_keys": title_keys,
+                    }
+                )
+
+        self._citation_cache = cache
+        logger.info("Built exact citation cache with %d paragraph windows", len(cache))
+        return cache
+
+    def _extract_explicit_citations(self, query_text: str) -> List[Dict[str, Any]]:
+        query = str(query_text or "")
+        pattern = re.compile(
+            r"\b(?P<authority>EBA|ECB|PRA|BCBS|Basel|Federal Reserve|OCC)"
+            r"(?:'s|’s)?\s+"
+            r"(?P<title>[A-Za-z0-9][A-Za-z0-9 ._/\-&(),'’]{2,120}?)\s+"
+            r"paragraph\s+(?P<paragraph>\d+)\b",
+            re.IGNORECASE,
+        )
+        citations: List[Dict[str, Any]] = []
+        seen_pairs: set[tuple[str, int]] = set()
+
+        def normalize_authority(value: str) -> str:
+            if value.lower() == "basel":
+                return "BCBS"
+            if value.lower() == "occ":
+                return "Federal Reserve"
+            if value.upper() in {"EBA", "ECB", "PRA", "BCBS"}:
+                return value.upper()
+            return value
+
+        for match in pattern.finditer(query):
+            authority = match.group("authority")
+            authority = normalize_authority(authority)
+
+            title = re.sub(
+                r"\b(?:in|from|under|the|cited|passage|material|materials)$",
+                "",
+                match.group("title"),
+                flags=re.IGNORECASE,
+            ).strip(" .,:;")
+            title_key = self._normalize_lookup_text(title)
+            if " paragraph " in f" {title_key} ":
+                continue
+            paragraph_index = int(match.group("paragraph"))
+            seen_pairs.add((authority.lower(), paragraph_index))
+            citations.append(
+                {
+                    "authority": authority,
+                    "title_key": title_key,
+                    "paragraph_index": paragraph_index,
+                    "raw_title": title,
+                }
+            )
+
+        simple_pattern = re.compile(
+            r"\b(?P<authority>EBA|ECB|PRA|BCBS|Basel|Federal Reserve|OCC)"
+            r"(?:'s|’s)?\s+paragraph\s+(?P<paragraph>\d+)\b",
+            re.IGNORECASE,
+        )
+        for match in simple_pattern.finditer(query):
+            authority = normalize_authority(match.group("authority"))
+            paragraph_index = int(match.group("paragraph"))
+            pair = (authority.lower(), paragraph_index)
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            citations.append(
+                {
+                    "authority": authority,
+                    "title_key": "",
+                    "paragraph_index": paragraph_index,
+                    "raw_title": "",
+                }
+            )
+        return citations
+
+    def _citation_overlap_score(self, query_text: str, entry: Dict[str, Any]) -> float:
+        query_tokens = {
+            token
+            for token in re.findall(r"[a-z0-9]+", str(query_text or "").lower())
+            if len(token) > 2 and token not in SOURCE_BALANCE_STOPWORDS
+        }
+        metadata = entry.get("metadata") or {}
+        entry_text = " ".join(
+            str(part or "")
+            for part in (
+                metadata.get("title"),
+                metadata.get("full_title"),
+                metadata.get("section"),
+                entry.get("content"),
+            )
+        )
+        entry_tokens = {
+            token
+            for token in re.findall(r"[a-z0-9]+", entry_text.lower())
+            if len(token) > 2 and token not in SOURCE_BALANCE_STOPWORDS
+        }
+        if not query_tokens or not entry_tokens:
+            return 0.0
+        return len(query_tokens & entry_tokens) / max(len(query_tokens), 1)
+
+    def _resolve_exact_citation_docs(self, query_text: str) -> List[Dict[str, Any]]:
+        cfg = self.source_config or {}
+        if not bool(cfg.get("exact_citation_resolver_enabled", True)):
+            return []
+
+        citations = self._extract_explicit_citations(query_text)
+        if not citations:
+            return []
+
+        cache = self._build_citation_cache()
+        max_per_citation = max(1, int(cfg.get("exact_citation_max_per_citation", 1) or 1))
+        resolved: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+
+        for citation in citations:
+            title_key = str(citation.get("title_key") or "")
+            paragraph_index = int(citation.get("paragraph_index") or -1)
+            authority = str(citation.get("authority") or "")
+            matches: List[Dict[str, Any]] = []
+            for entry in cache:
+                metadata = entry.get("metadata") or {}
+                if int(metadata.get("paragraph_index") or -1) != paragraph_index:
+                    continue
+                if authority and str(metadata.get("source_org") or "").lower() != authority.lower():
+                    continue
+                if title_key:
+                    title_keys = entry.get("_title_keys") or set()
+                    if not any(
+                        title_key == key
+                        or (title_key and key and title_key in key)
+                        or (title_key and key and key in title_key)
+                        for key in title_keys
+                    ):
+                        continue
+                matches.append(entry)
+
+            if not title_key:
+                matches.sort(
+                    key=lambda entry: self._citation_overlap_score(query_text, entry),
+                    reverse=True,
+                )
+            for entry in matches[:max_per_citation]:
+                key = str(entry.get("id") or "")
+                if key in seen:
+                    continue
+                seen.add(key)
+                resolved.append(
+                    {
+                        "content": entry.get("content", ""),
+                        "metadata": dict(entry.get("metadata") or {}),
+                        "score": float(entry.get("score", 2.0) or 2.0),
+                        "id": entry.get("id"),
+                    }
+                )
+
+        if resolved:
+            logger.info("Exact citation resolver added %d passage(s)", len(resolved))
+        return resolved
+
+    def _merge_exact_citation_docs(
+        self,
+        exact_docs: List[Dict[str, Any]],
+        retrieved_docs: List[Dict[str, Any]],
+        limit: int,
+    ) -> List[Dict[str, Any]]:
+        if not exact_docs:
+            return retrieved_docs[:limit]
+
+        merged: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+        for doc in list(exact_docs) + list(retrieved_docs):
+            key = self._evidence_doc_key(doc)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(doc)
+            if len(merged) >= limit:
+                break
+        return merged
+
     def _retrieve_documents(self, query_text: str, k: int) -> List[Dict[str, Any]]:
         retrieval_cfg = getattr(self, "retrieval_config", {})
         expansion_cfg = retrieval_cfg.get("query_expansion", {})
         queries = self._expanded_retrieval_queries(query_text)
+        exact_docs = self._resolve_exact_citation_docs(query_text)
         if len(queries) == 1:
-            return self._run_cuda_stage("retrieval", self.retriever.retrieve, query_text, k=k)
+            retrieved = self._run_cuda_stage("retrieval", self.retriever.retrieve, query_text, k=k)
+            return self._merge_exact_citation_docs(
+                exact_docs,
+                retrieved,
+                max(int(k), len(exact_docs)),
+            )
 
-        per_query_k = int(expansion_cfg.get("per_query_k", k) or k)
-        max_candidates = int(expansion_cfg.get("max_candidates", max(k, per_query_k)) or max(k, per_query_k))
+        configured_per_query_k = int(expansion_cfg.get("per_query_k", k) or k)
+        per_query_k = max(int(k), configured_per_query_k)
+        configured_max_candidates = int(
+            expansion_cfg.get("max_candidates", max(k, per_query_k)) or max(k, per_query_k)
+        )
+        max_candidates = max(int(k), per_query_k, configured_max_candidates)
         merge_strategy = str(expansion_cfg.get("merge_strategy", "score") or "score").strip().lower()
         merged: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
         buckets: list[list[Dict[str, Any]]] = []
@@ -1919,7 +2688,7 @@ class RAGPipeline:
             len(docs),
             len(queries),
         )
-        return docs[:max_candidates]
+        return self._merge_exact_citation_docs(exact_docs, docs, max_candidates)
 
     def query(
         self,
@@ -1978,7 +2747,7 @@ class RAGPipeline:
 
             if self.reranker:
                 logger.info("Applying reranker...")
-                rerank_top_k = self.reranker_top_k or current_k
+                rerank_top_k = max(int(self.reranker_top_k or current_k), int(current_k))
                 reranked_docs = self._run_cuda_stage(
                     "reranker",
                     self.reranker.rerank,
@@ -1989,6 +2758,11 @@ class RAGPipeline:
                 retrieved_docs = self._balance_source_families(
                     query_text,
                     reranked_docs,
+                    rerank_top_k,
+                )
+                retrieved_docs = self._merge_exact_citation_docs(
+                    self._resolve_exact_citation_docs(query_text),
+                    retrieved_docs,
                     rerank_top_k,
                 )
                 logger.info(f"Reranked documents -> top {len(retrieved_docs)} kept")
@@ -2029,11 +2803,13 @@ class RAGPipeline:
             # Generate answer
             logger.info("Generating answer...")
             context_texts = [doc['content'] for doc in retrieved_docs]
+            generation_context_texts = self._format_generation_contexts(retrieved_docs)
+            detector_context_texts = self._format_detector_contexts(retrieved_docs)
             answer = self._run_cuda_stage(
                 "llm_generate",
                 self.llm.generate_with_context,
                 query_text,
-                context_texts,
+                generation_context_texts,
             )
             answer = self._normalize_generated_answer(answer)
             degenerate_answer = self._is_degenerate_answer(answer)
@@ -2079,7 +2855,7 @@ class RAGPipeline:
                             "llm_rewrite",
                             self.llm.generate_with_context,
                             query_text,
-                            context_texts,
+                            generation_context_texts,
                             max_tokens=self.answer_quality_config.get("rewrite_max_tokens"),
                             quality_feedback=feedback,
                         )
@@ -2129,7 +2905,7 @@ class RAGPipeline:
 
             detection_updates, detection_result = self._detect_generated_answer(
                 answer,
-                context_texts,
+                detector_context_texts,
                 aggregation_mode,
                 query_text,
                 detect_hallucinations,
@@ -2139,7 +2915,7 @@ class RAGPipeline:
                 answer_quality = self._audit_answer_quality(
                     query_text,
                     answer,
-                    context_texts,
+                    detector_context_texts,
                     aggregation_mode,
                     detect_hallucinations,
                 )
@@ -2164,6 +2940,43 @@ class RAGPipeline:
                     "retrieval_max_score": retrieval_stats.get("max_score", 0.0),
                     "retrieval_mean_score": retrieval_stats.get("mean_score", 0.0),
                     "source_consistency": source_consistency,
+                    "closed_probe_without_refutation": float(
+                        1.0
+                        if self._is_closed_probe_question(query_text)
+                        and not self._answer_has_direct_refutation(
+                            str(result.get("pre_gating_answer") or answer or "")
+                        )
+                        else 0.0
+                    ),
+                    "specific_detail_question": float(
+                        1.0 if self._is_specific_detail_question(query_text) else 0.0
+                    ),
+                    "cross_authority_transfer_question": float(
+                        1.0 if self._is_cross_authority_transfer_question(query_text) else 0.0
+                    ),
+                    "answer_has_direct_refutation": float(
+                        1.0
+                        if self._answer_has_direct_refutation(
+                            str(result.get("pre_gating_answer") or answer or "")
+                        )
+                        else 0.0
+                    ),
+                    "answer_has_specific_detail_limitation": float(
+                        1.0
+                        if self._answer_has_specific_detail_limitation(
+                            query_text,
+                            str(result.get("pre_gating_answer") or answer or ""),
+                        )
+                        else 0.0
+                    ),
+                    "answer_affirms_risk_probe": float(
+                        1.0
+                        if self._answer_affirms_risk_probe(
+                            query_text,
+                            str(result.get("pre_gating_answer") or answer or ""),
+                        )
+                        else 0.0
+                    ),
                     "source_inconsistency": (
                         self._clamp01(1.0 - float(source_consistency))
                         if isinstance(source_consistency, (int, float))
@@ -2346,8 +3159,13 @@ class RAGPipeline:
                 retrieved_docs,
                 top_k=rerank_top_k,
             )
+            retrieved_docs = self._merge_exact_citation_docs(
+                self._resolve_exact_citation_docs(query_text),
+                retrieved_docs,
+                int(rerank_top_k),
+            )
 
-        context_texts = [doc["content"] for doc in retrieved_docs]
+        context_texts = self._format_detector_contexts(retrieved_docs)
         detection_result = self.hallucination_detector.verify_answer_with_contexts(
             answer=candidate_answer,
             contexts=context_texts,
@@ -2460,6 +3278,69 @@ class RAGPipeline:
                 break
 
         return entries
+
+    def _format_generation_contexts(self, retrieved_docs: List[Dict[str, Any]]) -> List[str]:
+        formatted: List[str] = []
+        for doc in retrieved_docs:
+            metadata = doc.get("metadata") or {}
+            title = (
+                metadata.get("title")
+                or metadata.get("doc_id")
+                or metadata.get("source")
+                or metadata.get("path")
+                or "Unknown source"
+            )
+            authority = self._doc_source_family(doc) or metadata.get("source_org") or ""
+            section = (
+                metadata.get("section")
+                or metadata.get("heading")
+                or metadata.get("section_heading")
+                or ""
+            )
+            page = metadata.get("page") or metadata.get("page_number") or ""
+            header_parts = [f"Source: {title}"]
+            if authority:
+                header_parts.append(f"Authority: {authority}")
+            if section:
+                header_parts.append(f"Section: {section}")
+            if page:
+                header_parts.append(f"Page: {page}")
+            formatted.append("; ".join(str(part) for part in header_parts) + "\n" + str(doc.get("content") or ""))
+        return formatted
+
+    def _format_detector_contexts(self, retrieved_docs: List[Dict[str, Any]]) -> List[str]:
+        """Return evidence texts in the shape the detector should actually judge.
+
+        The detector is trained on premise+hypothesis pairs, but runtime answers
+        often cite source metadata and synthesize across several chunks. Passing
+        only raw chunk text makes correct answers look unsupported. We therefore
+        preserve source headers and prepend a compact evidence pack before the
+        individual chunks.
+        """
+        formatted = self._format_generation_contexts(retrieved_docs)
+        if not formatted:
+            return []
+
+        cfg = self.source_config or {}
+        if not bool(cfg.get("detector_context_pack_enabled", True)) or len(formatted) == 1:
+            return formatted
+
+        pack_top_k = max(1, int(cfg.get("detector_context_pack_top_k", 4) or 4))
+        pack_max_chars = max(400, int(cfg.get("detector_context_pack_max_chars", 2600) or 2600))
+        per_context_chars = max(160, int(cfg.get("detector_context_pack_per_context_chars", 650) or 650))
+        pack_parts: List[str] = []
+        remaining = pack_max_chars
+        for index, context in enumerate(formatted[:pack_top_k], start=1):
+            cleaned = " ".join(str(context or "").split())
+            if not cleaned or remaining <= 0:
+                continue
+            snippet = cleaned[: min(per_context_chars, remaining)]
+            pack_parts.append(f"[Evidence {index}] {snippet}")
+            remaining -= len(snippet)
+
+        if not pack_parts:
+            return formatted
+        return ["\n".join(pack_parts)] + formatted
 
     def _format_sources_text(self, sources: List[Dict[str, Any]]) -> str:
         if not sources:

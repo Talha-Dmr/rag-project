@@ -1,0 +1,25 @@
+{
+  "total_questions": 160,
+  "category_distribution": {
+    "cross_source_nuanced": 72,
+    "factual_supported": 16,
+    "false_premise": 32,
+    "low_evidence_policy": 40
+  },
+  "challenge_distribution": {
+    "assertive_cross_authority_transfer": 72,
+    "assertive_unsupported_detail_request": 16,
+    "fabricated_requirement_acceptance": 32,
+    "partial_support_misleading_inference": 24,
+    "supported_sanity": 16
+  },
+  "unique_queries": 160,
+  "duplicate_queries": [],
+  "near_duplicate_examples": [],
+  "missing_paths": [],
+  "missing_evidence_text_rows": [],
+  "exact_forbidden_claims_present_in_corpus": [],
+  "strict_caution_required_count": 144,
+  "min_expected_points": 5,
+  "max_expected_points": 8
+}

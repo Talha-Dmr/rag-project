@@ -316,6 +316,9 @@ class HuggingFaceLLM(BaseLLM):
         context_text = "\n\n".join([f"Document {i+1}:\n{doc}" for i, doc in enumerate(context)])
         system_message = (
             "You are a careful financial-regulation RAG assistant. "
+            "Preserve regulator names and acronyms exactly as written in the question and sources: "
+            "BCBS, EBA, ECB, PRA, Federal Reserve, OCC, and Bank of England. "
+            "Never rename these authorities, never translate them, and never output non-English text. "
             "Use only the provided context. If the answer is not in the context, "
             "say: \"I don't know based on the provided context.\" "
             "If the question asks for a specific rule, deadline, threshold, portal, "
@@ -324,10 +327,17 @@ class HuggingFaceLLM(BaseLLM):
             "approval, portal, or threshold, explicitly state that the specific item is not "
             "established and do not replace it with a broad regulatory discussion. "
             "If the evidence is incomplete or mixed, say what is supported and what is not established. "
+            "When the question cites specific paragraphs, prioritize those exact cited passages and do not "
+            "broaden the answer merely from the document title or nearby unrelated context. "
+            "Do not change cited paragraph numbers; repeat the paragraph number from the question exactly, "
+            "or omit the number if it is not needed. "
             "For broad what/how/main-elements questions, cover all distinct supported elements "
             "that are relevant to the question instead of giving only one narrow example. "
             "When the question asks for areas, controls, capabilities, responsibilities, or how several "
             "items fit together, explicitly address each named item from the question when the context supports it. "
+            "For BCBS risk data aggregation and risk reporting questions, preserve the BCBS 239 name exactly "
+            "and include concrete governance, board, management, data-quality, technology, and supervisory-review "
+            "details when those details appear in the context. "
             "For risk-management lifecycle questions, cover supported identify/assess or measure, "
             "manage or mitigate, monitor or report, and governance elements. "
             "For ICT or security risk questions, cover supported identify, protect, detect, respond, "
@@ -379,6 +389,7 @@ class HuggingFaceLLM(BaseLLM):
         answer = self.generate(prompt, max_tokens=max_tokens, temperature=temperature)
         answer = self._strip_role_leaks(answer)
         answer = self._strip_unrelated_tail(answer)
+        answer = self._normalize_finreg_names(query, answer)
 
         # Post-process to drop prompt-injection or extra roles
         for marker in [
@@ -404,6 +415,65 @@ class HuggingFaceLLM(BaseLLM):
                 answer = answer.split(marker, 1)[0].strip()
 
         return answer
+
+    def _normalize_finreg_names(self, query: str, answer: str) -> str:
+        if not answer:
+            return answer
+
+        query_upper = (query or "").upper()
+        cleaned = answer
+
+        if "PRA" in query_upper:
+            replacements = {
+                r"\bPRC\b": "PRA",
+                r"\bPRAWITHDRAWN\b": "PRA",
+                r"\bPRAW\b": "PRA",
+                r"\bPrudential Regulation Committee\b": "Prudential Regulation Authority",
+                r"\bPrudentialRegulatorAuthority\b": "Prudential Regulation Authority",
+                r"\bPrudential Regulation Authorities\b": "Prudential Regulation Authority",
+            }
+            for pattern, value in replacements.items():
+                cleaned = re.sub(pattern, value, cleaned)
+
+        if "EBA" in query_upper:
+            replacements = {
+                r"\bEAB\b": "EBA",
+                r"\bEBS\b": "EBA",
+                r"\bEMA\b": "EBA",
+                r"\bEFA\b": "EBA",
+                r"\bEBR\b": "EBA",
+                r"\bEuropean Banking Authorty\b": "European Banking Authority",
+            }
+            for pattern, value in replacements.items():
+                cleaned = re.sub(pattern, value, cleaned)
+
+        if "BCBS" in query_upper:
+            replacements = {
+                r"\bBCFS\b": "BCBS",
+                r"\bBCPS\b": "BCBS",
+                r"\bBasele Committee\b": "Basel Committee",
+                r"\bBankING Supervision\b": "Banking Supervision",
+                r"\bBankingSupervision\b": "Banking Supervision",
+                r"\bPrinciples?\s+238\s+and\s+234\b": "BCBS 239 principles",
+                r"\bPrinciples?\s+238\b": "BCBS 239 principles",
+                r"\bPrinciples?\s+234\b": "BCBS 239 principles",
+                r"\bBCBS\s+238\b": "BCBS 239",
+                r"\bBCBS\s+234\b": "BCBS 239",
+            }
+            for pattern, value in replacements.items():
+                cleaned = re.sub(pattern, value, cleaned)
+
+        cleaned = cleaned.replace("风险管理", "risk management")
+        cleaned = cleaned.replace("FederalReserve", "Federal Reserve")
+        cleaned = cleaned.replace("Federal reserve", "Federal Reserve")
+        cleaned = cleaned.replace("The Eba ", "The EBA ")
+        cleaned = cleaned.replace("the Eba ", "the EBA ")
+        cleaned = cleaned.replace("financialrisk", "financial risk")
+        cleaned = cleaned.replace("riskmanagement", "risk management")
+        cleaned = cleaned.replace("supervisoryapproval", "supervisory approval")
+        cleaned = cleaned.replace("operationalresilience", "operational resilience")
+        cleaned = cleaned.replace("third-parties", "third-party")
+        return cleaned
 
     def _strip_role_leaks(self, answer: str) -> str:
         if not answer:
@@ -455,6 +525,10 @@ class HuggingFaceLLM(BaseLLM):
         )
 
         tail_patterns = [
+            r"\s*>>\s*The previous answer\b",
+            r"\bThe previous answer was\b",
+            r"\bRewrite using only the context provided\b",
+            r"\bThe previous narrow answer\b",
             r"\bQuestion:\s",
             r"\bANSWER:\s",
             r"\bTo address this prompt,?\b",

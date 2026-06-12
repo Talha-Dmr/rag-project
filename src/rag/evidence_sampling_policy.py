@@ -6,6 +6,7 @@ scripts and the runtime pipeline can use the same decision rules.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from src.rag.stochastic_epistemic_adapter import compute_epistemic_adapter
@@ -39,6 +40,139 @@ def _is_low_evidence_probe(text: str) -> bool:
     )
 
 
+def _is_specific_detail_probe(text: str) -> bool:
+    query = f" {(text or '').strip().lower()} "
+    return any(
+        marker in query
+        for marker in (
+            "audit sampling",
+            "automatic penalty",
+            "board paper",
+            "calendar-day",
+            "color code",
+            "column layout",
+            "committee meeting frequency",
+            "control owners",
+            "email address",
+            "does not specify",
+            "exact ",
+            "fixed ",
+            "form identifier",
+            "mandatory ",
+            "meeting frequency",
+            "minimum number",
+            "named ",
+            "notice wording",
+            "numeric ",
+            "percentage",
+            "precise ",
+            "universal ",
+            "specific ",
+            "requirement ",
+            "requires ",
+            "required ",
+            "required audit",
+            "required numeric",
+            "required spreadsheet",
+            "single escalation",
+            "supervisor's email",
+            "needed for every",
+            "for every ",
+            "means that ",
+            "portal",
+            "deadline",
+            "threshold",
+            "template",
+            "certification",
+            "certificate",
+            "approval",
+            "approval workflow",
+            "software product",
+            "public disclosure",
+            "is mandatory",
+            "are mandatory",
+            "mandatory for",
+            "include the requirement",
+            "source rationale",
+            "implied by",
+            "checklist item",
+            "converted into",
+            "treated as evidence",
+        )
+    )
+
+
+def _is_cross_authority_transfer_probe(text: str) -> bool:
+    query = f" {(text or '').strip().lower()} "
+    authority_mentions = sum(
+        1
+        for marker in (
+            " eba",
+            " ecb",
+            " pra",
+            " bcbs",
+            " basel",
+            " federal reserve",
+            " occ",
+        )
+        if marker in query
+    )
+    transfer_markers = (
+        " as supporting context",
+        " cross-authority",
+        " cross authority",
+        " evidence establishes",
+        " evidence into",
+        " evidence supports that transfer",
+        " inherit this claim",
+        " inherits this claim",
+        " source-transfer",
+        " source transfer",
+        " transfer",
+        " transfers",
+        " proves that",
+        " can be used to conclude",
+        " used to conclude",
+        " used to create",
+        " justify this sentence under",
+        " obligation that",
+        " requirement saying that",
+    )
+    strong_transfer_markers = (
+        " inherit this claim",
+        " inherits this claim",
+        " evidence establishes",
+        " evidence into",
+        " source-transfer",
+        " source transfer",
+        " transfer",
+        " transfers",
+        " proves that",
+        " can be used to conclude",
+        " used to conclude",
+        " used to create",
+    )
+    requirement_markers = (
+        " obligation ",
+        " requires ",
+        " requirement ",
+        " mandatory ",
+        " must ",
+        " allowed only",
+        " can ignore",
+        " may apply",
+        " is supported by the two passages",
+    )
+    return (
+        authority_mentions >= 2
+        and any(marker in query for marker in transfer_markers)
+        and (
+            any(marker in query for marker in requirement_markers)
+            or any(marker in query for marker in strong_transfer_markers)
+        )
+    )
+
+
 def _has_direct_refutation(text: str) -> bool:
     answer = f" {(text or '').strip().lower()} "
     markers = (
@@ -57,9 +191,146 @@ def _has_direct_refutation(text: str) -> bool:
         " not stated ",
         " not establish ",
         " does not establish ",
+        " does not support ",
+        " do not support ",
+        " cannot be converted into ",
+        " cannot be directly converted ",
+        " cannot be treated as ",
+        " cannot be verified ",
+        " does not discuss ",
+        " do not discuss ",
+        " not verifiable ",
+        " i don't see ",
+        " i do not see ",
         " not supported ",
     )
     return any(marker in answer for marker in markers)
+
+
+def _has_specific_detail_limitation(query: str, answer: str) -> bool:
+    answer_lower = f" {(answer or '').strip().lower()} "
+    if not _has_direct_refutation(answer_lower):
+        return False
+
+    strict_limitation_markers = (
+        " not established",
+        " does not establish",
+        " not specified",
+        " not specify",
+        " does not specify",
+        " do not specify",
+        " doesn't specify",
+        " not stated",
+        " not mentioned",
+        " not mandated",
+        " not required",
+        " no explicit",
+        " not explicit",
+        " not explicitly",
+        " no evidence",
+        " not supported",
+        " does not support",
+        " do not support",
+        " cannot be converted into",
+        " cannot be directly converted",
+        " cannot be treated as",
+        " cannot be verified",
+        " does not discuss",
+        " do not discuss",
+        " cannot determine",
+        " cannot conclude",
+        " not verifiable",
+        " i don't see",
+        " i do not see",
+        " don't know based on the provided context",
+        " do not know based on the provided context",
+    )
+    if any(marker in answer_lower for marker in strict_limitation_markers):
+        return True
+
+    query_lower = f" {(query or '').strip().lower()} "
+    detail_terms = (
+        "portal",
+        "deadline",
+        "threshold",
+        "template",
+        "certification",
+        "certificate",
+        "approval",
+        "audit sampling",
+        "automatic penalty",
+        "board paper",
+        "calendar-day",
+        "color code",
+        "column layout",
+        "committee",
+        "control owner",
+        "email address",
+        "form identifier",
+        "meeting frequency",
+        "minimum number",
+        "named",
+        "notice wording",
+        "numeric",
+        "percentage",
+        "precise",
+        "software product",
+        "vendor",
+        "public disclosure",
+        "cloud",
+        "global",
+    )
+    query_terms = [term for term in detail_terms if term in query_lower]
+    return bool(query_terms) and any(term in answer_lower for term in query_terms)
+
+
+def _answer_affirms_risk_probe(query: str, answer: str) -> bool:
+    if not (_is_specific_detail_probe(query) or _is_cross_authority_transfer_probe(query)):
+        return False
+
+    answer_lower = f" {(answer or '').strip().lower()} "
+    if not answer_lower.strip():
+        return False
+    early = re.split(r"\b(?:however|but|although|nevertheless)\b", answer_lower, maxsplit=1)[0]
+    if any(
+        marker in early
+        for marker in (
+            " does not establish",
+            " does not explicitly establish",
+            " does not support",
+            " no evidence",
+            " not established",
+            " not supported",
+            " cannot conclude",
+            " cannot be verified",
+        )
+    ):
+        return False
+
+    affirmation_markers = (
+        " is supported",
+        " this is supported",
+        " supports the transfer",
+        " establish a requirement",
+        " establishes a requirement",
+        " establishes that",
+        " mandate",
+        " mandates",
+        " must use",
+        " must be selected",
+        " can apply",
+        " may apply",
+        " without requiring local",
+        " without local governance",
+        " requirement mandates",
+        " requirements stating",
+        " derived from",
+        " transferred into",
+        " transfers",
+        " can be converted",
+        " is converted",
+    )
+    return any(marker in early for marker in affirmation_markers)
 
 
 def _clamp01(value: float) -> float:
@@ -283,6 +554,14 @@ def decide_policy(row: dict[str, Any], policy: str) -> tuple[str, str]:
                 return baseline, "baseline_non_answer_vector_confirmed"
             return baseline, "baseline_non_answer_preserved"
 
+        open_synthesis_query = not _is_closed_probe(query) and not _is_low_evidence_probe(query)
+        if (
+            open_synthesis_query
+            and contradiction_mean <= 0.08
+            and vector_instability <= 0.03
+        ):
+            return baseline, "open_synthesis_neutral_without_contradiction"
+
         if non_answer_rate >= 0.50:
             return "retrieve_more", "subset_non_answer_majority"
         if non_answer_rate >= 0.20 and vector_risk >= 0.76:
@@ -296,6 +575,94 @@ def decide_policy(row: dict[str, Any], policy: str) -> tuple[str, str]:
         if vector_instability >= 0.05 and risk_max >= 0.82:
             return "retrieve_more", "unstable_probability_vector"
         return baseline, "vector_stable_or_insufficient_signal"
+
+    if policy == "vector_v4":
+        # Evidence-consensus policy:
+        # open supported questions can override an overly conservative detector
+        # when sampled evidence is stable, while specific-detail probes require
+        # an explicit limitation or abstention.
+        closed_probe = _is_closed_probe(query)
+        cross_authority_transfer_probe = _is_cross_authority_transfer_probe(query)
+        low_evidence_probe = (
+            _is_low_evidence_probe(query)
+            or _is_specific_detail_probe(query)
+            or cross_authority_transfer_probe
+        )
+        closed_without_refutation = closed_probe and not _has_direct_refutation(answer)
+        not_included_mass = _clamp01(neutral_mean + contradiction_mean)
+        vector_risk = _vector_answer_risk(row)
+        answer_completeness = _float(row, "answer_completeness_score_mean_across_subsets", 1.0)
+        context_coverage = _float(row, "context_coverage_mean_across_subsets", 1.0)
+        open_supported_probe = not closed_probe and not low_evidence_probe
+        stable_supported_evidence = (
+            answer_rate >= 0.60
+            and contradiction_mean <= 0.08
+            and vector_instability <= 0.06
+            and answer_completeness >= 0.40
+            and context_coverage >= 0.40
+        )
+        strong_supported_evidence = (
+            answer_rate >= 0.75
+            and support_mean >= 0.18
+            and contradiction_mean <= 0.10
+            and risk_max <= 0.92
+        )
+        risk_probe_affirmed = (
+            (_is_specific_detail_probe(query) or cross_authority_transfer_probe)
+            and _answer_affirms_risk_probe(query, answer)
+        )
+
+        if canonical_action(baseline) != "answer":
+            if risk_probe_affirmed:
+                return baseline, "risk_probe_affirmation_preserves_non_answer"
+            if open_supported_probe and (stable_supported_evidence or strong_supported_evidence):
+                return "none", "stable_evidence_overrides_conservative_detector"
+            if (
+                low_evidence_probe
+                and _has_specific_detail_limitation(query, answer)
+                and contradiction_mean <= 0.12
+            ):
+                return "none", "explicit_limitation_overrides_conservative_detector"
+            if (
+                not low_evidence_probe
+                and _has_direct_refutation(answer)
+                and contradiction_mean <= 0.08
+                and not_included_mass <= 0.92
+            ):
+                return "none", "safe_refutation_overrides_conservative_detector"
+            if non_answer_rate >= 0.50 or vector_risk >= 0.74:
+                return baseline, "baseline_non_answer_evidence_confirmed"
+            return baseline, "baseline_non_answer_preserved"
+
+        if low_evidence_probe:
+            if cross_authority_transfer_probe and not _has_specific_detail_limitation(query, answer):
+                return "retrieve_more", "cross_authority_transfer_without_limitation"
+            if _has_specific_detail_limitation(query, answer):
+                return baseline, "specific_detail_limited_answer"
+            if vector_risk >= 0.58 or not_included_mass >= 0.70 or support_mean <= 0.25:
+                return "retrieve_more", "specific_detail_without_limitation"
+
+        if risk_probe_affirmed:
+            return "retrieve_more", "risk_probe_affirmed_claim"
+
+        if closed_without_refutation and (
+            contradiction_mean >= 0.05
+            or not_included_mass >= 0.68
+            or vector_risk >= 0.58
+        ):
+            return "abstain", "closed_probe_without_refutation_vector_v4"
+
+        if non_answer_rate >= 0.60:
+            return "retrieve_more", "subset_non_answer_supermajority"
+        if non_answer_rate >= 0.30 and vector_risk >= 0.70:
+            return "retrieve_more", "partial_subset_non_answer_vector_v4"
+        if vector_risk >= 0.82 and entailment_mean <= 0.14 and not_included_mass >= 0.84:
+            return "retrieve_more", "low_entailment_not_included_vector_v4"
+        if contradiction_mean >= 0.14 and support_mean <= 0.35:
+            return "retrieve_more", "soft_contradiction_vector_v4"
+        if open_supported_probe and contradiction_mean <= 0.08 and vector_instability <= 0.06:
+            return baseline, "open_supported_stable_vector_v4"
+        return baseline, "vector_v4_stable_or_insufficient_signal"
 
     if policy in {"adapter_evidence_instability", "evidence_instability_v1"}:
         score = _adapter_score(row, "evidence_instability")

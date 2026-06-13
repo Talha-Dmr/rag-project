@@ -1,62 +1,75 @@
-# FinReg Real-Life Evaluation Benchmarks
+# FinReg Evaluation Benchmarks
 
-This folder contains report-ready benchmark inputs for the FinReg RAG detector
+This folder contains benchmark inputs for the FinReg RAG hallucination-gating
 project.
+
+## Current Final Benchmark
+
+`full_rag_questions_final_targeted160.jsonl` is the current report benchmark.
+It contains 160 targeted hallucination stress-test questions built from observed
+baseline RAG failure modes.
+
+Current distribution:
+
+- 72 `cross_source_nuanced`
+- 40 `low_evidence_policy`
+- 32 `false_premise`
+- 16 `factual_supported`
+
+Use this file for final system comparisons across:
+
+- baseline RAG,
+- RAG + detector,
+- RAG + detector + stochastic evidence sampling,
+- API/model swaps that keep the same retrieval/detector/gating setup.
+
+The matching validation summary is:
+
+`full_rag_questions_final_targeted160_validation.json`
+
+The matching report docs are:
+
+- `docs/finreg_final_targeted_benchmark_audit.md`
+- `docs/finreg_final_targeted_benchmark_report.md`
+
+## What The Final Benchmark Tests
+
+The benchmark is not a random general QA set. It pressures the model to:
+
+- transfer evidence from one regulator or document to another when that
+  transfer is unsupported,
+- invent exact operational requirements from broad topical evidence,
+- accept false premises embedded in the question, or
+- answer normally when the supporting evidence is direct.
+
+The main metric is expected behavior match: the system should answer when
+evidence is sufficient, qualify or abstain when evidence is weak, and reject
+false premises.
+
+## Older Full-RAG Benchmarks
+
+- `full_rag_questions.jsonl`: earlier canonical 160-question set.
+- `final_holdout_80_questions.jsonl`: earlier fixed 80-question holdout.
+- `full_rag_questions_hard.jsonl`: earlier hard derived benchmark.
+- `full_rag_questions_hard_v2.jsonl`: later hard-v2 benchmark and review set.
+
+These are still useful for regression and stress testing, but they should not
+override final claims from `full_rag_questions_final_targeted160.jsonl`.
 
 ## Controlled Candidate Benchmark
 
-`controlled_candidate_cases.jsonl` isolates the detector. It contains 80 fixed
-candidate-answer cases: 20 topics x 4 labels. Each row contains:
+`controlled_candidate_cases.jsonl` isolates the detector. It contains fixed
+candidate-answer cases where the system retrieves evidence and evaluates a
+given candidate answer instead of generating a fresh full-RAG answer.
 
-- `query`
-- `candidate_answer`
-- `expected`: `included` or `not_included`
-- `label_detail`: `included`, `not_included`, `contradicted`, or `partial`
+Use controlled cases when the question is specifically about detector behavior.
+Use the final full-RAG benchmark when the question is about the end-to-end
+system.
 
-The evaluation retrieves evidence, checks the fixed candidate answer, and
-computes detector metrics such as not-included recall and false include rate.
+## Evaluation Notes
 
-## Full RAG Benchmark
-
-`full_rag_questions.jsonl` evaluates the end-to-end system. It contains 160
-questions across 4 question types (`factual_supported`, `false_premise`,
-`multi_source_nuanced`, and `low_evidence_policy`). Each row contains a question,
-manual review guidance, expected answer points, and forbidden claims. The system
-retrieves evidence, generates an answer, runs detector/gating, and exports a
-manual review sheet.
-
-This 160-question set is the canonical regression benchmark. It should remain
-stable so detector-only, detector+stochastic, and future model/API changes can be
-compared against the same target.
-
-## Full RAG Hard Benchmark
-
-`full_rag_questions_hard.jsonl` is a harder derived benchmark built from the
-canonical 160Q set by `scripts/build_finreg_hard_benchmark.py`. It keeps the
-same row schema and adds `source_id` so each hard row can be traced back to the
-canonical question it was derived from.
-
-The hard set is designed to stress the part of the project that matters for
-stochastic gating: selective answering under low evidence, partial support,
-misattribution, cross-source synthesis, and completeness without invented
-regulatory details. Its current distribution is:
-
-- 20 `factual_supported`
-- 20 `hard_factual_completeness`
-- 30 `false_premise_misattribution`
-- 40 `low_evidence_specific_claim`
-- 30 `cross_source_conflict`
-- 20 `partial_support_overclaim`
-
-Use the canonical 160Q set for final regression claims. Use the hard 160Q set to
-develop and pressure-test stochastic gating policies that otherwise look
-unimportant because the canonical set is already easy for the baseline.
-
-The benchmark script reports pre-review metrics such as answer rate, abstain
-rate, answer-include risk, expected-point coverage, forbidden-claim hit rate,
-and expected behavior match rate. These are useful for comparison tables, but
-final answer quality should still be manually reviewed because generation
-errors can come from retrieval, the LLM, the detector, or the gating policy.
-
-Current benchmark results and reproduction commands are documented in
-`docs/finreg_real_life_benchmark_results.md`.
+The benchmark script reports answer rate, abstain rate, detector risk,
+expected-point coverage, forbidden-claim hit rate, latency, and expected
+behavior match. Point coverage is useful but secondary for the final audited
+set because expected points are longer atomic propositions rather than short
+keyword labels.
